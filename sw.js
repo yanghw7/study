@@ -1,4 +1,4 @@
-const CACHE = 'gongbujang-merge-v6';
+const CACHE = 'gongbujang-v9-final-1';
 const APP_SHELL = [
   '/',
   '/index.html',

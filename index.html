@@ -715,26 +715,11 @@ function periodStartDT(p){ return combineDT(p.startDate, p.startTime); }
 function periodEndDT(p){ return combineDT(p.endDate, p.endTime); }
 
 
-// ---------- v8: 기기간 타이머 시계 보정 ----------
-// Supabase가 발급한 새 access token의 iat(서버 발급 시각)를 이용해
-// 이 기기의 로컬 시계와 서버 시계 차이를 추정한다.
-// 타이머 초 카운트는 serverNowMs() 기준으로 계산한다.
-let serverClockOffsetMs = 0;       // server time - local time
+// ---------- v9 FINAL: Supabase 서버 시간 보정 ----------
+let serverClockOffsetMs = 0;
 let serverClockCalibrated = false;
 let serverClockLastCalibratedAt = 0;
 let serverClockCalibrationBusy = false;
-
-function decodeJwtPayload(token){
-  try{
-    const part = String(token || '').split('.')[1];
-    if(!part) return null;
-    const normalized = part.replace(/-/g,'+').replace(/_/g,'/');
-    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
-    return JSON.parse(decodeURIComponent(Array.prototype.map.call(
-      atob(padded), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-    ).join('')));
-  }catch(e){ return null; }
-}
 
 function serverNowMs(){
   return Date.now() + (serverClockCalibrated ? serverClockOffsetMs : 0);
@@ -742,53 +727,42 @@ function serverNowMs(){
 
 async function calibrateServerClock(force=false){
   if(serverClockCalibrationBusy || !sbClient || !cloudUser) return serverClockOffsetMs;
-  if(!force && serverClockCalibrated && (Date.now() - serverClockLastCalibratedAt) < 5*60*1000){
+  if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 60000){
     return serverClockOffsetMs;
   }
+
   serverClockCalibrationBusy = true;
   try{
+    // 왕복 요청의 중간 시각을 사용해 네트워크 지연을 반으로 보정한다.
     const t0 = Date.now();
-    const {data,error} = await sbClient.auth.refreshSession();
+    const {data,error} = await sbClient.rpc('server_now');
     const t1 = Date.now();
-    if(error || !data?.session?.access_token) return serverClockOffsetMs;
-    const payload = decodeJwtPayload(data.session.access_token);
-    const iat = Number(payload?.iat);
-    if(!Number.isFinite(iat) || iat <= 0) return serverClockOffsetMs;
+    if(error) throw error;
 
-    // JWT iat는 초 단위이므로 그 초의 중앙(+500ms)을 사용하고,
-    // 왕복 네트워크 시간은 로컬 t0/t1의 중간값으로 보정한다.
-    const estimatedServerMs = iat * 1000 + 500;
-    const localMidpoint = (t0 + t1) / 2;
-    const candidate = estimatedServerMs - localMidpoint;
+    const serverMs = Date.parse(data);
+    if(!Number.isFinite(serverMs)) throw new Error('서버 시간을 읽지 못했습니다.');
 
-    if(Number.isFinite(candidate)){
-      serverClockOffsetMs = Math.round(candidate);
-      serverClockCalibrated = true;
-      serverClockLastCalibratedAt = Date.now();
-      try{ sessionStorage.setItem('gongbujang:serverClockOffsetMs', String(serverClockOffsetMs)); }catch(e){}
-      updateStudyTimer();
-      if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
-    }
+    serverClockOffsetMs = Math.round(serverMs - ((t0 + t1) / 2));
+    serverClockCalibrated = true;
+    serverClockLastCalibratedAt = Date.now();
+
+    updateStudyTimer();
+    if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
   }catch(e){
-    console.warn('서버 시계 보정 실패:', e);
+    console.warn('Supabase 서버 시계 보정 실패:', e);
   }finally{
     serverClockCalibrationBusy = false;
   }
   return serverClockOffsetMs;
 }
 
-try{
-  const cachedOffset = Number(sessionStorage.getItem('gongbujang:serverClockOffsetMs'));
-  if(Number.isFinite(cachedOffset)){
-    serverClockOffsetMs = cachedOffset;
-    serverClockCalibrated = true;
-  }
-}catch(e){}
-
-// 장시간 켜 둔 경우의 시계 drift를 보정하고, 앱/탭 복귀 시 다시 맞춘다.
-setInterval(()=>{ if(cloudUser) calibrateServerClock(false); }, 5*60*1000);
+// 1분마다 재보정하고, 화면으로 돌아올 때 즉시 다시 맞춘다.
+setInterval(()=>{ if(cloudUser) calibrateServerClock(false); }, 60000);
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && cloudUser) calibrateServerClock(true);
+  if(document.visibilityState === 'visible' && cloudUser){
+    calibrateServerClock(true);
+    if(typeof syncActiveTimerFromCloud === 'function') syncActiveTimerFromCloud(true);
+  }
 });
 
 
@@ -839,6 +813,52 @@ function updateStudyTimer(){
   box.classList.toggle('running', !!info.running);
 }
 setInterval(updateStudyTimer, 250);
+
+
+// ---------- v9 FINAL: Android APK 알림 브리지 ----------
+// 일반 브라우저/PWA에서는 window.AndroidTimer가 없으므로 아무 동작도 하지 않는다.
+let lastAndroidTimerKey = '';
+function syncAndroidTimer(){
+  try{
+    if(!window.AndroidTimer) return;
+    const info = timerPeriodForCurrentDay();
+
+    if(!info){
+      if(lastAndroidTimerKey !== 'clear'){
+        window.AndroidTimer.clearTimer();
+        lastAndroidTimerKey = 'clear';
+      }
+      return;
+    }
+
+    const p = info.p;
+    const label = `${info.idx+1}교시`;
+
+    if(info.running && Number(p.timerStartedAt) > 0){
+      // 서버 epoch를 이 Android 기기의 wall clock epoch로 변환한다.
+      // 1초 단위로 반올림해 작은 보정 흔들림 때문에 서비스가 반복 재시작되지 않게 한다.
+      const localEpochStarted = Math.round(
+        (Number(p.timerStartedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
+      ) * 1000;
+      const key = `run:${localEpochStarted}:${label}`;
+      if(key !== lastAndroidTimerKey){
+        window.AndroidTimer.startTimer(localEpochStarted, label);
+        lastAndroidTimerKey = key;
+      }
+    }else if(Number(p.timerStartedAt) > 0){
+      const elapsed = Math.floor(timerElapsedMs(p));
+      const key = `stop:${elapsed}:${label}`;
+      if(key !== lastAndroidTimerKey){
+        window.AndroidTimer.stopTimer(elapsed, label);
+        lastAndroidTimerKey = key;
+      }
+    }
+  }catch(e){
+    console.warn('Android 타이머 브리지 실패:', e);
+  }
+}
+setInterval(syncAndroidTimer, 1000);
+
 
 // 각 공부일은 생성 당시의 집계 기준시간을 보존한다. 설정을 바꿔도 과거 기록 범위는 변하지 않는다.
 function cutoffForDate(date = cur){
@@ -1220,9 +1240,11 @@ $('#periodList').addEventListener('input', async (e) => {
       if(k==='startPage'){
         p.timerStartedAt = null;
         p.timerEndedAt = null;
+        if(cloudUser) await cloudClearActiveTimer();
       } else if(k==='endPage' && Number(p.timerStartedAt) > 0){
-        // 끝 페이지를 지우면 같은 시작 시점에서 다시 카운트한다.
+        // 끝 페이지를 지우면 같은 서버 시작 시점에서 다시 카운트한다.
         p.timerEndedAt = null;
+        if(cloudUser) await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
       }
     } else if(pageWasBlank && !isNaN(t.value)){
       if(cloudUser && !serverClockCalibrated) await calibrateServerClock(false);
@@ -1242,10 +1264,24 @@ $('#periodList').addEventListener('input', async (e) => {
       // 실제 현재 공부일에서 페이지를 새로 입력할 때만 초 단위 타이머를 제어한다.
       if(isWithinSelectedStudyDay(now)){
         if(k==='startPage'){
-          p.timerStartedAt = Math.round(serverNowMs());
           p.timerEndedAt = null;
+          if(cloudUser){
+            const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+            const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
+            p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+            await calibrateServerClock(true);
+          }else{
+            p.timerStartedAt = Math.round(serverNowMs());
+          }
         } else if(k==='endPage' && Number(p.timerStartedAt) > 0 && !Number(p.timerEndedAt)){
-          p.timerEndedAt = Math.round(serverNowMs());
+          if(cloudUser){
+            const row = await cloudStopActiveTimer();
+            const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
+            p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+            await calibrateServerClock(true);
+          }else{
+            p.timerEndedAt = Math.round(serverNowMs());
+          }
         }
       }
     }
@@ -1878,12 +1914,62 @@ $('#cloudGoogle').onclick = async () => {
     alert('클라우드 연결을 시작하지 못했어요. 인터넷 연결을 확인해 주세요.');
     return;
   }
+
+  // Android APK: 외부 브라우저 Google OAuth -> yangstudy://auth/callback -> WebView 세션 교환
+  if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
+    const {data,error} = await sbClient.auth.signInWithOAuth({
+      provider:'google',
+      options:{
+        redirectTo:'yangstudy://auth/callback',
+        skipBrowserRedirect:true
+      }
+    });
+    if(error){ alert('Google 로그인 실패: ' + error.message); return; }
+    if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    window.AndroidAuth.openOAuth(data.url);
+    return;
+  }
+
+  // 일반 PWA
   const redirectTo = window.location.origin + window.location.pathname;
   const {error} = await sbClient.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo }
+    provider:'google',
+    options:{redirectTo}
   });
   if(error) alert('Google 로그인 실패: ' + error.message);
+};
+
+window.yangStudyHandleOAuthCallback = async function(callbackUrl){
+  try{
+    if(!sbClient && !initSupabase()) throw new Error('Supabase 연결 실패');
+    const u = new URL(callbackUrl);
+    const oauthError = u.searchParams.get('error_description') || u.searchParams.get('error');
+    if(oauthError) throw new Error(oauthError);
+
+    const code = u.searchParams.get('code');
+    if(!code) throw new Error('Google 로그인 인증 코드가 없습니다.');
+
+    const {data,error} = await sbClient.auth.exchangeCodeForSession(code);
+    if(error) throw error;
+
+    cloudUser = data?.session?.user || data?.user || null;
+    await refreshCloudStatus();
+
+    if(cloudUser){
+      await calibrateServerClock(true);
+      await autoSyncFromCloud();
+      startActiveTimerRealtime();
+      await syncActiveTimerFromCloud(true);
+    }
+    enforceStudyDayLimit();
+    await renderCurrentView();
+    showToast('Google 로그인이 완료됐어요');
+    return true;
+  }catch(e){
+    console.error('Google OAuth callback 실패:', e);
+    alert('Google 로그인 완료 처리 실패: ' + (e?.message || e));
+    return false;
+  }
 };
 
 $('#cloudLogout').onclick = async () => {
@@ -1942,90 +2028,201 @@ if(sbClient){
 })();
 
 
-// ---------- v7: 기기간 실행 중 타이머 동기화 ----------
-// timerStartedAt/timerEndedAt은 기존 study_months 데이터 안에 저장된다.
-// 별도 테이블이나 SQL 변경 없이 같은 Google/Supabase 계정의 기기들이 현재 달의
-// 타이머 상태를 짧은 간격으로 확인한다. 초 카운트 자체는 각 기기에서 로컬 계산하므로
-// Supabase에 매초 쓰지 않는다.
+// ---------- v9 FINAL: Supabase active_timer 동기화 ----------
 let activeTimerSyncBusy = false;
 let activeTimerLastFingerprint = '';
+let activeTimerRealtimeChannel = null;
 
-function activeTimerFingerprint(month, ym){
-  const m = ensureMonthSync(deepClone(month || {}), ym);
-  const parts = [];
-  Object.keys(m).filter(k=>/^\d{1,2}$/.test(k)).sort((a,b)=>Number(a)-Number(b)).forEach(dk=>{
-    (m[dk]?.periods || []).forEach(p=>{
-      const s = Number(p.timerStartedAt || 0);
-      const e = Number(p.timerEndedAt || 0);
-      if(s > 0) parts.push(`${dk}:${p._id||''}:${s}:${e}`);
-    });
-  });
-  return parts.join('|');
+function activeTimerRowFingerprint(row){
+  if(!row) return '';
+  return [
+    row.user_id || '',
+    row.ym || '',
+    row.day_key || '',
+    row.period_id || '',
+    row.period_index ?? '',
+    row.status || '',
+    row.started_at || '',
+    row.stopped_at || '',
+    row.updated_at || ''
+  ].join('|');
 }
 
-async function syncActiveTimerFromCloud(){
+async function cloudStartActiveTimer(ym, dayKey, p, idx){
+  if(!sbClient || !cloudUser) return null;
+  const {data,error} = await sbClient.rpc('start_active_timer',{
+    p_ym: ym,
+    p_day_key: String(dayKey),
+    p_period_id: String(p._id || ''),
+    p_period_index: Number(idx || 0)
+  });
+  if(error){
+    console.error('서버 타이머 시작 실패:', error);
+    showToast('서버 타이머 시작 실패');
+    return null;
+  }
+  return data || null;
+}
+
+async function cloudStopActiveTimer(){
+  if(!sbClient || !cloudUser) return null;
+  const {data,error} = await sbClient.rpc('stop_active_timer');
+  if(error){
+    console.error('서버 타이머 종료 실패:', error);
+    showToast('서버 타이머 종료 실패');
+    return null;
+  }
+  return data || null;
+}
+
+async function cloudResumeActiveTimer(ym, dayKey, p, idx){
+  if(!sbClient || !cloudUser || !Number(p.timerStartedAt)) return null;
+  const {data,error} = await sbClient.rpc('resume_active_timer',{
+    p_ym: ym,
+    p_day_key: String(dayKey),
+    p_period_id: String(p._id || ''),
+    p_period_index: Number(idx || 0),
+    p_started_at: new Date(Number(p.timerStartedAt)).toISOString()
+  });
+  if(error){
+    console.error('서버 타이머 재개 실패:', error);
+    return null;
+  }
+  return data || null;
+}
+
+async function cloudClearActiveTimer(){
+  if(!sbClient || !cloudUser) return;
+  const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
+  if(error) console.warn('서버 타이머 삭제 실패:', error);
+  else activeTimerLastFingerprint = '';
+}
+
+function findPeriodForActiveTimer(row){
+  if(!row) return null;
+  const ym = String(row.ym || '');
+  const dk = String(row.day_key || '');
+  const month = monthCache[ym];
+  const day = month && month[dk];
+  if(!day || !Array.isArray(day.periods)) return null;
+
+  let idx = day.periods.findIndex(p => String(p._id || '') === String(row.period_id || ''));
+  if(idx < 0){
+    const fallback = Number(row.period_index);
+    if(Number.isInteger(fallback) && day.periods[fallback]) idx = fallback;
+  }
+  if(idx < 0) return null;
+  return {ym, dk, day, p:day.periods[idx], idx};
+}
+
+async function applyActiveTimerRow(row){
+  if(!row) return false;
+
+  let found = findPeriodForActiveTimer(row);
+
+  // 다른 기기에서 막 만든 교시는 active_timer가 study_months보다 먼저 도착할 수 있다.
+  // 그 경우 월 데이터를 한 번 동기화한 뒤 다시 찾는다.
+  if(!found){
+    await autoSyncFromCloud();
+    found = findPeriodForActiveTimer(row);
+  }
+  if(!found) return false;
+
+  const started = Date.parse(row.started_at);
+  const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
+  if(!Number.isFinite(started)) return false;
+
+  found.p.timerStartedAt = started;
+  found.p.timerEndedAt =
+    row.status === 'stopped' && Number.isFinite(stopped) ? stopped : null;
+
+  localStorage.setItem(`month:${found.ym}`, JSON.stringify(monthCache[found.ym]));
+
+  if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
+    await renderCurrentView();
+  }else{
+    updateStudyTimer();
+  }
+  syncAndroidTimer();
+  return true;
+}
+
+async function syncActiveTimerFromCloud(force=false){
   if(activeTimerSyncBusy || !sbClient || !cloudUser) return;
   activeTimerSyncBusy = true;
+
   try{
-    const ym = ymKey(logicalToday());
-    const {data:rows,error} = await sbClient.from('study_months')
-      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',ym).limit(1);
-    if(error || !rows || !rows[0]) return;
+    const {data,error} = await sbClient
+      .from('active_timer')
+      .select('*')
+      .eq('user_id',cloudUser.id)
+      .maybeSingle();
 
-    let local = {};
-    try{
-      local = monthCache[ym] || JSON.parse(localStorage.getItem(`month:${ym}`) || '{}');
-    }catch(e){ local = monthCache[ym] || {}; }
+    if(error) throw error;
 
-    const remote = rows[0].data || {};
-    const before = activeTimerFingerprint(local, ym);
-    const remoteFp = activeTimerFingerprint(remote, ym);
-    const merged = mergeMonths(local, remote, ym);
-    const after = activeTimerFingerprint(merged, ym);
+    const fp = activeTimerRowFingerprint(data);
+    if(!force && fp === activeTimerLastFingerprint) return;
 
-    // 타이머 상태가 실제로 달라졌을 때만 화면/Android 알림을 갱신한다.
-    if(after !== before || remoteFp !== activeTimerLastFingerprint){
-      monthCache[ym] = merged;
-      localStorage.setItem(`month:${ym}`, JSON.stringify(merged));
-      activeTimerLastFingerprint = remoteFp;
-
-      // 현재 보고 있는 달이면 표시를 즉시 맞춘다.
-      if(ymKey(cur) === ym){
-        await renderCurrentView();
-      }else{
+    if(data){
+      const applied = await applyActiveTimerRow(data);
+      // period가 아직 클라우드 월 데이터에 안 올라온 경우 다음 2초 poll에서 다시 시도한다.
+      if(applied) activeTimerLastFingerprint = fp;
+    }else{
+      const previouslyHadTimer = !!activeTimerLastFingerprint;
+      activeTimerLastFingerprint = '';
+      if(previouslyHadTimer){
+        await autoSyncFromCloud();
         updateStudyTimer();
+        syncAndroidTimer();
       }
-      if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
     }
   }catch(e){
-    console.warn('실행 중 타이머 동기화 실패:', e);
+    console.warn('서버 타이머 동기화 실패:', e);
   }finally{
     activeTimerSyncBusy = false;
   }
 }
 
-// Supabase Realtime이 켜진 프로젝트에서는 거의 즉시 반영.
-// Realtime 설정이 꺼져 있어도 아래 3초 fallback으로 동작한다.
-let activeTimerRealtimeChannel = null;
+// Realtime이 활성화된 프로젝트에서는 즉시 반영.
+// 비활성 상태여도 2초 polling이 항상 동작한다.
 function startActiveTimerRealtime(){
   if(!sbClient || !cloudUser || activeTimerRealtimeChannel) return;
   try{
-    activeTimerRealtimeChannel = sbClient.channel(`gongbujang-timer-${cloudUser.id}`)
-      .on('postgres_changes',
-        {event:'*', schema:'public', table:'study_months', filter:`user_id=eq.${cloudUser.id}`},
-        ()=>{ syncActiveTimerFromCloud(); }
-      ).subscribe();
+    activeTimerRealtimeChannel = sbClient
+      .channel(`gongbujang-active-${cloudUser.id}`)
+      .on(
+        'postgres_changes',
+        {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${cloudUser.id}`},
+        ()=>syncActiveTimerFromCloud(true)
+      )
+      .subscribe();
   }catch(e){
     activeTimerRealtimeChannel = null;
   }
 }
+
 function stopActiveTimerRealtime(){
   if(activeTimerRealtimeChannel && sbClient){
     try{ sbClient.removeChannel(activeTimerRealtimeChannel); }catch(e){}
   }
   activeTimerRealtimeChannel = null;
 }
-setInterval(()=>{ if(cloudUser) syncActiveTimerFromCloud(); }, 3000);
+
+setInterval(()=>{ if(cloudUser) syncActiveTimerFromCloud(false); }, 2000);
+
+// Android가 백그라운드에서 다시 열렸을 때 즉시 서버 시각/타이머를 재동기화한다.
+window.yangStudyAppResume = async function(){
+  try{
+    if(!cloudUser) return;
+    await calibrateServerClock(true);
+    await autoSyncFromCloud();
+    await syncActiveTimerFromCloud(true);
+    updateStudyTimer();
+    syncAndroidTimer();
+  }catch(e){
+    console.warn('앱 복귀 동기화 실패:', e);
+  }
+};
 
 
 // ---------- 전체 데이터 백업 / 복원 ----------
