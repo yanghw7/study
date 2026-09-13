@@ -373,6 +373,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// BUILD: v9.3-cross-device-period-lock
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2,'0');
 const fmtHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -1116,11 +1117,24 @@ $('#datePicker').onchange = async (e) => {
 };
 
 $('#addPeriod').onclick = async () => {
+  // v9.3: 다른 기기에서도 반드시 Supabase 최신 상태를 먼저 확인한다.
+  if(cloudUser){
+    try{
+      await autoSyncFromCloud();
+      enforceStudyDayLimit();
+      await renderCurrentView();
+    }catch(e){
+      console.error('교시 추가 전 최신 기록 확인 실패:', e);
+      alert('최신 공부 기록을 확인하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.');
+      return;
+    }
+  }
+
   const day = getDayData();
   const periods = day.periods || [];
 
-  // 첫 교시는 바로 추가할 수 있지만,
-  // 그 다음 교시부터는 현재 마지막 교시의 시작/끝 페이지가 모두 입력되어야 한다.
+  // 첫 교시는 바로 추가 가능.
+  // 2교시 이상은 최신 마지막 교시의 시작/끝 페이지가 모두 1 이상의 정수여야 한다.
   if(periods.length > 0){
     const last = periods[periods.length - 1];
     const start = String(last.startPage ?? '').trim();
@@ -1134,29 +1148,36 @@ $('#addPeriod').onclick = async () => {
     }
   }
 
-  {
-    const ts = syncNow();
-    const nextOrder = periods.reduce((mx,p)=>Math.max(mx,Number(p._order||0)),0)+1;
-    periods.push({
-      subject:'',
-      startPage:'',
-      endPage:'',
-      startDate:'',
-      startTime:'',
-      endDate:'',
-      endTime:'',
-      timerStartedAt:null,
-      timerEndedAt:null,
-      _id:makeSyncId(),
-      _order:nextOrder,
-      _createdAt:ts,
-      _updatedAt:ts,
-      _fieldUpdatedAt:{}
-    });
-  }
+  const ts = syncNow();
+  const nextOrder = periods.reduce((mx,p)=>Math.max(mx,Number(p._order||0)),0)+1;
+  periods.push({
+    subject:'',
+    startPage:'',
+    endPage:'',
+    startDate:'',
+    startTime:'',
+    endDate:'',
+    endTime:'',
+    timerStartedAt:null,
+    timerEndedAt:null,
+    _id:makeSyncId(),
+    _order:nextOrder,
+    _createdAt:ts,
+    _updatedAt:ts,
+    _fieldUpdatedAt:{}
+  });
 
   renderPeriods();
   await persistToday();
+
+  if(cloudUser){
+    try{
+      await autoSyncFromCloud();
+      await renderCurrentView();
+    }catch(e){
+      console.warn('교시 추가 후 재동기화 실패:', e);
+    }
+  }
 };
 
 $('#periodList').addEventListener('click', async (e) => {
