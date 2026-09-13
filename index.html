@@ -1117,7 +1117,44 @@ $('#datePicker').onchange = async (e) => {
 
 $('#addPeriod').onclick = async () => {
   const day = getDayData();
-  { const ts=syncNow(); const nextOrder=(day.periods||[]).reduce((mx,p)=>Math.max(mx,Number(p._order||0)),0)+1; day.periods.push({ subject:'', startPage:'', endPage:'', startDate:'', startTime:'', endDate:'', endTime:'', timerStartedAt:null, timerEndedAt:null, _id:makeSyncId(), _order:nextOrder, _createdAt:ts, _updatedAt:ts, _fieldUpdatedAt:{} }); }
+  const periods = day.periods || [];
+
+  // 첫 교시는 바로 추가할 수 있지만,
+  // 그 다음 교시부터는 현재 마지막 교시의 시작/끝 페이지가 모두 입력되어야 한다.
+  if(periods.length > 0){
+    const last = periods[periods.length - 1];
+    const start = String(last.startPage ?? '').trim();
+    const end = String(last.endPage ?? '').trim();
+    const validStart = /^[1-9][0-9]*$/.test(start);
+    const validEnd = /^[1-9][0-9]*$/.test(end);
+
+    if(!validStart || !validEnd){
+      alert(`${periods.length}교시의 시작 페이지와 끝 페이지를 먼저 입력해주세요.`);
+      return;
+    }
+  }
+
+  {
+    const ts = syncNow();
+    const nextOrder = periods.reduce((mx,p)=>Math.max(mx,Number(p._order||0)),0)+1;
+    periods.push({
+      subject:'',
+      startPage:'',
+      endPage:'',
+      startDate:'',
+      startTime:'',
+      endDate:'',
+      endTime:'',
+      timerStartedAt:null,
+      timerEndedAt:null,
+      _id:makeSyncId(),
+      _order:nextOrder,
+      _createdAt:ts,
+      _updatedAt:ts,
+      _fieldUpdatedAt:{}
+    });
+  }
+
   renderPeriods();
   await persistToday();
 };
