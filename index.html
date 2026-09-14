@@ -2,9 +2,6 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>공부장</title>
 
@@ -47,10 +44,6 @@
   /* header */
   .datebar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;position:relative;}
   .top-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;}
-  .top-right-actions{display:flex;align-items:center;gap:6px;}
-  .sync-top-btn{display:block;margin:0;border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:10px;padding:8px 9px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);position:relative;z-index:5;min-height:42px;white-space:nowrap;}
-  .sync-top-btn:disabled{opacity:.55;cursor:default;}
-  .sync-top-btn:active:not(:disabled){transform:translateY(1px);}
   .settings-top-btn{display:block;margin:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 11px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);position:relative;z-index:5;min-height:42px;}
   .settings-top-btn:active{transform:translateY(1px);}
   .study-timer{
@@ -63,6 +56,12 @@
   .study-timer.running{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 2px 9px rgba(59,110,92,.14);}
   .study-timer.running .study-timer-label{color:var(--accent);}
   .study-timer.running .study-timer-time{color:var(--accent);}
+  .waste-timer{border-color:var(--waste);background:var(--warn-soft);box-shadow:0 2px 9px rgba(161,51,39,.14);}
+  .waste-timer .study-timer-label{color:var(--waste);}
+  .waste-timer .study-timer-time{color:var(--waste);}
+  .study-timer.wasting{border-color:var(--waste);background:var(--warn-soft);box-shadow:0 2px 9px rgba(161,51,39,.14);}
+  .study-timer.wasting .study-timer-label{color:var(--waste);}
+  .study-timer.wasting .study-timer-time{color:var(--waste);}
   .datebar button{
     width:38px;height:38px;border-radius:10px;border:1px solid var(--line);
     background:var(--surface);color:var(--ink);font-size:17px;cursor:pointer;
@@ -167,11 +166,12 @@
     background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
     padding:13px 16px 14px;margin-bottom:12px;
   }
-  .summary-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:11px;position:relative;}
+  .summary-head{display:grid;grid-template-columns:minmax(56px,1fr) minmax(118px,150px) minmax(118px,150px);align-items:center;gap:8px;margin-bottom:11px;position:relative;}
   .summary-title{font-size:13px;color:var(--ink-soft);margin-bottom:10px;font-weight:600;}
   .summary-head .summary-title{margin-bottom:0;}
   .today-summary-title{font-size:15px;width:auto;text-align:left;justify-self:start;}
-  .summary-head .study-timer{grid-column:2;justify-self:center;}
+  .summary-head #studyTimer{grid-column:2;justify-self:center;min-width:0;width:100%;padding-left:7px;padding-right:7px;}
+  .summary-head #wasteTimer{grid-column:3;justify-self:end;min-width:0;width:100%;padding-left:7px;padding-right:7px;}
   .summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
   .summary-item b{display:block;font-size:19px;font-variant-numeric:tabular-nums;}
   .summary-item span{font-size:11.5px;color:var(--ink-soft);}
@@ -277,10 +277,7 @@
 
   <div class="top-actions">
     <button class="chart-toggle-btn top-chart-btn" id="chartToggle" aria-pressed="false">📈 그래프 보기</button>
-    <div class="top-right-actions">
-      <button class="sync-top-btn" id="syncNowBtn" aria-label="클라우드 동기화" title="로컬과 클라우드 기록을 병합 동기화">↻ 동기화</button>
-      <button class="settings-top-btn" id="settingsBtn" aria-label="설정 열기">⚙ 설정</button>
-    </div>
+    <button class="settings-top-btn" id="settingsBtn" aria-label="설정 열기">⚙ 설정</button>
   </div>
 
   <div class="datebar">
@@ -342,6 +339,10 @@
           <span class="study-timer-label" id="studyTimerLabel">타이머</span>
           <span class="study-timer-time" id="studyTimerTime">00:00:00</span>
         </div>
+        <div class="study-timer waste-timer" id="wasteTimer" aria-live="polite" title="교시 종료부터 다음 교시 시작까지 자동 측정">
+          <span class="study-timer-label" id="wasteTimerLabel">낭비시간</span>
+          <span class="study-timer-time" id="wasteTimerTime">00:00:00</span>
+        </div>
       </div>
       <div class="summary-grid">
         <div class="summary-item ok"><b id="sumStudy">0분</b><span>공부시간</span></div>
@@ -397,7 +398,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// BUILD: v9.9-safe-manual-sync
+// BUILD: v9.9-waste-live-timer-red
 // BUILD: v9.3-cross-device-period-lock
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2,'0');
@@ -781,6 +782,7 @@ async function calibrateServerClock(force=false){
     serverClockLastCalibratedAt = Date.now();
 
     updateStudyTimer();
+    updateWasteTimer();
     if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
   }catch(e){
     console.warn('Supabase 서버 시계 보정 실패:', e);
@@ -827,13 +829,45 @@ function timerPeriodForCurrentDay(){
   });
   return best;
 }
+
+// v9.9: 1교시가 끝난 뒤부터 다음 교시가 시작될 때까지 실시간 낭비시간 타이머.
+// 저장/통계의 낭비시간(wasteBefore)은 기존 방식 그대로 유지한다.
+function wasteTimerForCurrentDay(){
+  const logical = logicalToday();
+  if(ymd(cur) !== ymd(logical)) return null;
+
+  const day = getDayData();
+  if(!day.periods.length) return null;
+
+  // 공부 중에는 낭비시간 타이머를 멈춘다.
+  const running = day.periods.some(p =>
+    Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
+  );
+  if(running) return null;
+
+  // 가장 최근에 끝난 교시 이후, 아직 다음 교시가 시작되지 않았을 때만 흐른다.
+  for(let i=day.periods.length-1; i>=0; i--){
+    const p = day.periods[i];
+    const started = Number(p.timerStartedAt);
+    const ended = Number(p.timerEndedAt);
+    if(started > 0 && ended >= started){
+      const laterStarted = day.periods.slice(i+1).some(x =>
+        Number(x.timerStartedAt) > 0 || !!periodStartDT(x)
+      );
+      if(laterStarted) return null;
+      return {p, idx:i, startedAt:ended};
+    }
+  }
+  return null;
+}
+
 function updateStudyTimer(){
   const box = $('#studyTimer'), timeEl = $('#studyTimerTime'), labelEl = $('#studyTimerLabel');
   if(!box || !timeEl || !labelEl) return;
   const info = timerPeriodForCurrentDay();
   if(!info){
     timeEl.textContent = '00:00:00';
-    labelEl.textContent = '타이머';
+    labelEl.textContent = '공부시간';
     box.classList.remove('running');
     return;
   }
@@ -841,7 +875,24 @@ function updateStudyTimer(){
   labelEl.textContent = info.running ? `${info.idx+1}교시 · 진행 중` : `${info.idx+1}교시 · 종료`;
   box.classList.toggle('running', !!info.running);
 }
-setInterval(updateStudyTimer, 250);
+
+function updateWasteTimer(){
+  const box = $('#wasteTimer'), timeEl = $('#wasteTimerTime'), labelEl = $('#wasteTimerLabel');
+  if(!box || !timeEl || !labelEl) return;
+  const info = wasteTimerForCurrentDay();
+  if(!info){
+    timeEl.textContent = '00:00:00';
+    labelEl.textContent = '낭비시간';
+    return;
+  }
+  timeEl.textContent = formatTimer(Math.max(0, serverNowMs() - info.startedAt));
+  labelEl.textContent = `${info.idx+1}교시 후 · 낭비시간`;
+}
+
+setInterval(()=>{
+  updateStudyTimer();
+  updateWasteTimer();
+}, 250);
 
 
 // ---------- v9.5: 기준시점 횡단 + 소급 분할 복구 ----------
@@ -1233,6 +1284,7 @@ async function recoverFromBackground(){
     await checkStudyDayBoundaryRollover();
 
     updateStudyTimer();
+    updateWasteTimer();
     if(typeof syncAndroidTimer === 'function'){
       syncAndroidTimer();
     }
@@ -1274,6 +1326,20 @@ function syncAndroidTimer(){
       if(lastAndroidTimerKey !== 'clear'){
         window.AndroidTimer.clearTimer();
         lastAndroidTimerKey = 'clear';
+      }
+      return;
+    }
+
+    const wasteInfo = wasteTimerForCurrentDay();
+    if(!info?.running && wasteInfo){
+      const localWasteStarted = Math.round(
+        (Number(wasteInfo.startedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
+      ) * 1000;
+      const wasteLabel = `${wasteInfo.idx+1}교시 종료 · 낭비시간`;
+      const key = `waste:${localWasteStarted}:${wasteLabel}`;
+      if(key !== lastAndroidTimerKey){
+        window.AndroidTimer.startTimer(localWasteStarted, wasteLabel);
+        lastAndroidTimerKey = key;
       }
       return;
     }
@@ -2169,24 +2235,16 @@ function showChartTooltip(bar, clientX, clientY){
     indicator.textContent = ready ? '↻ 놓으면 새로고침' : '↓ 당겨서 새로고침';
   }, {passive:false});
 
-  document.addEventListener('touchend', async () => {
+  document.addEventListener('touchend', () => {
     if(!tracking) return;
     const shouldRefresh = distance >= TRIGGER;
     tracking = false;
     if(shouldRefresh){
       refreshing = true;
       indicator.classList.add('show','ready');
-      indicator.textContent = '↻ 동기화 중…';
+      indicator.textContent = '↻ 새로고침 중…';
       indicator.style.transform = 'translate(-50%,10px)';
-      try{
-        if(typeof safeTwoWaySync === 'function') await safeTwoWaySync({quiet:true});
-      }catch(e){
-        console.error('당겨서 동기화 실패:', e);
-        showToast('동기화에 실패했어요');
-      }finally{
-        refreshing = false;
-        reset();
-      }
+      setTimeout(() => location.reload(), 80);
     }else{
       reset();
     }
@@ -2469,46 +2527,6 @@ async function autoSyncFromCloud(){
   }
 }
 
-async function safeTwoWaySync({quiet=false}={}){
-  if(!sbClient && !initSupabase()){
-    if(!quiet) alert('클라우드 연결을 시작하지 못했어요. 인터넷 연결을 확인해 주세요.');
-    return false;
-  }
-  if(!cloudUser){
-    await refreshCloudStatus();
-  }
-  if(!cloudUser){
-    if(!quiet) alert('먼저 클라우드에 로그인해 주세요.');
-    else showToast('클라우드 로그인이 필요해요');
-    return false;
-  }
-
-  await calibrateServerClock(true);
-
-  // 1) 이 기기에만 있는 달도 먼저 클라우드와 병합 저장한다.
-  // cloudSaveMonth() 자체가 원격 최신본을 다시 읽어 필드 단위 병합하므로 덮어쓰지 않는다.
-  const localBackup = collectBackupData();
-  for(const [ym,data] of Object.entries(localBackup.months || {})){
-    monthCache[ym] = ensureMonthSync(deepClone(data || {}), ym);
-    await cloudSaveMonth(ym);
-  }
-
-  // 2) 클라우드에만 있는 기록까지 다시 내려받아 양쪽을 한 번 더 병합한다.
-  await autoSyncFromCloud();
-  await syncActiveTimerFromCloud(true);
-  await checkStudyDayBoundaryRollover();
-  enforceStudyDayLimit();
-
-  if(!isPeriodInputEditing()){
-    await renderCurrentView();
-  }else{
-    periodRenderPending = true;
-  }
-
-  if(!quiet) showToast('기록을 안전하게 동기화했어요');
-  return true;
-}
-
 async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
@@ -2617,22 +2635,6 @@ $('#cloudLogout').onclick = async () => {
 };
 $('#cloudUpload').onclick = uploadAllToCloud;
 $('#cloudDownload').onclick = downloadAllFromCloud;
-$('#syncNowBtn').onclick = async () => {
-  const btn = $('#syncNowBtn');
-  if(btn.disabled) return;
-  const oldText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '↻ 동기화 중';
-  try{
-    await safeTwoWaySync();
-  }catch(e){
-    console.error('수동 동기화 실패:', e);
-    showToast('동기화에 실패했어요');
-  }finally{
-    btn.disabled = false;
-    btn.textContent = oldText;
-  }
-};
 
 
 // PWA Service Worker는 페이지 하단에서 등록합니다.
@@ -2979,35 +2981,11 @@ renderDay();
 </script>
 
 <script>
-// v9.9.1: PWA 업데이트를 적극적으로 확인해 OAuth 복귀 후에도 최신 index를 사용한다.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    try {
-      const reg = await navigator.serviceWorker.register('/sw.js?v=9.9.1', { updateViaCache: 'none' });
-      await reg.update();
-
-      // 새 SW가 대기 상태라면 즉시 활성화를 요청한다.
-      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-
-      reg.addEventListener('updatefound', () => {
-        const worker = reg.installing;
-        if (!worker) return;
-        worker.addEventListener('statechange', () => {
-          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-            worker.postMessage({ type: 'SKIP_WAITING' });
-          }
-        });
-      });
-
-      // controller 교체 시 무한 새로고침을 피하면서 한 번만 최신 페이지로 갱신.
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (sessionStorage.getItem('gb-sw-reloaded-v991') === '1') return;
-        sessionStorage.setItem('gb-sw-reloaded-v991', '1');
-        location.reload();
-      });
-    } catch (err) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
       console.error('Service worker registration failed:', err);
-    }
+    });
   });
 }
 </script>
