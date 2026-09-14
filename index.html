@@ -315,6 +315,7 @@
       <button class="data-btn" id="toggleCloudSetup">로그인 / 회원가입</button>
       <button class="data-btn" id="cloudUpload">전체 클라우드 저장</button>
       <button class="data-btn" id="cloudDownload">클라우드에서 불러오기</button>
+      <button class="data-btn" id="cloudSync">동기화</button>
       <button class="data-btn" id="cloudLogout" style="display:none">로그아웃</button>
     </div>
     <div class="cloud-setup" id="cloudSetup">
@@ -2633,8 +2634,32 @@ $('#cloudLogout').onclick = async () => {
   if(sbClient) await sbClient.auth.signOut();
   cloudUser=null; await refreshCloudStatus(); showToast('로그아웃했어요');
 };
+async function runManualCloudSync(){
+  const btn = $('#cloudSync');
+  if(btn?.disabled) return;
+  if(btn){ btn.disabled = true; btn.textContent = '동기화 중…'; }
+  try{
+    await saveMonth(ymKey(cur));
+    if(!cloudUser){
+      showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
+      return;
+    }
+    await calibrateServerClock(false);
+    await autoSyncFromCloud();
+    await syncActiveTimerFromCloud(true);
+    await renderAfterCloudSync();
+    showToast('클라우드 동기화 완료');
+  }catch(e){
+    console.error('수동 동기화 실패:', e);
+    showToast('동기화에 실패했어요');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '동기화'; }
+  }
+}
+
 $('#cloudUpload').onclick = uploadAllToCloud;
 $('#cloudDownload').onclick = downloadAllFromCloud;
+$('#cloudSync').onclick = runManualCloudSync;
 
 
 // PWA Service Worker는 페이지 하단에서 등록합니다.
