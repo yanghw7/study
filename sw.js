@@ -1,4 +1,4 @@
-const CACHE = 'gongbujang-v9-6-battery-optimized';
+const CACHE = 'gongbujang-v9-8-tablet-input-pull-refresh-reusable';
 const APP_SHELL = [
   '/',
   '/index.html',
