@@ -1,4 +1,4 @@
-const CACHE = 'gongbujang-v9-4-rule2-merged';
+const CACHE = 'gongbujang-v9-5-retroactive-split';
 const APP_SHELL = [
   '/',
   '/index.html',
