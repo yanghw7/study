@@ -44,7 +44,10 @@
   /* header */
   .datebar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;position:relative;}
   .top-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;}
-  .settings-top-btn{display:block;margin:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 11px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);position:relative;z-index:5;min-height:42px;}
+  .top-right-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
+  .sync-top-btn{display:block;margin:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 7px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);position:relative;z-index:5;min-height:42px;white-space:nowrap;}
+  .sync-top-btn:active{transform:translateY(1px);}
+  .settings-top-btn{display:block;margin:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 7px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);position:relative;z-index:5;min-height:42px;white-space:nowrap;}
   .settings-top-btn:active{transform:translateY(1px);}
   .study-timer{
     min-width:150px;min-height:42px;border:1.5px solid #BFCFC6;background:#F7FAF8;
@@ -89,7 +92,7 @@
 
   /* tabs */
   .view-controls{display:flex;gap:8px;align-items:stretch;margin-bottom:16px;}
-  .top-chart-btn{flex:0 0 auto;width:auto;padding:8px 11px!important;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.05);font-size:13px!important;border-radius:10px!important;position:relative;z-index:5;min-height:42px;}
+  .top-chart-btn{flex:0 0 auto;width:auto;padding:8px 11px!important;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.05);font-size:13px!important;border-radius:10px!important;position:relative;z-index:5;min-height:42px;white-space:nowrap;}
   .chart-toggle-btn{
     display:block;white-space:nowrap;border:1px solid var(--line);background:var(--surface);color:var(--ink);
     border-radius:12px;padding:0 11px;font-size:12px;font-weight:700;cursor:pointer;
@@ -277,7 +280,10 @@
 
   <div class="top-actions">
     <button class="chart-toggle-btn top-chart-btn" id="chartToggle" aria-pressed="false">📈 그래프 보기</button>
-    <button class="settings-top-btn" id="settingsBtn" aria-label="설정 열기">⚙ 설정</button>
+    <div class="top-right-actions">
+      <button class="sync-top-btn" id="cloudSync" aria-label="동기화">↻ 동기화</button>
+      <button class="settings-top-btn" id="settingsBtn" aria-label="설정 열기">⚙ 설정</button>
+    </div>
   </div>
 
   <div class="datebar">
@@ -315,7 +321,6 @@
       <button class="data-btn" id="toggleCloudSetup">로그인 / 회원가입</button>
       <button class="data-btn" id="cloudUpload">전체 클라우드 저장</button>
       <button class="data-btn" id="cloudDownload">클라우드에서 불러오기</button>
-      <button class="data-btn" id="cloudSync">동기화</button>
       <button class="data-btn" id="cloudLogout" style="display:none">로그아웃</button>
     </div>
     <div class="cloud-setup" id="cloudSetup">
@@ -1783,9 +1788,31 @@ $('#periodList').addEventListener('input', async (e) => {
       }
       p[dateKey] = d || '';
       p[timeKey] = tm || '';
+
+      // 수동으로 시작/종료일시를 수정하면 상단 타이머 기준도 즉시 맞춘다.
+      // 공부시간 타이머 = 시작일시 기준 / 낭비시간 타이머 = 종료일시 기준
+      if(selected){
+        const selectedMs = selected.getTime();
+        if(k === 'start'){
+          p.timerStartedAt = selectedMs;
+          // 종료값이 새 시작시각보다 앞서면 진행 중 상태로 되돌린다.
+          if(Number(p.timerEndedAt) > 0 && Number(p.timerEndedAt) < selectedMs){
+            p.timerEndedAt = null;
+          }
+          if(cloudUser && !(Number(p.timerEndedAt) >= selectedMs)){
+            await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+          }
+        } else if(k === 'end'){
+          p.timerEndedAt = selectedMs;
+          // 종료일시를 수정하면 이 시각부터 낭비시간 타이머가 계산된다.
+          if(cloudUser) await cloudClearActiveTimer();
+        }
+      }
     } else {
       p[dateKey] = '';
       p[timeKey] = '';
+      if(k === 'start') p.timerStartedAt = null;
+      if(k === 'end') p.timerEndedAt = null;
     }
   } else {
     p[k] = t.value;
@@ -1857,6 +1884,12 @@ $('#periodList').addEventListener('input', async (e) => {
       }
     }
     updateStudyTimer();
+  }
+  // 시작/종료일시를 직접 수정한 경우 두 타이머를 즉시 다시 계산한다.
+  if(k === 'start' || k === 'end'){
+    updateStudyTimer();
+    updateWasteTimer();
+    if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
   }
   // 입력 중인 칸은 다시 그리지 않고, 계산되는 숫자만 갱신해서 포커스/커서를 유지
   markChangedPeriodFields(p, beforeSync);
@@ -2637,7 +2670,7 @@ $('#cloudLogout').onclick = async () => {
 async function runManualCloudSync(){
   const btn = $('#cloudSync');
   if(btn?.disabled) return;
-  if(btn){ btn.disabled = true; btn.textContent = '동기화 중…'; }
+  if(btn){ btn.disabled = true; btn.textContent = '↻ 동기화 중…'; }
   try{
     await saveMonth(ymKey(cur));
     if(!cloudUser){
@@ -2653,7 +2686,7 @@ async function runManualCloudSync(){
     console.error('수동 동기화 실패:', e);
     showToast('동기화에 실패했어요');
   }finally{
-    if(btn){ btn.disabled = false; btn.textContent = '동기화'; }
+    if(btn){ btn.disabled = false; btn.textContent = '↻ 동기화'; }
   }
 }
 

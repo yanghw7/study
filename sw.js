@@ -1,4 +1,4 @@
-const CACHE = 'gongbujang-v9-9-waste-live-timer-red';
+const CACHE = 'gongbujang-v10-0';
 const APP_SHELL = [
   '/',
   '/index.html',
