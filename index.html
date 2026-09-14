@@ -373,6 +373,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// BUILD: v9.4-rule2-merged
 // BUILD: v9.3-cross-device-period-lock
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2,'0');
@@ -814,6 +815,286 @@ function updateStudyTimer(){
   box.classList.toggle('running', !!info.running);
 }
 setInterval(updateStudyTimer, 250);
+
+
+// ---------- v9.4: 기준시점 횡단 예외처리 ----------
+// 원칙:
+// - 시작페이지 입력 -> 타이머 시작
+// - 끝페이지 입력 -> 타이머 종료
+//
+// 예외:
+// 진행 중 교시가 해당 공부일의 기준시점을 통과하면
+// 1) 이전 공부일을 시작페이지와 같은 끝페이지로 자동 마감
+// 2) 다음 공부일 1교시를 같은 시작페이지로 자동 생성
+// 3) 화면상 새 교시 시작일시는 기준시점
+// 4) timerStartedAt은 최초 시작값을 유지해 타이머는 끊기지 않음
+
+let studyDayRolloverBusy = false;
+
+function studyDayBoundaryMs(ym, dk, day){
+  const [y,m] = String(ym).split('-').map(Number);
+  const d = new Date(y, m-1, Number(dk), 12, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+
+  const cutoff = Number.isInteger(day?.cutoffHour)
+    ? day.cutoffHour
+    : Number(appSettings.dayStartHour || 0);
+
+  d.setHours(cutoff, 0, 0, 0);
+  return d.getTime();
+}
+
+function nextStudyDayKey(ym, dk){
+  const [y,m] = String(ym).split('-').map(Number);
+  const d = new Date(y, m-1, Number(dk), 12, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  return {date:d, ym:ymKey(d), dk:dKey(d)};
+}
+
+function rolloverPeriodId(oldPeriodId, newYm, newDk){
+  // 여러 기기가 같은 경계를 처리해도 같은 ID를 사용해서 중복 생성 방지
+  return `roll-${String(oldPeriodId||'period')}-${newYm}-${String(newDk).padStart(2,'0')}`;
+}
+
+async function getRunningPeriodForBoundary(){
+  // 1순위: Supabase active_timer
+  if(cloudUser && sbClient){
+    try{
+      const {data,error} = await sbClient
+        .from('active_timer')
+        .select('*')
+        .eq('user_id', cloudUser.id)
+        .maybeSingle();
+
+      if(!error && data?.status === 'running'){
+        const ym = String(data.ym || '');
+        const dk = String(data.day_key || '');
+
+        await loadMonth(ym);
+        let day = monthCache[ym]?.[dk];
+
+        if(!day){
+          await autoSyncFromCloud();
+          await loadMonth(ym);
+          day = monthCache[ym]?.[dk];
+        }
+
+        if(day?.periods){
+          let idx = day.periods.findIndex(
+            p => String(p._id||'') === String(data.period_id||'')
+          );
+
+          if(idx < 0){
+            const fallback = Number(data.period_index);
+            if(Number.isInteger(fallback) && day.periods[fallback]) idx = fallback;
+          }
+
+          if(idx >= 0){
+            return {ym, dk, day, p:day.periods[idx], idx};
+          }
+        }
+      }
+    }catch(e){
+      console.warn('기준시점 진행 교시 확인 실패:', e);
+    }
+  }
+
+  // 2순위: 현재 화면 날짜
+  try{
+    const ym = ymKey(cur);
+    const dk = dKey(cur);
+    await loadMonth(ym);
+    const day = monthCache[ym]?.[dk];
+
+    if(day?.periods){
+      const idx = day.periods.findIndex(
+        p => Number(p.timerStartedAt) > 0 &&
+             !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
+      );
+      if(idx >= 0) return {ym, dk, day, p:day.periods[idx], idx};
+    }
+  }catch(e){}
+
+  return null;
+}
+
+async function splitRunningPeriodAtBoundary(running){
+  const oldP = running.p;
+  const page = String(oldP.startPage ?? '').trim();
+
+  if(!/^[1-9][0-9]*$/.test(page)){
+    return false;
+  }
+
+  const boundaryMs = studyDayBoundaryMs(running.ym, running.dk, running.day);
+  if(serverNowMs() < boundaryMs){
+    return false;
+  }
+
+  const originalTimerStartedAt = Number(oldP.timerStartedAt);
+  if(!Number.isFinite(originalTimerStartedAt) || originalTimerStartedAt <= 0){
+    return false;
+  }
+
+  const displayEnd = new Date(boundaryMs - 60000);
+
+  // A. 이전 공부일 자동 마감
+  const beforeOld = deepClone(oldP);
+
+  oldP.endPage = page;
+  oldP.endDate = ymd(displayEnd);
+  oldP.endTime = hm(displayEnd);
+
+  // 이전 교시 자체는 경계에서 종료 처리
+  oldP.timerEndedAt = boundaryMs;
+
+  markChangedPeriodFields(oldP, beforeOld);
+  await saveMonth(running.ym);
+
+  // B. 다음 공부일 1교시 생성
+  const next = nextStudyDayKey(running.ym, running.dk);
+  await loadMonth(next.ym);
+
+  if(!monthCache[next.ym]) monthCache[next.ym] = {};
+
+  if(!monthCache[next.ym][next.dk]){
+    monthCache[next.ym][next.dk] = {
+      wake:null,
+      periods:[],
+      cutoffHour:appSettings.dayStartHour,
+      _metaUpdatedAt:syncNow(),
+      _deletedPeriods:[]
+    };
+  }
+
+  const newDay = monthCache[next.ym][next.dk];
+  ensureDaySync(newDay, next.ym, next.dk);
+
+  const continuationId = rolloverPeriodId(oldP._id, next.ym, next.dk);
+  let newIdx = newDay.periods.findIndex(
+    p => String(p._id||'') === continuationId
+  );
+
+  let nextP;
+  const ts = syncNow();
+
+  if(newIdx >= 0){
+    nextP = newDay.periods[newIdx];
+    const beforeNew = deepClone(nextP);
+
+    nextP.subject = oldP.subject || '';
+    nextP.startPage = page;
+    nextP.endPage = '';
+    nextP.startDate = ymd(new Date(boundaryMs));
+    nextP.startTime = hm(new Date(boundaryMs));
+    nextP.endDate = '';
+    nextP.endTime = '';
+
+    // 핵심: 타이머는 최초 시작시점을 그대로 유지
+    nextP.timerStartedAt = originalTimerStartedAt;
+    nextP.timerEndedAt = null;
+    nextP._order = 1;
+
+    markChangedPeriodFields(nextP, beforeNew);
+  }else{
+    // 자동 생성 교시는 항상 다음 공부일의 1교시
+    newDay.periods.forEach(p=>{
+      const n = Number(p._order||0);
+      if(Number.isFinite(n) && n > 0) p._order = n + 1;
+    });
+
+    nextP = {
+      subject:oldP.subject || '',
+      startPage:page,
+      endPage:'',
+      startDate:ymd(new Date(boundaryMs)),
+      startTime:hm(new Date(boundaryMs)),
+      endDate:'',
+      endTime:'',
+
+      // 화면 기록은 기준시점,
+      // stopwatch는 원래 최초 시작시점 유지
+      timerStartedAt:originalTimerStartedAt,
+      timerEndedAt:null,
+
+      _id:continuationId,
+      _order:1,
+      _createdAt:ts,
+      _updatedAt:ts,
+      _fieldUpdatedAt:{
+        subject:ts,
+        startPage:ts,
+        startDate:ts,
+        startTime:ts,
+        timerStartedAt:ts
+      }
+    };
+
+    newDay.periods.unshift(nextP);
+    newIdx = 0;
+  }
+
+  await saveMonth(next.ym);
+
+  // C. Supabase active_timer도 새 공부일 1교시로 이동
+  // cloudResumeActiveTimer는 p.timerStartedAt을 사용하므로
+  // 서버 타이머 역시 최초 시작시점을 그대로 유지한다.
+  if(cloudUser){
+    try{
+      await cloudResumeActiveTimer(
+        next.ym,
+        next.dk,
+        nextP,
+        newIdx
+      );
+    }catch(e){
+      console.warn('기준시점 이후 서버 타이머 재개 실패:', e);
+    }
+  }
+
+  // D. 현재 보고 있던 공부일이 자동 마감된 공부일이면 다음 공부일로 이동
+  if(ymKey(cur) === running.ym && dKey(cur) === running.dk){
+    cur = new Date(
+      next.date.getFullYear(),
+      next.date.getMonth(),
+      next.date.getDate()
+    );
+  }
+
+  // 이 시점에서는 실제 기준시점을 지났으므로 미래날짜 제한에 걸리지 않음
+  await renderCurrentView();
+  updateStudyTimer();
+  if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
+
+  return true;
+}
+
+async function checkStudyDayBoundaryRollover(){
+  if(studyDayRolloverBusy) return;
+  studyDayRolloverBusy = true;
+
+  try{
+    const running = await getRunningPeriodForBoundary();
+    if(!running) return;
+
+    await splitRunningPeriodAtBoundary(running);
+  }catch(e){
+    console.error('기준시점 자동 분할 실패:', e);
+  }finally{
+    studyDayRolloverBusy = false;
+  }
+}
+
+// 기준시점 근처에서도 충분히 빠르게 반응하도록 1초마다 확인
+setInterval(checkStudyDayBoundaryRollover, 1000);
+
+// 앱/브라우저로 돌아왔을 때도 즉시 확인
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible'){
+    checkStudyDayBoundaryRollover();
+  }
+});
+
 
 
 // ---------- v9 FINAL: Android APK 알림 브리지 ----------

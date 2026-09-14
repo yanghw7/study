@@ -1,4 +1,4 @@
-const CACHE = 'gongbujang-v9-3-cross-device-lock';
+const CACHE = 'gongbujang-v9-4-rule2-merged';
 const APP_SHELL = [
   '/',
   '/index.html',
