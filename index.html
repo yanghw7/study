@@ -373,7 +373,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// BUILD: v9.6-battery-optimized
+// BUILD: v9.5-retroactive-split
 // BUILD: v9.3-cross-device-period-lock
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2,'0');
@@ -418,12 +418,16 @@ function loadSettings(){
     return {
       dayStartHour: Number.isInteger(dayStartHour) && dayStartHour >= 0 && dayStartHour <= 11 ? dayStartHour : DEFAULT_SETTINGS.dayStartHour,
       weekStartDay: Number.isInteger(weekStartDay) && weekStartDay >= 0 && weekStartDay <= 6 ? weekStartDay : DEFAULT_SETTINGS.weekStartDay,
-      pendingDayStart
+      pendingDayStart,
+      _metaUpdatedAt: Number(saved._metaUpdatedAt) || 0
     };
-  }catch(e){ return {...DEFAULT_SETTINGS}; }
+  }catch(e){ return {...DEFAULT_SETTINGS, _metaUpdatedAt:0}; }
 }
 let appSettings = loadSettings();
-function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings)); }
+function saveSettings(){
+  appSettings._metaUpdatedAt = syncNow();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+}
 function nextBoundaryForHour(hour, from = new Date()){
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate(), hour, 0, 0, 0);
   if(d <= from) d.setDate(d.getDate()+1);
@@ -759,8 +763,13 @@ async function calibrateServerClock(force=false){
 }
 
 // 1분마다 재보정하고, 화면으로 돌아올 때 즉시 다시 맞춘다.
-// v9.6: managed by startBackgroundSensitiveLoops()
-// v9.6: visibility handling centralized below
+setInterval(()=>{ if(cloudUser) calibrateServerClock(false); }, 60000);
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && cloudUser){
+    calibrateServerClock(true);
+    if(typeof syncActiveTimerFromCloud === 'function') syncActiveTimerFromCloud(true);
+  }
+});
 
 
 // 시작 페이지 입력부터 끝 페이지 입력까지 초 단위로 보여주는 상단 타이머
@@ -1130,104 +1139,19 @@ async function checkStudyDayBoundaryRollover(){
 
 // 화면이 켜져 있을 때 경계 확인.
 // 백그라운드에서 throttling되어도 아래 복귀/초기화 검사가 별도로 처리한다.
-// v9.6: managed by startBackgroundSensitiveLoops()
+setInterval(checkStudyDayBoundaryRollover, 1000);
 
 // 백그라운드 -> foreground 복귀 시 즉시 소급 검사.
-// v9.6: visibility handling centralized below
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible'){
+    setTimeout(()=>checkStudyDayBoundaryRollover(), 0);
+  }
+});
 
 // 브라우저의 bfcache에서 복원되는 경우도 즉시 검사.
 window.addEventListener('pageshow', ()=>{
   setTimeout(()=>checkStudyDayBoundaryRollover(), 0);
 });
-
-// ---------- v9.6: 배터리 최적화 + foreground 즉시 복구 ----------
-let activeTimerPollId = null;
-let clockCalibrateId = null;
-let rolloverCheckId = null;
-
-function startBackgroundSensitiveLoops(){
-  // hidden 상태에서는 시작하지 않는다.
-  if(document.visibilityState === 'hidden') return;
-
-  if(!activeTimerPollId){
-    activeTimerPollId = setInterval(()=>{
-      if(cloudUser) syncActiveTimerFromCloud(false);
-    }, 2000);
-  }
-
-  if(!clockCalibrateId){
-    clockCalibrateId = setInterval(()=>{
-      if(cloudUser) calibrateServerClock(false);
-    }, 60000);
-  }
-
-  if(!rolloverCheckId){
-    rolloverCheckId = setInterval(()=>{
-      checkStudyDayBoundaryRollover();
-    }, 1000);
-  }
-}
-
-function stopBackgroundSensitiveLoops(){
-  if(activeTimerPollId){
-    clearInterval(activeTimerPollId);
-    activeTimerPollId = null;
-  }
-
-  if(clockCalibrateId){
-    clearInterval(clockCalibrateId);
-    clockCalibrateId = null;
-  }
-
-  if(rolloverCheckId){
-    clearInterval(rolloverCheckId);
-    rolloverCheckId = null;
-  }
-}
-
-async function recoverFromBackground(){
-  try{
-    // 순서 중요:
-    // 1. 서버 시계 보정
-    // 2. active_timer 최신 상태
-    // 3. 기준시점 소급 분할
-    // 4. 화면/알림 타이머 갱신
-    if(cloudUser){
-      await calibrateServerClock(true);
-      await autoSyncFromCloud();
-      await syncActiveTimerFromCloud(true);
-    }
-
-    await checkStudyDayBoundaryRollover();
-
-    updateStudyTimer();
-    if(typeof syncAndroidTimer === 'function'){
-      syncAndroidTimer();
-    }
-  }catch(e){
-    console.warn('foreground 복구 실패:', e);
-  }
-}
-
-document.addEventListener('visibilitychange', async ()=>{
-  if(document.visibilityState === 'hidden'){
-    stopBackgroundSensitiveLoops();
-    return;
-  }
-
-  startBackgroundSensitiveLoops();
-  await recoverFromBackground();
-});
-
-// bfcache 복귀도 같은 복구 순서를 사용
-window.addEventListener('pageshow', async ()=>{
-  startBackgroundSensitiveLoops();
-  await recoverFromBackground();
-});
-
-// 최초 로드 시 인터벌 시작
-startBackgroundSensitiveLoops();
-
 
 
 // ---------- v9 FINAL: Android APK 알림 브리지 ----------
@@ -2215,6 +2139,7 @@ $('#settingsSave').onclick = async () => {
   if(requestedHour === appSettings.dayStartHour){
     appSettings.pendingDayStart = null;
     saveSettings();
+    if(cloudUser) await cloudPushSettings();
     closeSettings();
     await renderCurrentView();
     showToast('설정을 저장했어요');
@@ -2229,6 +2154,7 @@ $('#settingsSave').onclick = async () => {
   const effectiveAt = new Date(Math.max(oldBoundary.getTime(), newBoundary.getTime()));
   appSettings.pendingDayStart = { hour: requestedHour, effectiveAt: effectiveAt.toISOString() };
   saveSettings();
+  if(cloudUser) await cloudPushSettings();
   closeSettings();
   await renderCurrentView();
   showToast(`${pad(requestedHour)}:00 기준 · ${formatEffectiveAt(effectiveAt)}부터 적용`);
@@ -2242,6 +2168,7 @@ setInterval(async ()=>{
     if(ymd(cur) === ymd(latest) || cur > latest) cur = latest;
     await renderCurrentView();
     if(before !== appSettings.dayStartHour) showToast(`새 집계 기준 ${pad(appSettings.dayStartHour)}:00 적용`);
+    if(cloudUser) await cloudPushSettings();
   }
 }, 60000);
 
@@ -2322,12 +2249,14 @@ async function uploadAllToCloud(){
 
 async function autoSyncFromCloud(){
   if(!sbClient || !cloudUser) return;
+  await cloudPullSettings();
   const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
   if(error){ console.error('자동 동기화 불러오기 실패:', error); return; }
   if(!data || data.length===0) return;
   const needsPush=[];
   for(const row of data){
     const ym=row.ym;
+    if(ym === SETTINGS_CLOUD_YM) continue; // 설정 전용 행은 월별 병합 대상에서 제외
     let local={};
     try{ local=JSON.parse(localStorage.getItem(`month:${ym}`)||'{}'); }catch(e){}
     const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
@@ -2342,6 +2271,59 @@ async function autoSyncFromCloud(){
   await renderCurrentView();
 }
 
+// ---------- 기준시점/설정 클라우드 동기화 ----------
+// study_months 테이블을 재사용하되 ym='__settings__' 전용 행에 설정만 저장한다.
+// (여러 기기에서 기준시점을 서로 다르게 들고 있는 문제를 막기 위함)
+const SETTINGS_CLOUD_YM = '__settings__';
+
+async function cloudPushSettings(){
+  if(!sbClient || !cloudUser) return;
+  try{
+    const nowIso = new Date(serverNowMs()).toISOString();
+    const payload = {
+      dayStartHour: appSettings.dayStartHour,
+      weekStartDay: appSettings.weekStartDay,
+      pendingDayStart: appSettings.pendingDayStart,
+      _metaUpdatedAt: appSettings._metaUpdatedAt || syncNow()
+    };
+    const {data:rows} = await sbClient.from('study_months')
+      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',SETTINGS_CLOUD_YM).limit(1);
+    const row = rows && rows[0];
+    if(row){
+      await sbClient.from('study_months').update({data:payload, updated_at:nowIso})
+        .eq('user_id',cloudUser.id).eq('ym',SETTINGS_CLOUD_YM);
+    }else{
+      await sbClient.from('study_months').insert({user_id:cloudUser.id, ym:SETTINGS_CLOUD_YM, data:payload, updated_at:nowIso});
+    }
+  }catch(e){ console.warn('설정 클라우드 저장 실패:', e); }
+}
+
+async function cloudPullSettings(){
+  if(!sbClient || !cloudUser) return;
+  try{
+    const {data:rows,error} = await sbClient.from('study_months')
+      .select('data').eq('user_id',cloudUser.id).eq('ym',SETTINGS_CLOUD_YM).limit(1);
+    if(error || !rows || !rows[0]) return;
+    const remote = rows[0].data || {};
+    const remoteMt = Number(remote._metaUpdatedAt||0);
+    const localMt = Number(appSettings._metaUpdatedAt||0);
+    if(remoteMt > localMt){
+      // 원격(다른 기기)이 더 최신 -> 로컬에 반영
+      const dh = Number(remote.dayStartHour);
+      const wd = Number(remote.weekStartDay);
+      appSettings.dayStartHour = Number.isInteger(dh) ? dh : appSettings.dayStartHour;
+      appSettings.weekStartDay = Number.isInteger(wd) && wd>=0 && wd<=6 ? wd : appSettings.weekStartDay;
+      appSettings.pendingDayStart = remote.pendingDayStart || null;
+      appSettings._metaUpdatedAt = remoteMt;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+      maybeActivatePending();
+    } else if(localMt > remoteMt){
+      // 이 기기가 더 최신 -> 클라우드로 밀어올려서 다른 기기가 받게 한다
+      await cloudPushSettings();
+    }
+  }catch(e){ console.warn('설정 클라우드 불러오기 실패:', e); }
+}
+
 async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
@@ -2353,7 +2335,10 @@ async function downloadAllFromCloud(){
     const k=localStorage.key(i); if(k && k.startsWith('month:')) keys.push(k);
   }
   keys.forEach(k=>localStorage.removeItem(k));
-  data.forEach(row=>localStorage.setItem(`month:${row.ym}`, JSON.stringify(row.data || {})));
+  data.forEach(row=>{
+    if(row.ym === SETTINGS_CLOUD_YM) return; // 설정 전용 행은 월 기록으로 복원하지 않음
+    localStorage.setItem(`month:${row.ym}`, JSON.stringify(row.data || {}));
+  });
   monthCache={};
   enforceStudyDayLimit();
   await renderCurrentView();
@@ -2509,9 +2494,6 @@ if(sbClient){
   if(!cloudUser){
     await checkStudyDayBoundaryRollover();
   }
-
-  // v9.6: 초기화 완료 후 foreground 루프가 살아 있는지 보장
-  startBackgroundSensitiveLoops();
 })();
 
 
@@ -2695,16 +2677,21 @@ function stopActiveTimerRealtime(){
   activeTimerRealtimeChannel = null;
 }
 
-// v9.6: managed by startBackgroundSensitiveLoops()
+setInterval(()=>{ if(cloudUser) syncActiveTimerFromCloud(false); }, 2000);
 
 // Android가 백그라운드에서 다시 열렸을 때 즉시 서버 시각/타이머를 재동기화한다.
 window.yangStudyAppResume = async function(){
   try{
     if(!cloudUser) return;
     await calibrateServerClock(true);
-    // v9.6: Android WebView 복귀도 동일한 foreground 복구 순서를 사용.
-    startBackgroundSensitiveLoops();
-    await recoverFromBackground();
+    await autoSyncFromCloud();
+    await syncActiveTimerFromCloud(true);
+
+    // v9.5: Android WebView가 백그라운드에서 돌아오면 즉시 소급 분할.
+    await checkStudyDayBoundaryRollover();
+
+    updateStudyTimer();
+    syncAndroidTimer();
   }catch(e){
     console.warn('앱 복귀 동기화 실패:', e);
   }
