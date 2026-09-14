@@ -373,7 +373,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// BUILD: v9.5-retroactive-split
+// BUILD: v9.6-battery-optimized
 // BUILD: v9.3-cross-device-period-lock
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2,'0');
@@ -759,13 +759,8 @@ async function calibrateServerClock(force=false){
 }
 
 // 1분마다 재보정하고, 화면으로 돌아올 때 즉시 다시 맞춘다.
-setInterval(()=>{ if(cloudUser) calibrateServerClock(false); }, 60000);
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && cloudUser){
-    calibrateServerClock(true);
-    if(typeof syncActiveTimerFromCloud === 'function') syncActiveTimerFromCloud(true);
-  }
-});
+// v9.6: managed by startBackgroundSensitiveLoops()
+// v9.6: visibility handling centralized below
 
 
 // 시작 페이지 입력부터 끝 페이지 입력까지 초 단위로 보여주는 상단 타이머
@@ -1135,19 +1130,104 @@ async function checkStudyDayBoundaryRollover(){
 
 // 화면이 켜져 있을 때 경계 확인.
 // 백그라운드에서 throttling되어도 아래 복귀/초기화 검사가 별도로 처리한다.
-setInterval(checkStudyDayBoundaryRollover, 1000);
+// v9.6: managed by startBackgroundSensitiveLoops()
 
 // 백그라운드 -> foreground 복귀 시 즉시 소급 검사.
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible'){
-    setTimeout(()=>checkStudyDayBoundaryRollover(), 0);
-  }
-});
+// v9.6: visibility handling centralized below
 
 // 브라우저의 bfcache에서 복원되는 경우도 즉시 검사.
 window.addEventListener('pageshow', ()=>{
   setTimeout(()=>checkStudyDayBoundaryRollover(), 0);
 });
+
+// ---------- v9.6: 배터리 최적화 + foreground 즉시 복구 ----------
+let activeTimerPollId = null;
+let clockCalibrateId = null;
+let rolloverCheckId = null;
+
+function startBackgroundSensitiveLoops(){
+  // hidden 상태에서는 시작하지 않는다.
+  if(document.visibilityState === 'hidden') return;
+
+  if(!activeTimerPollId){
+    activeTimerPollId = setInterval(()=>{
+      if(cloudUser) syncActiveTimerFromCloud(false);
+    }, 2000);
+  }
+
+  if(!clockCalibrateId){
+    clockCalibrateId = setInterval(()=>{
+      if(cloudUser) calibrateServerClock(false);
+    }, 60000);
+  }
+
+  if(!rolloverCheckId){
+    rolloverCheckId = setInterval(()=>{
+      checkStudyDayBoundaryRollover();
+    }, 1000);
+  }
+}
+
+function stopBackgroundSensitiveLoops(){
+  if(activeTimerPollId){
+    clearInterval(activeTimerPollId);
+    activeTimerPollId = null;
+  }
+
+  if(clockCalibrateId){
+    clearInterval(clockCalibrateId);
+    clockCalibrateId = null;
+  }
+
+  if(rolloverCheckId){
+    clearInterval(rolloverCheckId);
+    rolloverCheckId = null;
+  }
+}
+
+async function recoverFromBackground(){
+  try{
+    // 순서 중요:
+    // 1. 서버 시계 보정
+    // 2. active_timer 최신 상태
+    // 3. 기준시점 소급 분할
+    // 4. 화면/알림 타이머 갱신
+    if(cloudUser){
+      await calibrateServerClock(true);
+      await autoSyncFromCloud();
+      await syncActiveTimerFromCloud(true);
+    }
+
+    await checkStudyDayBoundaryRollover();
+
+    updateStudyTimer();
+    if(typeof syncAndroidTimer === 'function'){
+      syncAndroidTimer();
+    }
+  }catch(e){
+    console.warn('foreground 복구 실패:', e);
+  }
+}
+
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState === 'hidden'){
+    stopBackgroundSensitiveLoops();
+    return;
+  }
+
+  startBackgroundSensitiveLoops();
+  await recoverFromBackground();
+});
+
+// bfcache 복귀도 같은 복구 순서를 사용
+window.addEventListener('pageshow', async ()=>{
+  startBackgroundSensitiveLoops();
+  await recoverFromBackground();
+});
+
+// 최초 로드 시 인터벌 시작
+startBackgroundSensitiveLoops();
+
 
 
 // ---------- v9 FINAL: Android APK 알림 브리지 ----------
@@ -2429,6 +2509,9 @@ if(sbClient){
   if(!cloudUser){
     await checkStudyDayBoundaryRollover();
   }
+
+  // v9.6: 초기화 완료 후 foreground 루프가 살아 있는지 보장
+  startBackgroundSensitiveLoops();
 })();
 
 
@@ -2612,21 +2695,16 @@ function stopActiveTimerRealtime(){
   activeTimerRealtimeChannel = null;
 }
 
-setInterval(()=>{ if(cloudUser) syncActiveTimerFromCloud(false); }, 2000);
+// v9.6: managed by startBackgroundSensitiveLoops()
 
 // Android가 백그라운드에서 다시 열렸을 때 즉시 서버 시각/타이머를 재동기화한다.
 window.yangStudyAppResume = async function(){
   try{
     if(!cloudUser) return;
     await calibrateServerClock(true);
-    await autoSyncFromCloud();
-    await syncActiveTimerFromCloud(true);
-
-    // v9.5: Android WebView가 백그라운드에서 돌아오면 즉시 소급 분할.
-    await checkStudyDayBoundaryRollover();
-
-    updateStudyTimer();
-    syncAndroidTimer();
+    // v9.6: Android WebView 복귀도 동일한 foreground 복구 순서를 사용.
+    startBackgroundSensitiveLoops();
+    await recoverFromBackground();
   }catch(e){
     console.warn('앱 복귀 동기화 실패:', e);
   }

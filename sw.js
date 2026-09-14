@@ -1,4 +1,4 @@
-const CACHE = 'gongbujang-v9-5-retroactive-split';
+const CACHE = 'gongbujang-v9-6-battery-optimized';
 const APP_SHELL = [
   '/',
   '/index.html',
