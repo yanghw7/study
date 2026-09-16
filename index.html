@@ -11,10 +11,8 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .tabs{
   flex:0 0 56px;height:56px;display:grid;grid-template-columns:1fr 1fr 1fr;
   gap:6px;padding:7px 8px;background:#f7f9f8;border-bottom:1px solid #dde5e1;
-  position:relative;z-index:5;
-  transition:margin-top .16s ease;
+  position:sticky;top:0;z-index:999;
 }
-.shell.tabs-away .tabs{margin-top:-56px}
 .tabs button{min-width:0;border:0;border-radius:12px;font-weight:900;font-size:14px;background:#e8eeeb;color:#53615c;padding:0 5px;white-space:nowrap}
 .tabs button.active.study{background:#285f50;color:#fff}
 .tabs button.active.lecture{background:#67538b;color:#fff}
@@ -44,21 +42,8 @@ const tabs={
  lecture:{button:document.getElementById('lectureTab'),frame:document.getElementById('lectureFrame')},
  sleep:{button:document.getElementById('sleepTab'),frame:document.getElementById('sleepFrame')}
 };
-function bindFrameScroll(frame){
-  if(frame.dataset.scrollBound) return;
-  frame.dataset.scrollBound='1';
-  frame.addEventListener('load',()=>{
-    try{
-      const w=frame.contentWindow;
-      const update=()=>shell.classList.toggle('tabs-away',(w.scrollY||w.document.documentElement.scrollTop||0)>24);
-      w.addEventListener('scroll',update,{passive:true});
-      update();
-    }catch(e){}
-  });
-}
-Object.values(tabs).forEach(x=>bindFrameScroll(x.frame));
+
 function openTab(which){
-  shell.classList.remove('tabs-away');
   Object.entries(tabs).forEach(([key,item])=>{
     const active=key===which;
     item.button.classList.toggle('active',active);
@@ -78,6 +63,5 @@ openTab(first);
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
-</script>
-</body>
+</script></body>
 </html>

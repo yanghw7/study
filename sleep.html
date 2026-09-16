@@ -87,6 +87,16 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 /* v1.08: 수면장 기존 핵심영역 틀고정 유지 */
 .fixed-core{position:sticky!important;top:0!important;z-index:30!important}
 
+
+/* v1.09: 상단 버튼 순서/배치 통일 — 그래프 | 현재 날짜 | 동기화 | 설정 */
+.top-actions{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:10px!important}
+.top-right-actions{display:flex!important;align-items:center!important;gap:8px!important;margin-left:auto!important}
+.top-actions button{white-space:nowrap!important}
+@media(max-width:520px){
+  .top-actions{gap:6px!important}
+  .top-right-actions{gap:5px!important}
+}
+
 </style>
 <style>
 .alarm-card{padding:12px 14px !important;margin-bottom:16px !important;border-radius:18px !important}
@@ -190,7 +200,14 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 <meta name="theme-color" content="#285f50">
 <link rel="icon" href="./icon-192.png">
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
-<div class="top-actions"><button id="chartToggle">📈 그래프 보기</button><button id="syncBtn">↻ 동기화</button><button type="button" id="todayJumpBtn">현재 날짜</button><button id="settingsBtn">⚙ 설정</button></div>
+<div class="top-actions">
+  <button id="chartToggle">📈 그래프 보기</button>
+  <div class="top-right-actions">
+    <button type="button" id="todayJumpBtn">현재 날짜</button>
+    <button id="syncBtn">↻ 동기화</button>
+    <button id="settingsBtn">⚙ 설정</button>
+  </div>
+</div>
 <div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
 <div class="tabs"><button class="active" data-view="day">오늘</button><button data-view="week">주별</button><button data-view="month">월별</button><button data-view="year">년도별</button></div>
 <div class="fixed-core" id="fixedCore">
@@ -782,7 +799,13 @@ $('#saveSettings').onclick=()=>{
   $('#settingsOverlay').classList.remove('show');
   render();
   toast(`${pad(requestedHour)}:00 기준 · ${effectiveAt.getMonth()+1}/${effectiveAt.getDate()} ${pad(effectiveAt.getHours())}:${pad(effectiveAt.getMinutes())}부터 적용`);
-};document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>$('#'+x.dataset.close).classList.remove('show'));$('#deleteAll').onclick=()=>{if(confirm('모든 수면 기록을 삭제할까요?')){data={sessions:[],active:null};save();render();toast('모든 기록 삭제 완료')}}
+};document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>$('#'+x.dataset.close).classList.remove('show'));$('#deleteAll').onclick=()=>{if(confirm('모든 수면 기록을 삭제할까요?')){
+  data={sessions:[],active:null};
+  save();
+  $('#settingsOverlay').classList.remove('show');
+  render();
+  toast('모든 수면 기록을 삭제했어요');
+}}
 function movePeriod(dir){
   let n=new Date(cur);
   if(view==='day') n.setDate(n.getDate()+dir);
@@ -1467,5 +1490,4 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
-</script>
-</body></html>
+</script></body></html>
