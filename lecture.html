@@ -568,6 +568,21 @@ body{background:#f7f5fb!important}
 }
 </style>
 
+
+<style id="v123-header-cloud-unify">
+/* v1.23: exact cross-page control sizing */
+.top-actions{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:8px!important;margin-bottom:10px!important}
+.top-right-actions{display:flex!important;align-items:center!important;gap:8px!important;margin-left:auto!important}
+.sync-top-btn,.settings-top-btn,.top-chart-btn{box-sizing:border-box!important;margin:0!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;min-height:42px!important;height:42px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:13px!important;font-weight:700!important;line-height:1!important;white-space:nowrap!important;box-shadow:0 1px 4px rgba(0,0,0,.05)!important}
+.sync-top-btn,.settings-top-btn{padding:8px 7px!important}
+.top-chart-btn{padding:8px 11px!important;width:auto!important}
+/* Cloud layout follows the sleep-page layout */
+.cloud-card{display:block!important;background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:12px!important;margin:-6px 0 14px!important}
+.cloud-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;margin-top:8px!important}
+.cloud-actions .data-btn{box-sizing:border-box!important;width:100%!important;min-width:0!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;padding:9px 6px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:12px!important;font-weight:700!important;line-height:1.2!important;white-space:nowrap!important}
+.cloud-actions .data-btn[style*="display:none"]{display:none!important}
+@media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
+</style>
 </head>
 <script>
 (()=> {
