@@ -20,9 +20,6 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .frame{display:none;flex:1 1 auto;width:100%;min-height:0;border:0;background:#fff}
 .frame.active{display:block}
 </style>
-<link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#285f50">
-<link rel="icon" href="./icon-192.png">
 </head>
 <body>
 <div class="shell" id="shell">
@@ -58,10 +55,56 @@ Object.entries(tabs).forEach(([key,item])=>item.button.onclick=()=>openTab(key))
 let first='study';
 try{const saved=localStorage.getItem('journal:lastTab');if(saved&&tabs[saved])first=saved}catch(e){}
 openTab(first);
-</script>
-<script>
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){
- window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+
+
+const baseTabLabels={study:'📚 공부장',lecture:'🎓 강의기록',sleep:'🌙 수면장'};
+function setExclusiveTabStatus(kind){
+  Object.entries(tabs).forEach(([key,item])=>{
+    if(key==='study') item.button.textContent = kind==='study' ? '📚 공부장 기록중' : baseTabLabels.study;
+    else if(key==='lecture') item.button.textContent = kind==='lecture' ? '🎓 강의장 기록중' : baseTabLabels.lecture;
+    else item.button.textContent = kind==='sleep' ? '🌙 수면장 기록중' : baseTabLabels.sleep;
+  });
 }
-</script></body>
+
+const exclusiveFrames={study:tabs.study.frame,lecture:tabs.lecture.frame,sleep:tabs.sleep.frame};
+let exclusiveActive=null;
+let exclusiveQueue=Promise.resolve();
+
+function stopExclusive(kind){
+  return new Promise(resolve=>{
+    const frame=exclusiveFrames[kind];
+    if(!frame?.contentWindow){resolve(true);return}
+    const req='stop-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    const timer=setTimeout(()=>{window.removeEventListener('message',done);resolve(true)},2200);
+    function done(ev){
+      if(ev.origin!==location.origin||ev.source!==frame.contentWindow||
+         ev.data?.type!=='exclusive-session-stopped'||ev.data?.req!==req)return;
+      clearTimeout(timer);window.removeEventListener('message',done);resolve(ev.data.ok!==false);
+    }
+    window.addEventListener('message',done);
+    frame.contentWindow.postMessage({type:'exclusive-session-stop',kind,req},location.origin);
+  });
+}
+window.addEventListener('message',ev=>{
+  if(ev.origin!==location.origin)return;
+  if(ev.data?.type==='exclusive-session-ended'){
+    if(exclusiveActive===ev.data.kind){ exclusiveActive=null; setExclusiveTabStatus(null); }
+    return;
+  }
+  if(ev.data?.type!=='exclusive-session-start')return;
+  const kind=ev.data.kind, req=ev.data.req;
+  if(!exclusiveFrames[kind])return;
+  exclusiveQueue=exclusiveQueue.then(async()=>{
+    // Ask both other pages to stop. This also repairs state if index was reloaded.
+    for(const other of Object.keys(exclusiveFrames)){
+      if(other!==kind) await stopExclusive(other);
+    }
+    exclusiveActive=kind;
+    setExclusiveTabStatus(kind);
+    ev.source?.postMessage({type:'exclusive-session-result',req,ok:true},location.origin);
+  });
+});
+
+</script>
+</body>
 </html>

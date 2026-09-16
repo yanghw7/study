@@ -196,9 +196,6 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 </style>
 
 <!-- sleep_v1.07: v46 기준 UI/그래프/10분 알람 보완 -->
-<link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#285f50">
-<link rel="icon" href="./icon-192.png">
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
 <div class="top-actions">
   <button id="chartToggle">📈 그래프 보기</button>
@@ -728,12 +725,42 @@ $('#saveEdit').onclick=()=>{let x=data.sessions.find(s=>s.id===editing),a=new Da
     return alert(`이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치지 않는 시간으로 수정해주세요.`);
   }
   x.start=a;x.end=b;data.sessions.sort((x,y)=>x.start-y.start);save();$('#editOverlay').classList.remove('show');render();toast('수정했어요')}
-$('#action').onclick=()=>{if(!data.active){data.active={start:Date.now()};save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
+async function requestExclusiveSessionStart(){
+  if(window.parent===window)return true;
+  try{
+    const req='sleep-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    return await new Promise(resolve=>{
+      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},2500);
+      function onMsg(ev){
+        if(ev.source!==window.parent||ev.data?.type!=='exclusive-session-result'||ev.data?.req!==req)return;
+        clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
+      }
+      window.addEventListener('message',onMsg);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'sleep',req},location.origin);
+    });
+  }catch(e){return true}
+}
+window.addEventListener('message',ev=>{
+  if(ev.origin!==location.origin||ev.data?.type!=='exclusive-session-stop'||ev.data?.kind!=='sleep')return;
+  let stopped=false;
+  try{
+    if(data.active){
+      const end=Date.now();
+      const overlap=overlappingSession(data.active.start,end);
+      if(!overlap){
+        data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});
+        data.active=null;save();render();stopped=true;
+      }
+    }
+  }catch(e){console.warn('자동 수면 종료 실패',e)}
+  window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped},location.origin);
+});
+$('#action').onclick=async()=>{if(!data.active){if(!(await requestExclusiveSessionStart()))return;data.active={start:Date.now()};save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
 if(overlap){
   alert(`현재 수면시간이 이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치는 기록을 먼저 수정하거나 삭제해주세요.`);
   return;
 }
-data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});data.active=null;save();render();toast('수면 종료 · 저장 완료')}render()}
+data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});data.active=null;save();render();toast('수면 종료 · 저장 완료');if(window.parent!==window)window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin)}render()}
 function tick(){
   let n=Date.now();
   if(view==='day' && ymd(cur)===ymd(logicalToday())){
@@ -1486,8 +1513,4 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 })();
 </script>
 
-<script>
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){
- window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-}
-</script></body></html>
+</body></html>

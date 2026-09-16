@@ -2288,6 +2288,41 @@ $('#periodList').addEventListener('input', async (e) => {
 });
 
 
+
+async function requestExclusiveSessionStart(){
+  if(window.parent===window) return true;
+  try{
+    const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    return await new Promise(resolve=>{
+      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},2500);
+      function onMsg(ev){
+        if(ev.source!==window.parent || ev.data?.type!=='exclusive-session-result' || ev.data?.req!==req)return;
+        clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
+      }
+      window.addEventListener('message',onMsg);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req},location.origin);
+    });
+  }catch(e){return true}
+}
+window.addEventListener('message',async ev=>{
+  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
+  let stopped=false;
+  try{
+    const now=new Date(serverNowMs()),day=getDayData();
+    const p=(day.periods||[]).find(x=>Number(x.timerStartedAt)>0 && !Number(x.timerEndedAt));
+    if(p){
+      p.endDate=ymd(now);p.endTime=hm(now);
+      if(cloudUser){
+        const row=await cloudStopActiveTimer();const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
+        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(serverNowMs());
+      }else p.timerEndedAt=Math.round(serverNowMs());
+      p._updatedAt=syncNow();autoSortPeriodsByStart(day);await persistToday();
+      renderPeriods();updateStudyTimer();updateWasteTimer();stopped=true;
+    }
+  }catch(e){console.warn('자동 강의 종료 실패',e)}
+  window.parent.postMessage({type:'exclusive-session-stopped',kind:'lecture',req:ev.data.req,ok:true,stopped},location.origin);
+});
+
 // 강의 카드의 시작/종료 버튼
 $('#periodList').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-lecture-action]');
@@ -2305,6 +2340,7 @@ $('#periodList').addEventListener('click', async (e) => {
   }
 
   if(btn.dataset.lectureAction === 'start'){
+    if(!(await requestExclusiveSessionStart())) return;
     p.startDate = ymd(now);
     p.startTime = hm(now);
     p.endDate = '';
@@ -2333,6 +2369,7 @@ $('#periodList').addEventListener('click', async (e) => {
     }else{
       p.timerEndedAt = Math.round(serverNowMs());
     }
+    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
   }
   p._updatedAt = syncNow();
   if(btn.dataset.lectureAction === 'end') autoSortPeriodsByStart(day);
@@ -3779,9 +3816,5 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
-<script>
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){
- window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-}
-</script></body>
+</body>
 </html>
