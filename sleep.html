@@ -83,6 +83,10 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 .alarm-set{border:0;background:var(--accent);color:white}.alarm-cancel{border:1px solid var(--line);background:var(--surface);color:var(--text)}
 .alarm-local-note{margin-top:10px;font-size:11px;color:var(--soft);text-align:center}
 @media(max-width:430px){.alarm-time-grid{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto}.alarm-sound-row{grid-template-columns:1fr auto}.alarm-sound-row label{grid-column:1/-1}}
+
+/* v1.08: 수면장 기존 핵심영역 틀고정 유지 */
+.fixed-core{position:sticky!important;top:0!important;z-index:30!important}
+
 </style>
 <style>
 .alarm-card{padding:12px 14px !important;margin-bottom:16px !important;border-radius:18px !important}
@@ -182,6 +186,9 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 </style>
 
 <!-- sleep_v1.07: v46 기준 UI/그래프/10분 알람 보완 -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#285f50">
+<link rel="icon" href="./icon-192.png">
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
 <div class="top-actions"><button id="chartToggle">📈 그래프 보기</button><button id="syncBtn">↻ 동기화</button><button type="button" id="todayJumpBtn">현재 날짜</button><button id="settingsBtn">⚙ 설정</button></div>
 <div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
@@ -1456,4 +1463,9 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 })();
 </script>
 
+<script>
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
 </body></html>

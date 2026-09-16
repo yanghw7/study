@@ -6,59 +6,77 @@
 <title>기록장</title>
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;font-family:system-ui,-apple-system,sans-serif;background:#f5f7f6}
-.tabs{height:56px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:7px 8px;background:#f7f9f8;border-bottom:1px solid #dde5e1;position:sticky;top:0;z-index:999}
+html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;background:#f5f7f6}
+.shell{height:100dvh;display:flex;flex-direction:column}
+.tabs{
+  flex:0 0 56px;height:56px;display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:6px;padding:7px 8px;background:#f7f9f8;border-bottom:1px solid #dde5e1;
+  position:relative;z-index:5;
+  transition:margin-top .16s ease;
+}
+.shell.tabs-away .tabs{margin-top:-56px}
 .tabs button{min-width:0;border:0;border-radius:12px;font-weight:900;font-size:14px;background:#e8eeeb;color:#53615c;padding:0 5px;white-space:nowrap}
 .tabs button.active.study{background:#285f50;color:#fff}
 .tabs button.active.lecture{background:#67538b;color:#fff}
-.tabs button.active.sleep{background:#385b7a;color:#fff}
-.frame{display:none;width:100%;height:calc(100dvh - 56px);border:0;background:#fff}
+.tabs button.active.sleep{background:#456d96;color:#fff}
+.frame{display:none;flex:1 1 auto;width:100%;min-height:0;border:0;background:#fff}
 .frame.active{display:block}
 </style>
-
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#285f50">
 <link rel="icon" href="./icon-192.png">
 </head>
 <body>
-<div class="tabs">
-<button id="studyTab" class="active study">📚 공부장</button>
-<button id="lectureTab" class="lecture">🎓 강의기록</button>
-<button id="sleepTab" class="sleep">🌙 수면장</button>
+<div class="shell" id="shell">
+  <div class="tabs">
+    <button id="studyTab" class="active study">📚 공부장</button>
+    <button id="lectureTab" class="lecture">🎓 강의기록</button>
+    <button id="sleepTab" class="sleep">🌙 수면장</button>
+  </div>
+  <iframe id="studyFrame" class="frame active" src="study.html"></iframe>
+  <iframe id="lectureFrame" class="frame" data-src="lecture.html"></iframe>
+  <iframe id="sleepFrame" class="frame" data-src="sleep.html"></iframe>
 </div>
-
-<iframe id="studyFrame" class="frame active" src="study.html"></iframe>
-<iframe id="lectureFrame" class="frame" data-src="lecture.html"></iframe>
-<iframe id="sleepFrame" class="frame" data-src="sleep.html"></iframe>
-
 <script>
+const shell=document.getElementById('shell');
 const tabs={
  study:{button:document.getElementById('studyTab'),frame:document.getElementById('studyFrame')},
  lecture:{button:document.getElementById('lectureTab'),frame:document.getElementById('lectureFrame')},
  sleep:{button:document.getElementById('sleepTab'),frame:document.getElementById('sleepFrame')}
 };
+function bindFrameScroll(frame){
+  if(frame.dataset.scrollBound) return;
+  frame.dataset.scrollBound='1';
+  frame.addEventListener('load',()=>{
+    try{
+      const w=frame.contentWindow;
+      const update=()=>shell.classList.toggle('tabs-away',(w.scrollY||w.document.documentElement.scrollTop||0)>24);
+      w.addEventListener('scroll',update,{passive:true});
+      update();
+    }catch(e){}
+  });
+}
+Object.values(tabs).forEach(x=>bindFrameScroll(x.frame));
 function openTab(which){
- Object.entries(tabs).forEach(([key,item])=>{
-   const active=key===which;
-   item.button.classList.toggle('active',active);
-   item.frame.classList.toggle('active',active);
-   if(active && !item.frame.getAttribute('src') && item.frame.dataset.src){
-     item.frame.src=item.frame.dataset.src;
-   }
- });
- try{localStorage.setItem('journal:lastTab',which)}catch(e){}
+  shell.classList.remove('tabs-away');
+  Object.entries(tabs).forEach(([key,item])=>{
+    const active=key===which;
+    item.button.classList.toggle('active',active);
+    item.frame.classList.toggle('active',active);
+    if(active && !item.frame.getAttribute('src') && item.frame.dataset.src){
+      item.frame.src=item.frame.dataset.src;
+    }
+  });
+  try{localStorage.setItem('journal:lastTab',which)}catch(e){}
 }
 Object.entries(tabs).forEach(([key,item])=>item.button.onclick=()=>openTab(key));
 let first='study';
-try{
- const saved=localStorage.getItem('journal:lastTab');
- if(saved && tabs[saved]) first=saved;
-}catch(e){}
+try{const saved=localStorage.getItem('journal:lastTab');if(saved&&tabs[saved])first=saved}catch(e){}
 openTab(first);
 </script>
 <script>
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 </script>
 </body>

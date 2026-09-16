@@ -266,7 +266,7 @@
   .pull-refresh-blur{
     position:fixed;inset:0;z-index:9997;pointer-events:none;opacity:0;
     background:rgba(255,255,255,.08);
-    -webkit-backdrop-filter:blur(0px);backdrop-filter:blur(0px);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
     transition:opacity .14s ease,-webkit-backdrop-filter .14s ease,backdrop-filter .14s ease;
   }
   .pull-refresh-blur.show{opacity:1;}
@@ -334,6 +334,11 @@
   @media(max-width:520px){
     #dayView > .summary-card{top:112px}
   }
+
+
+/* v1.08: 기존 틀고정 복구 — 알람 + 오늘 합계만 고정 */
+#dayView > .study-alarm-card{position:sticky!important;top:8px!important;z-index:22!important}
+#dayView > .summary-card{position:sticky!important;top:116px!important;z-index:21!important}
 
 </style>
 </head>
@@ -2387,8 +2392,8 @@ function showChartTooltip(bar, clientX, clientY){
     indicator.classList.remove('show','ready');
     if(blurLayer){
       blurLayer.classList.remove('show');
-      blurLayer.style.webkitBackdropFilter = 'blur(0px)';
-      blurLayer.style.backdropFilter = 'blur(0px)';
+      blurLayer.style.webkitBackdropFilter = 'none';
+      blurLayer.style.backdropFilter = 'none';
     }
     indicator.style.transform = 'translate(-50%,-70px)';
     indicator.textContent = '↓ 당겨서 동기화';
@@ -2418,8 +2423,8 @@ function showChartTooltip(bar, clientX, clientY){
     if(blurLayer){
       const blurPx = Math.min(7, 1 + distance / 20);
       blurLayer.classList.add('show');
-      blurLayer.style.webkitBackdropFilter = `blur(${blurPx}px)`;
-      blurLayer.style.backdropFilter = `blur(${blurPx}px)`;
+      blurLayer.style.webkitBackdropFilter = 'none';
+      blurLayer.style.backdropFilter = 'none';
     }
     indicator.style.transform = `translate(-50%,${Math.min(18, -46 + distance * 0.58)}px)`;
     const ready = distance >= TRIGGER;
@@ -2462,8 +2467,8 @@ function showChartTooltip(bar, clientX, clientY){
     indicator.textContent = '↑ 당겨서 동기화';
     if(blurLayer){
       blurLayer.classList.remove('show');
-      blurLayer.style.webkitBackdropFilter = 'blur(0px)';
-      blurLayer.style.backdropFilter = 'blur(0px)';
+      blurLayer.style.webkitBackdropFilter = 'none';
+      blurLayer.style.backdropFilter = 'none';
     }
   };
 
@@ -2486,8 +2491,8 @@ function showChartTooltip(bar, clientX, clientY){
     if(blurLayer){
       const blurPx = Math.min(7, 1 + distance / 20);
       blurLayer.classList.add('show');
-      blurLayer.style.webkitBackdropFilter = `blur(${blurPx}px)`;
-      blurLayer.style.backdropFilter = `blur(${blurPx}px)`;
+      blurLayer.style.webkitBackdropFilter = 'none';
+      blurLayer.style.backdropFilter = 'none';
     }
     indicator.style.transform = `translate(-50%,${Math.min(10, -70 + distance * 0.72)}px)`;
     const ready = distance >= TRIGGER;
@@ -3464,7 +3469,7 @@ if ('serviceWorker' in navigator) {
 
 <script>
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 </script>
 </body>
