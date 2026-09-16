@@ -759,7 +759,7 @@ function fmtDuration(min){
 const dayKeys = ['일','월','화','수','목','금','토'];
 
 // 사용자 설정: 하루 집계 기준시간 / 일주일 시작 요일
-const SETTINGS_KEY = 'studySettings:v1';
+const SETTINGS_KEY = 'lectureSettings:v1';
 const DEFAULT_SETTINGS = { dayStartHour: 11, weekStartDay: 6, pendingDayStart: null }; // 기본 11:00, 6 = 토요일
 function loadSettings(){
   try{
@@ -1002,7 +1002,7 @@ function mergeMonths(localMonth, remoteMonth, ym=''){
 async function loadMonth(ym){
   if(monthCache[ym]) return monthCache[ym];
   try{
-    const raw = localStorage.getItem(`month:${ym}`);
+    const raw = localStorage.getItem(`lectureMonth:${ym}`);
     const m = raw ? JSON.parse(raw) : {};
     const [year, mo] = ym.split('-').map(Number);
     Object.keys(m).forEach(dk => {
@@ -1017,7 +1017,7 @@ async function loadMonth(ym){
 
 async function saveMonth(ym){
   try{
-    localStorage.setItem(`month:${ym}`, JSON.stringify(monthCache[ym]));
+    localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(monthCache[ym]));
     await cloudSaveMonth(ym);
   }catch(e){
     console.error('저장 실패:', e);
@@ -2642,7 +2642,7 @@ async function renderYearView(){
   const years = new Set([cur.getFullYear()]);
   for(let i=0; i<localStorage.length; i++){
     const k = localStorage.key(i);
-    const m = k && k.match(/^month:(\d{4})-\d{2}$/);
+    const m = k && k.match(/^lectureMonth:(\d{4})-\d{2}$/);
     if(m) years.add(Number(m[1]));
   }
   Object.keys(monthCache).forEach(k=>{ const m=k.match(/^(\d{4})-\d{2}$/); if(m) years.add(Number(m[1])); });
@@ -3036,7 +3036,7 @@ async function deleteAllStudyRecords(){
       alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
       return;
     }
-    const {error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id);
+    const {error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id).like('ym','L:%');
     if(error){
       alert('클라우드 기록 삭제에 실패해 삭제를 중단했어요: ' + error.message);
       return;
@@ -3049,7 +3049,7 @@ async function deleteAllStudyRecords(){
   const keys=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
-    if(k && k.startsWith('month:')) keys.push(k);
+    if(k && k.startsWith('lectureMonth:')) keys.push(k);
   }
   keys.forEach(k=>localStorage.removeItem(k));
   monthCache = {};
@@ -3067,7 +3067,7 @@ async function stampExistingStudyDays(){
   const monthKeys = new Set();
   for(let i=0; i<localStorage.length; i++){
     const k = localStorage.key(i);
-    const m = k && k.match(/^month:(\d{4}-\d{2})$/);
+    const m = k && k.match(/^lectureMonth:(\d{4}-\d{2})$/);
     if(m) monthKeys.add(m[1]);
   }
   Object.keys(monthCache).forEach(k=>{ if(/^\d{4}-\d{2}$/.test(k)) monthKeys.add(k); });
@@ -3149,6 +3149,10 @@ async function refreshCloudStatus(){
   $('#cloudLogout').style.display = cloudUser ? '' : 'none';
 }
 
+
+function lectureCloudYm(ym){ return `L:${ym}`; }
+function lectureLocalYm(v){ return String(v||'').startsWith('L:') ? String(v).slice(2) : null; }
+
 async function cloudSaveMonth(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
   // 낙관적 병합: 저장 직전 클라우드 최신본을 읽고 날짜/교시/필드 단위로 합친다.
@@ -3156,7 +3160,7 @@ async function cloudSaveMonth(ym){
   let local = ensureMonthSync(deepClone(monthCache[ym]), ym);
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',ym).limit(1);
+      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym)).limit(1);
     if(readErr){ console.error('클라우드 저장 전 읽기 실패:', readErr); return; }
     const row = rows && rows[0];
     const merged = mergeMonths(local, row?.data || {}, ym);
@@ -3164,19 +3168,19 @@ async function cloudSaveMonth(ym){
     let writeOk=false;
     if(row){
       let q = sbClient.from('study_months').update({data:merged,updated_at:nowIso})
-        .eq('user_id',cloudUser.id).eq('ym',ym);
+        .eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
       else if(wErr) console.warn('동기화 충돌 재시도:', wErr.message);
     }else{
-      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym,data:merged,updated_at:nowIso});
+      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:lectureCloudYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
       else console.warn('동기화 신규 저장 재시도:', iErr.message);
     }
     if(writeOk){
       monthCache[ym]=merged;
-      localStorage.setItem(`month:${ym}`,JSON.stringify(merged));
+      localStorage.setItem(`lectureMonth:${ym}`,JSON.stringify(merged));
       return;
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
@@ -3201,15 +3205,17 @@ async function autoSyncFromCloud(){
   if(!sbClient || !cloudUser) return;
   const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
   if(error){ console.error('자동 동기화 불러오기 실패:', error); return; }
-  if(!data || data.length===0) return;
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  if(lectureRows.length===0) return;
   const needsPush=[];
-  for(const row of data){
-    const ym=row.ym;
+  for(const row of lectureRows){
+    const ym=lectureLocalYm(row.ym);
+    if(!ym) continue;
     let local={};
-    try{ local=JSON.parse(localStorage.getItem(`month:${ym}`)||'{}'); }catch(e){}
+    try{ local=JSON.parse(localStorage.getItem(`lectureMonth:${ym}`)||'{}'); }catch(e){}
     const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
     const merged=mergeMonths(local,remoteNorm,ym);
-    localStorage.setItem(`month:${ym}`,JSON.stringify(merged));
+    localStorage.setItem(`lectureMonth:${ym}`,JSON.stringify(merged));
     monthCache[ym]=merged;
     if(!jsonSame(merged,remoteNorm)) needsPush.push(ym);
   }
@@ -3229,14 +3235,18 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+error.message); return; }
-  if(!data || data.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 강의 기록을 교체할까요?')) return;
   const keys=[];
   for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i); if(k && k.startsWith('month:')) keys.push(k);
+    const k=localStorage.key(i); if(k && k.startsWith('lectureMonth:')) keys.push(k);
   }
   keys.forEach(k=>localStorage.removeItem(k));
-  data.forEach(row=>localStorage.setItem(`month:${row.ym}`, JSON.stringify(row.data || {})));
+  lectureRows.forEach(row=>{
+    const ym=lectureLocalYm(row.ym);
+    if(ym) localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(row.data || {}));
+  });
   monthCache={};
   enforceStudyDayLimit();
   await renderCurrentView();
@@ -3623,13 +3633,13 @@ function collectBackupData(){
   const months = {};
   for(let i=0; i<localStorage.length; i++){
     const key = localStorage.key(i);
-    if(key && key.startsWith('month:')){
-      try{ months[key.slice(6)] = JSON.parse(localStorage.getItem(key)); }
-      catch(e){ months[key.slice(6)] = {}; }
+    if(key && key.startsWith('lectureMonth:')){
+      try{ months[key.slice(13)] = JSON.parse(localStorage.getItem(key)); }
+      catch(e){ months[key.slice(13)] = {}; }
     }
   }
   return {
-    app: 'study-log',
+    app: 'lecture-log',
     version: 1,
     exportedAt: new Date().toISOString(),
     settings: appSettings,
@@ -3643,7 +3653,7 @@ $('#backupData').onclick = () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `study-log-backup-${ymd(new Date())}.json`;
+  a.download = `lecture-log-backup-${ymd(new Date())}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3658,7 +3668,7 @@ $('#restoreFile').addEventListener('change', async (e) => {
   if(!file) return;
   try{
     const parsed = JSON.parse(await file.text());
-    if(!parsed || parsed.app !== 'study-log' || !parsed.months || typeof parsed.months !== 'object'){
+    if(!parsed || parsed.app !== 'lecture-log' || !parsed.months || typeof parsed.months !== 'object'){
       throw new Error('invalid backup');
     }
     if(!confirm('백업 데이터를 복원하면 현재 강의 기록이 백업 내용으로 교체됩니다. 계속할까요?')){
@@ -3668,12 +3678,12 @@ $('#restoreFile').addEventListener('change', async (e) => {
     const keysToRemove = [];
     for(let i=0; i<localStorage.length; i++){
       const key = localStorage.key(i);
-      if(key && key.startsWith('month:')) keysToRemove.push(key);
+      if(key && key.startsWith('lectureMonth:')) keysToRemove.push(key);
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
     Object.entries(parsed.months).forEach(([ym, data]) => {
       if(/^\d{4}-\d{2}$/.test(ym)){
-        localStorage.setItem(`month:${ym}`, JSON.stringify(data || {}));
+        localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(data || {}));
       }
     });
     if(parsed.settings && typeof parsed.settings === 'object'){

@@ -2916,9 +2916,10 @@ async function autoSyncFromCloud(){
   if(!sbClient || !cloudUser) return;
   const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
   if(error){ console.error('자동 동기화 불러오기 실패:', error); return; }
-  if(!data || data.length===0) return;
+  const studyRows=(data||[]).filter(row=>!String(row.ym||'').startsWith('L:'));
+  if(studyRows.length===0) return;
   const needsPush=[];
-  for(const row of data){
+  for(const row of studyRows){
     const ym=row.ym;
     let local={};
     try{ local=JSON.parse(localStorage.getItem(`month:${ym}`)||'{}'); }catch(e){}
@@ -2944,14 +2945,15 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+error.message); return; }
-  if(!data || data.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
+  const studyRows=(data||[]).filter(row=>!String(row.ym||'').startsWith('L:'));
+  if(studyRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 공부 기록을 교체할까요?')) return;
   const keys=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i); if(k && k.startsWith('month:')) keys.push(k);
   }
   keys.forEach(k=>localStorage.removeItem(k));
-  data.forEach(row=>localStorage.setItem(`month:${row.ym}`, JSON.stringify(row.data || {})));
+  studyRows.forEach(row=>localStorage.setItem(`month:${row.ym}`, JSON.stringify(row.data || {})));
   monthCache={};
   enforceStudyDayLimit();
   await renderCurrentView();
