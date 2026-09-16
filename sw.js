@@ -1,11 +1,11 @@
-const CACHE = 'gongbujang-v10-5';
+const CACHE = 'gongbujang-v10-6-study';
 const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon-maskable-512.png'
+  '/study/',
+  '/study/index.html',
+  '/study/manifest.webmanifest',
+  '/study/icons/icon-192.png',
+  '/study/icons/icon-512.png',
+  '/study/icons/icon-maskable-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -39,10 +39,10 @@ self.addEventListener('fetch', event => {
       fetch(req)
         .then(res => {
           const copy = res.clone();
-          caches.open(CACHE).then(cache => cache.put('/index.html', copy));
+          caches.open(CACHE).then(cache => cache.put('/study/index.html', copy));
           return res;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match('/study/index.html'))
     );
     return;
   }
