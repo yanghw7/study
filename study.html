@@ -330,15 +330,15 @@
   }
 /* v1.0 stable: alarm immediately above Today Total, both sticky */
   #dayView > .study-alarm-card{position:sticky;top:8px;z-index:22}
-  #dayView > .summary-card{position:sticky;top:116px;z-index:21}
+  #dayView > .summary-card{position:static;top:auto;z-index:auto}
   @media(max-width:520px){
-    #dayView > .summary-card{top:112px}
+    #dayView > .summary-card{top:auto}
   }
 
 
 /* v1.08: 기존 틀고정 복구 — 알람 + 오늘 합계만 고정 */
 #dayView > .study-alarm-card{position:sticky!important;top:8px!important;z-index:22!important}
-#dayView > .summary-card{position:sticky!important;top:116px!important;z-index:21!important}
+#dayView > .summary-card{position:static!important;top:auto!important;z-index:auto!important}
 
 .field.time{position:relative;min-height:45px}.field.time input[type="datetime-local"]{color:transparent;caret-color:transparent;min-height:20px}.field.time input[type="datetime-local"]::-webkit-calendar-picker-indicator{opacity:1;cursor:pointer}.ko-time-label{position:absolute;left:10px;right:34px;bottom:7px;z-index:2;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:700;color:var(--ink);background:var(--bg);line-height:20px}
 
@@ -386,6 +386,26 @@
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
 <div class="wrap">
+
+  <div class="summary-card">
+      <div class="summary-head">
+        <div class="summary-title today-summary-title">오늘 합계</div>
+        <div class="study-timer" id="studyTimer" aria-live="polite" title="시작 페이지 입력 시 시작 · 끝 페이지 입력 시 종료">
+          <span class="study-timer-label" id="studyTimerLabel">타이머</span>
+          <span class="study-timer-time" id="studyTimerTime">00:00:00</span>
+        </div>
+        <div class="study-timer waste-timer" id="wasteTimer" aria-live="polite" title="교시 종료부터 다음 교시 시작까지 자동 측정">
+          <span class="study-timer-label" id="wasteTimerLabel">낭비시간</span>
+          <span class="study-timer-time" id="wasteTimerTime">00:00:00</span>
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-item ok"><b id="sumStudy">0분</b><span>공부시간</span></div>
+        <div class="summary-item"><b id="sumPages">0 Page</b><span>공부 페이지</span></div>
+        <div class="summary-item warn"><b id="sumWaste">0분</b><span>낭비시간</span></div>
+      </div>
+    </div>
+
 
   <div class="top-actions">
     <button class="chart-toggle-btn top-chart-btn" id="chartToggle" aria-pressed="false">📈 그래프 보기</button>
@@ -470,24 +490,7 @@
     <button class="study-alarm-stop" id="studyAlarmStop" type="button">🔕 알람 끄기</button>
   </div>
 
-    <div class="summary-card">
-      <div class="summary-head">
-        <div class="summary-title today-summary-title">오늘 합계</div>
-        <div class="study-timer" id="studyTimer" aria-live="polite" title="시작 페이지 입력 시 시작 · 끝 페이지 입력 시 종료">
-          <span class="study-timer-label" id="studyTimerLabel">타이머</span>
-          <span class="study-timer-time" id="studyTimerTime">00:00:00</span>
-        </div>
-        <div class="study-timer waste-timer" id="wasteTimer" aria-live="polite" title="교시 종료부터 다음 교시 시작까지 자동 측정">
-          <span class="study-timer-label" id="wasteTimerLabel">낭비시간</span>
-          <span class="study-timer-time" id="wasteTimerTime">00:00:00</span>
-        </div>
-      </div>
-      <div class="summary-grid">
-        <div class="summary-item ok"><b id="sumStudy">0분</b><span>공부시간</span></div>
-        <div class="summary-item"><b id="sumPages">0 Page</b><span>공부 페이지</span></div>
-        <div class="summary-item warn"><b id="sumWaste">0분</b><span>낭비시간</span></div>
-      </div>
-    </div>
+    
 
     <div id="dayCharts"></div>
     <div id="periodList"></div>
@@ -2033,10 +2036,31 @@ $('#periodList').addEventListener('input', async (e) => {
     if(endEl) endEl.min = String(p.startPage||'').trim() || '1';
   }
 
-  // 종료 페이지는 입력 중에는 자유롭게 타이핑하게 둔다.
-  // 예: 시작 페이지가 35일 때 종료 페이지 40을 입력하려면 첫 숫자 '4'가
-  // 일시적으로 35보다 작으므로, input 이벤트에서 즉시 지우면 입력 자체가 불가능하다.
-  // 최종 유효성 검사는 change/focusout 시점에 처리한다.
+  // 종료 페이지 제한: 입력 도중 필요한 접두 숫자는 허용하되,
+  // 시작 페이지와 같은 자릿수 이상이 된 순간 더 작은 값이면 즉시 거부한다.
+  // 예: 시작 35 -> 끝 40 입력 시 첫 '4'는 허용, '40'도 허용.
+  // 시작 35 -> 끝 20 입력 시 '20'이 되는 순간 즉시 삭제한다.
+  if(k==='endPage'){
+    const startRaw = String(p.startPage ?? '').trim();
+    const endRaw = String(t.value ?? '').trim();
+    const startNum = Number(startRaw), endNum = Number(endRaw);
+    if(startRaw && endRaw && /^\d+$/.test(endRaw) &&
+       Number.isFinite(startNum) && startNum > 0 && Number.isFinite(endNum) && endNum > 0 &&
+       endRaw.length >= startRaw.length && endNum < startNum){
+      p.endPage=''; p.endDate=''; p.endTime=''; p.timerEndedAt=null;
+      t.value='';
+      const endDT=$('#periodList').querySelector(`input[data-k="end"][data-idx="${idx}"]`);
+      if(endDT){
+        endDT.value='';
+        const labelEl=endDT.nextElementSibling;
+        if(labelEl && labelEl.classList.contains('ko-time-label')) labelEl.textContent='';
+      }
+      showToast('종료 페이지는 시작 페이지보다 작을 수 없어요');
+      refreshStats();
+      await persistToday();
+      return;
+    }
+  }
 
   // 페이지 번호와 자동기록 시간을 서로 연동:
   // - 페이지를 처음 입력하는 순간(빈칸/0→값) 현재 날짜+시간을 자동 기록
@@ -2154,10 +2178,9 @@ $('#periodList').addEventListener('input', async (e) => {
   if(reordered) renderPeriods();
 });
 
-// 종료 페이지 최종값 검증: 입력을 마친 뒤 시작 페이지보다 작으면 비운다.
-$('#periodList').addEventListener('change', async (e) => {
-  const t = e.target;
-  if(t.tagName !== 'INPUT' || t.dataset.k !== 'endPage') return;
+// 종료 페이지 최종값 검증: 입력 중에는 건드리지 않고, change/focusout 때만 검사한다.
+async function validateEndPageFinal(t){
+  if(!t || t.tagName !== 'INPUT' || t.dataset.k !== 'endPage') return;
   const idx = Number(t.dataset.idx);
   const day = getDayData();
   const p = day.periods[idx];
@@ -2180,7 +2203,9 @@ $('#periodList').addEventListener('change', async (e) => {
     refreshStats();
     await persistToday();
   }
-});
+}
+$('#periodList').addEventListener('change', e => { validateEndPageFinal(e.target); });
+$('#periodList').addEventListener('focusout', e => { validateEndPageFinal(e.target); });
 
 // 자동 동기화 중 재렌더링이 보류됐으면, 입력칸을 완전히 벗어난 뒤 한 번만 반영한다.
 $('#periodList').addEventListener('focusout', () => {
