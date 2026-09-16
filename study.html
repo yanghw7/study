@@ -340,7 +340,13 @@
 #dayView > .study-alarm-card{position:sticky!important;top:8px!important;z-index:22!important}
 #dayView > .summary-card{position:sticky!important;top:116px!important;z-index:21!important}
 
-.ko-time-label{font-size:11px;font-weight:800;color:var(--ink-soft,var(--soft));margin-top:4px}
+.field.time{position:relative;min-height:45px}.field.time input[type="datetime-local"]{color:transparent;caret-color:transparent;min-height:20px}.field.time input[type="datetime-local"]::-webkit-calendar-picker-indicator{opacity:1;cursor:pointer}.ko-time-label{position:absolute;left:10px;right:34px;bottom:7px;z-index:2;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:700;color:var(--ink);background:var(--bg);line-height:20px}
+
+/* v1.34: 페이지 입력칸 유지 + 일시 한 줄 표시 */
+.field-grid .field input[data-k="startPage"],.field-grid .field input[data-k="endPage"]{display:block!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;padding-right:42px!important;}
+.field-grid .field:has(input[data-k="startPage"]),.field-grid .field:has(input[data-k="endPage"]){position:relative!important;}
+.field-grid .field:has(input[data-k="startPage"])::after,.field-grid .field:has(input[data-k="endPage"])::after{content:"Page";position:absolute;right:12px;bottom:13px;font-size:11px;font-weight:800;color:var(--muted);pointer-events:none;}
+.field-grid .ko-time-label{font-size:11.5px!important;letter-spacing:-.25px!important;}
 </style>
 
 <style id="v123-header-cloud-unify">
@@ -357,8 +363,26 @@
 .cloud-actions .data-btn[style*="display:none"]{display:none!important}
 @media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
 </style>
-<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style></head>
-<body><div class="index-alarm-note">⏰ 알람 · ☁ 클라우드는 홈 상단에서 관리합니다.</div><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
+<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style>
+<style id="v133-study-field-layout">
+/* v1.33: page field 35%, date/time field 65%; keep lower-left cell blank */
+.field-grid{grid-template-columns:minmax(0,38fr) minmax(0,62fr)!important;}
+.field-grid .field.time{min-width:0!important;}
+.field-grid .field.time input{font-size:12px!important;}
+.field-grid .ko-time-label{font-size:12px!important;left:10px!important;right:10px!important;text-overflow:clip!important;}
+.field-grid .field-empty{background:transparent!important;min-height:52px!important;padding:0!important;}
+</style>
+
+<style id="v136-datetime-value-center">
+.field-grid .ko-time-label{left:34px!important;right:34px!important;text-align:center!important;display:block!important;}
+</style>
+
+<style id="v137-wide-time-columns">
+.field-grid{grid-template-columns:minmax(118px,34fr) minmax(0,66fr)!important;}
+.field-grid .ko-time-label{left:8px!important;right:8px!important;text-align:center!important;font-size:11.5px!important;letter-spacing:-.45px!important;text-overflow:clip!important;}
+</style>
+</head>
+<body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
 <div class="wrap">
@@ -460,7 +484,7 @@
       </div>
       <div class="summary-grid">
         <div class="summary-item ok"><b id="sumStudy">0분</b><span>공부시간</span></div>
-        <div class="summary-item"><b id="sumPages">0쪽</b><span>공부 페이지</span></div>
+        <div class="summary-item"><b id="sumPages">0 Page</b><span>공부 페이지</span></div>
         <div class="summary-item warn"><b id="sumWaste">0분</b><span>낭비시간</span></div>
       </div>
     </div>
@@ -614,7 +638,7 @@ let currentView = 'day';
 function ymKey(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}`; }
 function dKey(date){ return String(date.getDate()); }
 
-function koDateTimeLabel(date,time){if(!date||!time)return '';const m=/^(\d{2}):(\d{2})/.exec(time);return m?`${m[1]}시 ${m[2]}분`:time;}
+function koDateTimeLabel(date,time){if(!date||!time)return '';const m=/^(\d{2}):(\d{2})/.exec(time);if(!m)return time;const h=Number(m[1]), ap=h<12?'오전':'오후', h12=h%12||12;const d=date.split('-');return `${d[0]}. ${d[1]}. ${d[2]}. ${ap} ${h12}시 ${m[2]}분`; }
 function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function hm(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 
@@ -1642,24 +1666,24 @@ function renderPeriods(){
       <div class="field-grid">
         <div class="field">
           <label>시작 페이지</label>
-          <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="startPage" value="${p.startPage ?? ''}" placeholder="입력 시 자동기록">
+          <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="startPage" value="${p.startPage ?? ''}">
         </div>
         <div class="field time">
-          <label>시작일시</label>
+          <label>시작 시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime)}</div>
         </div>
         <div class="field">
-          <label>끝 페이지</label>
-          <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="endPage" value="${p.endPage ?? ''}" placeholder="입력 시 자동기록">
+          <label>종료 페이지</label>
+          <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="endPage" min="${String(p.startPage||'').trim() || 1}" value="${p.endPage ?? ''}">
         </div>
         <div class="field time">
-          <label>종료일시</label>
+          <label>종료 시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime)}</div>
         </div>
       </div>
       <div class="period-stats">
         <div class="stat">공부시간<b id="study-${idx}" class="${sErr ? 'stat-error' : 'study-color'}">${sErr ? '오류!' : fmtDuration(study)}</b></div>
-        <div class="stat">공부 페이지<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : pages + '쪽'}</b></div>
+        <div class="stat">공부 페이지<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : pages + ' Page'}</b></div>
         ${idx>0 ? `<div class="stat">낭비시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
       </div>
     `;
@@ -1667,7 +1691,7 @@ function renderPeriods(){
   });
 
   $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
-  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${sumPages}쪽`;
+  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${sumPages} Page`;
   $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
   $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
   $('#sumPages').classList.toggle('stat-error', sumPagesErr);
@@ -1703,7 +1727,7 @@ function refreshStats(){
     }
     const pe = document.getElementById(`pages-${idx}`);
     if(pe){
-      pe.textContent = pErr ? '오류!' : pages + '쪽';
+      pe.textContent = pErr ? '오류!' : pages + ' Page';
       pe.classList.toggle('stat-error', pErr);
     }
     const we = document.getElementById(`waste-${idx}`);
@@ -1714,7 +1738,7 @@ function refreshStats(){
     }
   });
   $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
-  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${sumPages}쪽`;
+  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${sumPages} Page`;
   $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
   $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
   $('#sumPages').classList.toggle('stat-error', sumPagesErr);
@@ -2003,6 +2027,17 @@ $('#periodList').addEventListener('input', async (e) => {
     p[k] = t.value;
   }
 
+  // 시작 페이지가 바뀌면 종료 페이지의 최소값만 갱신한다. 입력 자체는 항상 가능하다.
+  if(k==='startPage'){
+    const endEl = $('#periodList').querySelector(`input[data-k="endPage"][data-idx="${idx}"]`);
+    if(endEl) endEl.min = String(p.startPage||'').trim() || '1';
+  }
+
+  // 종료 페이지는 입력 중에는 자유롭게 타이핑하게 둔다.
+  // 예: 시작 페이지가 35일 때 종료 페이지 40을 입력하려면 첫 숫자 '4'가
+  // 일시적으로 35보다 작으므로, input 이벤트에서 즉시 지우면 입력 자체가 불가능하다.
+  // 최종 유효성 검사는 change/focusout 시점에 처리한다.
+
   // 페이지 번호와 자동기록 시간을 서로 연동:
   // - 페이지를 처음 입력하는 순간(빈칸/0→값) 현재 날짜+시간을 자동 기록
   // - 페이지를 지우거나 0으로 만들면(값→빈칸/0) 자동 기록됐던 날짜+시간도 함께 지움
@@ -2073,6 +2108,14 @@ $('#periodList').addEventListener('input', async (e) => {
         }
       }
     }
+    // 페이지 자동기록 직후 시작/종료일시 표시도 즉시 갱신한다.
+    const dtInputEl = $('#periodList').querySelector(`input[data-k="${k==='startPage'?'start':'end'}"][data-idx="${idx}"]`);
+    if(dtInputEl){
+      const labelEl = dtInputEl.nextElementSibling;
+      if(labelEl && labelEl.classList.contains('ko-time-label')){
+        labelEl.textContent = koDateTimeLabel(p[k==='startPage'?'startDate':'endDate'], p[k==='startPage'?'startTime':'endTime']);
+      }
+    }
     updateStudyTimer();
   }
   // 직접 입력은 합계만 다시 계산하며 실시간 타이머 상태는 만들지 않는다.
@@ -2109,6 +2152,34 @@ $('#periodList').addEventListener('input', async (e) => {
     ? autoSortPeriodsByStart(day) : false;
   await persistToday();
   if(reordered) renderPeriods();
+});
+
+// 종료 페이지 최종값 검증: 입력을 마친 뒤 시작 페이지보다 작으면 비운다.
+$('#periodList').addEventListener('change', async (e) => {
+  const t = e.target;
+  if(t.tagName !== 'INPUT' || t.dataset.k !== 'endPage') return;
+  const idx = Number(t.dataset.idx);
+  const day = getDayData();
+  const p = day.periods[idx];
+  if(!p) return;
+  const start = Number(String(p.startPage ?? '').trim());
+  const end = Number(String(t.value ?? '').trim());
+  if(Number.isFinite(start) && start > 0 && Number.isFinite(end) && end > 0 && end < start){
+    p.endPage = '';
+    p.endDate = '';
+    p.endTime = '';
+    p.timerEndedAt = null;
+    t.value = '';
+    const endDT = $('#periodList').querySelector(`input[data-k="end"][data-idx="${idx}"]`);
+    if(endDT){
+      endDT.value = '';
+      const labelEl = endDT.nextElementSibling;
+      if(labelEl && labelEl.classList.contains('ko-time-label')) labelEl.textContent = '';
+    }
+    showToast('종료 페이지는 시작 페이지보다 작을 수 없어요');
+    refreshStats();
+    await persistToday();
+  }
 });
 
 // 자동 동기화 중 재렌더링이 보류됐으면, 입력칸을 완전히 벗어난 뒤 한 번만 반영한다.
@@ -2156,7 +2227,7 @@ function chartSvg(points, valueKey, kind, unit){
     const x=L+i*slot+(slot-barW)/2;
     const yy=y(v);
     const h=Math.max(v>0?2:0,T+innerH-yy);
-    const displayValue = valueKey==='pages' ? `${Math.round(v)}쪽` : formatTooltipTime(v);
+    const displayValue = valueKey==='pages' ? `${Math.round(v)} Page` : formatTooltipTime(v);
     return `<rect class="chart-bar-${kind}" data-chart-label="${escHtml(p.label)}" data-chart-value="${escHtml(displayValue)}" tabindex="0" x="${x}" y="${yy}" width="${barW}" height="${h}" rx="2"><title>${escHtml(p.label)}: ${escHtml(displayValue)}</title></rect>`;
   }).join('');
   const labels=points.map((p,i)=>{
@@ -2199,7 +2270,7 @@ function chartsHtml(points, averagePoints=points, averageLabel="평균", average
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
   const hasAverage = avgBase.length > 0;
   const avgStudy = hasAverage ? formatAvgTime(chartAverage(avgBase,'study')) : '—';
-  const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))}쪽` : '—';
+  const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))} Page` : '—';
   const avgWaste = hasAverage ? formatAvgTime(chartAverage(avgBase,'waste')) : '—';
   const totalStudy = chartTotalTime(points,'study');
   const totalPages = Math.round(points.reduce((sum,p)=>sum+(Number(p.pages)||0),0));
@@ -2207,7 +2278,7 @@ function chartsHtml(points, averagePoints=points, averageLabel="평균", average
   const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
     <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${note}${chartSvg(points,'study','study','분')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages}쪽</div></div>${note}${chartSvg(points,'pages','pages','쪽')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages} Page</div></div>${note}${chartSvg(points,'pages','pages','Page')}</div>
     <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste} · 총 ${totalWaste}</div></div>${note}${chartSvg(points,'waste','waste','분')}</div>
   </div>`;
 }
@@ -2330,7 +2401,7 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          공부 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 페이지 <b>${weeks[w].pages}쪽</b><br>낭비 <b class="waste-color">${fmtDuration(weeks[w].waste)}</b>
+          공부 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 페이지 <b>${weeks[w].pages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(weeks[w].waste)}</b>
         </div>
       </div>
     `).join('');
@@ -2353,7 +2424,7 @@ async function renderMonthView(){
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          공부 <b class="study-color">${fmtDuration(monthStudy)}</b> · 페이지 <b>${monthPages}쪽</b><br>낭비 <b class="waste-color">${fmtDuration(monthWaste)}</b>
+          공부 <b class="study-color">${fmtDuration(monthStudy)}</b> · 페이지 <b>${monthPages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(monthWaste)}</b>
         </div>
       </div>`;
   }
@@ -2391,7 +2462,7 @@ async function renderYearView(){
     chartPoints.push({label:`${year}`, study, pages, waste});
     if(study===0 && pages===0 && waste===0) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">공부 <b class="study-color">${fmtDuration(study)}</b> · 페이지 <b>${pages}쪽</b><br>낭비 <b class="waste-color">${fmtDuration(waste)}</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">공부 <b class="study-color">${fmtDuration(study)}</b> · 페이지 <b>${pages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(waste)}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">년도별 정리</div>` +
     chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +

@@ -474,7 +474,7 @@
 #dayView > .study-alarm-card{position:sticky!important;top:8px!important;z-index:22!important}
 #dayView > .summary-card{position:sticky!important;top:116px!important;z-index:21!important}
 
-.ko-time-label{font-size:11px;font-weight:800;color:var(--ink-soft,var(--soft));margin-top:4px}
+.field.time{position:relative;min-height:45px}.field.time input[type="datetime-local"]{color:transparent;caret-color:transparent;min-height:20px}.field.time input[type="datetime-local"]::-webkit-calendar-picker-indicator{opacity:1;cursor:pointer}.ko-time-label{position:absolute;left:10px;right:34px;bottom:7px;z-index:2;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:700;color:var(--ink);background:var(--bg);line-height:20px}
 </style>
 
 <style>
@@ -583,7 +583,34 @@ body{background:#f7f5fb!important}
 .cloud-actions .data-btn[style*="display:none"]{display:none!important}
 @media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
 </style>
-<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style></head>
+<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style>
+<style id="v136-datetime-value-center">
+.field-grid .ko-time-label{left:34px!important;right:34px!important;text-align:center!important;display:block!important;}
+</style>
+
+<style id="v137-wide-time-columns">
+.field-grid{grid-template-columns:minmax(0,27fr) minmax(0,73fr)!important;}
+.field-grid .ko-time-label{left:8px!important;right:8px!important;text-align:center!important;font-size:11.5px!important;letter-spacing:-.45px!important;text-overflow:clip!important;}
+.lecture-card-action{padding:10px 4px!important;font-size:14px!important;}
+</style>
+
+<style id="v144-lecture-action-single-line">
+/* Keep lecture action buttons on one line while preserving room for date/time. */
+.field-grid{grid-template-columns:minmax(0,34fr) minmax(0,66fr)!important;}
+.lecture-card-action{
+  white-space:nowrap!important;
+  word-break:keep-all!important;
+  padding:10px 5px!important;
+  font-size:13.5px!important;
+  letter-spacing:-.5px!important;
+}
+.field-grid .ko-time-label{
+  left:5px!important;right:5px!important;
+  font-size:11px!important;letter-spacing:-.65px!important;
+  white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;
+}
+</style>
+</head>
 <script>
 (()=> {
   const P='lecture::';
@@ -594,7 +621,7 @@ body{background:#f7f5fb!important}
   Storage.prototype.removeItem=function(k){return r.call(this,keep(k)?k:P+k)};
 })();
 </script>
-<body><div class="index-alarm-note">⏰ 알람 · ☁ 클라우드는 홈 상단에서 관리합니다.</div><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
+<body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
 <div class="wrap">
@@ -850,7 +877,7 @@ let currentView = 'day';
 function ymKey(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}`; }
 function dKey(date){ return String(date.getDate()); }
 
-function koDateTimeLabel(date,time){if(!date||!time)return '';const m=/^(\d{2}):(\d{2})/.exec(time);return m?`${m[1]}시 ${m[2]}분`:time;}
+function koDateTimeLabel(date,time){if(!date||!time)return '';const m=/^(\d{2}):(\d{2})/.exec(time);if(!m)return time;const h=Number(m[1]), ap=h<12?'오전':'오후', h12=h%12||12;const d=date.split('-');return `${d[0]}. ${d[1]}. ${d[2]}. ${ap} ${h12}시 ${m[2]}분`; }
 function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function hm(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 
@@ -1880,14 +1907,14 @@ function renderPeriods(){
           <button type="button" class="lecture-card-action start" data-lecture-action="start" data-idx="${idx}" ${p.startDate && p.startTime ? 'disabled' : ''}>▶ 강의 시작</button>
         </div>
         <div class="field time">
-          <label>시작일시</label>
+          <label>시작 시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime)}</div>
         </div>
         <div class="field lecture-action-field">
           <button type="button" class="lecture-card-action end" data-lecture-action="end" data-idx="${idx}" ${p.startDate && p.startTime && !(p.endDate && p.endTime) ? '' : 'disabled'}>■ 강의 종료</button>
         </div>
         <div class="field time">
-          <label>종료일시</label>
+          <label>종료 시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime)}</div>
         </div>
       </div>
