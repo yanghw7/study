@@ -19,18 +19,63 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .tabs button.active.sleep{background:#456d96;color:#fff}
 .frame{display:none;flex:1 1 auto;width:100%;min-height:0;border:0;background:#fff}
 .frame.active{display:block}
+
+.alarmbar{flex:0 0 auto;margin:6px 8px 0;padding:6px 8px;border:1px solid #dbe4e0;border-radius:11px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font-size:12px}
+.alarmline{display:flex;align-items:center;gap:5px;min-width:0}
+.alarmline strong{font-size:12px;white-space:nowrap;color:#26332f}
+.alarmline input{width:42px;height:30px;border:1px solid #dbe4e0;border-radius:8px;text-align:center;font-weight:800;font-size:13px;background:#f8faf9}
+.alarmline .unit{font-size:11px;font-weight:700;color:#6b7773;margin-left:-3px}
+.alarmline button{height:30px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 8px;font-size:11px;font-weight:800;white-space:nowrap;color:#34423d}
+.alarmline button.primary{background:#285f50;border-color:#285f50;color:#fff}
+.alarmline button.danger{display:none;background:#b42318;border-color:#b42318;color:#fff}
+.alarmline button.danger.show{display:inline-block}
+#alarmFileName{min-width:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#77827e}
+#alarmStatus{margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#60706a}
+@media(max-width:560px){.alarmbar{padding:5px 6px}.alarmline{gap:4px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{display:none}}
+
+.cloudbar{flex:0 0 auto;margin:5px 8px 0;padding:6px 8px;border:1px solid #dbe4e0;border-radius:11px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font:700 11px Inter,system-ui,sans-serif;color:#34423d}.cloudline{display:flex;align-items:center;gap:5px;min-width:0;flex-wrap:wrap}.cloudline strong{font-size:12px;white-space:nowrap}.cloudline button{height:30px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 8px;font:800 10px Inter,system-ui,sans-serif;white-space:nowrap;color:#34423d}.cloudline button.primary{background:#285f50;border-color:#285f50;color:#fff}.cloudline input{height:30px;min-width:110px;flex:1;border:1px solid #dbe4e0;border-radius:8px;padding:0 8px;font:700 11px Inter,system-ui,sans-serif}.cloudstatus{margin-left:auto;font-size:10px;color:#60706a;white-space:nowrap}.cloudsetup{display:none;margin-top:5px;gap:5px;align-items:center}.cloudsetup.show{display:flex}.cloudlogout{display:none!important}.cloudlogout.show{display:inline-block!important}@media(max-width:560px){.cloudbar{padding:5px 6px}.cloudline{gap:4px}.cloudline button{padding:0 6px;font-size:9px}.cloudsetup{flex-wrap:wrap}.cloudsetup input{min-width:0;width:calc(50% - 3px);flex:auto}.cloudstatus{width:100%;margin-left:0}}
 </style>
 
-<link rel="manifest" href="./manifest.webmanifest?v=1.21">
+<link rel="manifest" href="./manifest.webmanifest?v=1.28">
 <meta name="theme-color" content="#285f50">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style></head>
+<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body><button id="pwaInstallBtn" type="button">앱 설치</button>
 <div class="shell" id="shell">
   <div class="tabs">
     <button id="studyTab" class="active study">📚 공부장</button>
     <button id="lectureTab" class="lecture">🎓 강의기록장</button>
     <button id="sleepTab" class="sleep">🌙 수면장</button>
+  </div>
+  <div class="alarmbar" id="sharedAlarmBar">
+    <div class="alarmline">
+      <strong>⏰ 공용 알람</strong>
+      <input id="alarmHours" type="number" min="0" max="48" value="0" aria-label="시간"><span class="unit">시간</span>
+      <input id="alarmMinutes" type="number" min="0" max="59" value="30" aria-label="분"><span class="unit">분</span>
+      <button id="alarmFilePick" type="button">파일 선택</button><input id="alarmFile" type="file" accept="audio/*" hidden>
+      <span id="alarmFileName">기본음</span>
+      <button id="alarmPreview" type="button">▶ 미리듣기</button>
+      <button id="alarmStart" class="primary" type="button">시작</button>
+      <button id="alarmCancel" type="button">해제</button>
+      <button id="alarmStop" class="danger" type="button">🔕 끄기</button>
+      <span id="alarmStatus">설정 안 됨</span>
+    </div>
+  </div>
+  <div class="cloudbar" id="sharedCloudBar">
+    <div class="cloudline">
+      <strong>☁ 클라우드</strong><span id="sharedCloudStatus" class="cloudstatus">로그인 확인 중…</span>
+      <button id="sharedCloudToggle" type="button">로그인</button>
+      <button id="sharedCloudUpload" type="button">전체 저장</button>
+      <button id="sharedCloudDownload" type="button">전체 불러오기</button>
+      <button id="sharedCloudLogout" class="cloudlogout" type="button">로그아웃</button>
+    </div>
+    <div class="cloudsetup" id="sharedCloudSetup">
+      <input id="sharedCloudEmail" type="email" placeholder="이메일">
+      <input id="sharedCloudPassword" type="password" placeholder="비밀번호 (6자 이상)">
+      <button id="sharedCloudSignup" type="button">회원가입</button>
+      <button id="sharedCloudLogin" class="primary" type="button">로그인</button>
+      <button id="sharedCloudGoogle" type="button">Google 로그인</button>
+    </div>
   </div>
   <iframe id="studyFrame" class="frame active" src="study.html"></iframe>
   <iframe id="lectureFrame" class="frame" data-src="lecture.html"></iframe>
@@ -113,7 +158,7 @@ window.addEventListener('message',ev=>{
 // PWA v1.22: register the current service worker and ask it to check for updates.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.25', { scope: './' })
+    navigator.serviceWorker.register('./sw.js?v=1.28', { scope: './' })
       .then(reg => reg.update())
       .catch(err => console.error('Service worker registration failed:', err));
   });
@@ -124,6 +169,58 @@ let deferredInstallPrompt=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;document.getElementById('pwaInstallBtn')?.classList.add('show')});
 document.getElementById('pwaInstallBtn')?.addEventListener('click',async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;document.getElementById('pwaInstallBtn')?.classList.remove('show')});
 window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.getElementById('pwaInstallBtn')?.classList.remove('show')});
+</script>
+
+<script id="v128-shared-cloud">
+(()=>{
+ const URL='https://nvpvxtwebzefhgulswsv.supabase.co', KEY='sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
+ const $=id=>document.getElementById(id); let sb=null,user=null;
+ function init(){if(sb)return true;try{if(!window.supabase)return false;sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});return true}catch(e){return false}}
+ async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('sharedCloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';return user}
+ async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
+ async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
+ async function all(action){if(!await status()){alert('먼저 홈에서 클라우드에 로그인해 주세요.');$('sharedCloudSetup').classList.add('show');return}const map=action==='upload'?{study:['cloudUpload'],lecture:['cloudUpload'],sleep:['upload']}:{study:['cloudDownload'],lecture:['cloudDownload'],sleep:['download']};for(const kind of ['study','lecture','sleep']){try{await clickChild(kind,map[kind]);await new Promise(r=>setTimeout(r,180))}catch(e){console.error(kind,action,e)}}}
+ window.addEventListener('DOMContentLoaded',async()=>{
+  $('sharedCloudToggle').onclick=()=> $('sharedCloudSetup').classList.toggle('show');
+  $('sharedCloudSignup').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const e=$('sharedCloudEmail').value.trim(),p=$('sharedCloudPassword').value;if(!e||p.length<6)return alert('이메일과 6자 이상 비밀번호를 확인해 주세요.');const {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert('회원가입 실패: '+error.message);await status();alert('회원가입 요청이 완료됐어요.')};
+  $('sharedCloudLogin').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const {error}=await sb.auth.signInWithPassword({email:$('sharedCloudEmail').value.trim(),password:$('sharedCloudPassword').value});if(error)return alert('로그인 실패: '+error.message);await status();$('sharedCloudSetup').classList.remove('show')};
+  $('sharedCloudGoogle').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const redirectTo=location.origin+location.pathname;const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo}});if(error)alert('Google 로그인 실패: '+error.message)};
+  $('sharedCloudLogout').onclick=async()=>{if(init())await sb.auth.signOut();await status()};
+  $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
+  if(init())sb.auth.onAuthStateChange(()=>setTimeout(status,0));await status();
+ });
+})();
+</script>
+<script id="v126-shared-alarm">
+(()=>{
+ const KEY='sharedAlarm:v126', DB='yangStudyLocalMedia', STORE='files', AUDIO='sharedAlarmAudio';
+ const $=q=>document.querySelector(q); let timer=null,watch=null,ring=null,url=null,ctx=null,gain=null;
+ const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
+ const write=v=>localStorage.setItem(KEY,JSON.stringify(v));
+ const pad=n=>String(n).padStart(2,'0');
+ function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+ async function saveFile(f){const db=await openDB();await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(f,AUDIO);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}
+ async function loadFile(){try{const db=await openDB();const f=await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(AUDIO);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});db.close();if(f){setFile(f);return f}}catch(e){}return null}
+ function setFile(f){if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);$('#alarmFileName').textContent=f.name||'선택한 알람음';localStorage.setItem('sharedAlarmAudioName',f.name||'')}
+ async function beep(){ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const o=ctx.createOscillator();gain=ctx.createGain();o.frequency.value=880;gain.gain.value=.18;o.connect(gain);gain.connect(ctx.destination);o.start();o.stop(ctx.currentTime+1.2)}
+ async function play(loop=false){if(url){try{ring?.pause();ring=new Audio(url);ring.loop=loop;await ring.play();return true}catch(e){}}await beep();return false}
+ function stopRing(){try{ring?.pause();if(ring)ring.currentTime=0}catch(e){};try{navigator.vibrate?.(0)}catch(e){};$('#alarmStop').classList.remove('show')}
+ function fmt(t){const d=new Date(t);return `${d.getHours()}시 ${pad(d.getMinutes())}분 예정`}
+ function ui(a){if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmt(a.due)}else{$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='설정 안 됨'}}
+ async function fire(){const a=read();if(!a?.enabled)return;write({...a,enabled:false});clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent='⏰ 알람 시간';$('#alarmStop').classList.add('show');try{navigator.vibrate?.([800,250,800,250,1200])}catch(e){};await play(true)}
+ function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500)}
+ document.addEventListener('DOMContentLoaded',async()=>{
+   const oldName=localStorage.getItem('sharedAlarmAudioName');if(oldName)$('#alarmFileName').textContent=oldName;await loadFile();
+   $('#alarmFilePick').onclick=()=>$('#alarmFile').click();
+   $('#alarmFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith('audio/')&&!/\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(f.name))return alert('오디오 파일을 선택해주세요.');await saveFile(f);setFile(f)};
+   $('#alarmPreview').onclick=async()=>{await play(false);setTimeout(()=>{try{ring?.pause()}catch(e){}},2500)};
+   $('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');await play(false);try{ring?.pause()}catch(e){};const a={enabled:true,due:Date.now()+ms};write(a);arm(a)};
+   $('#alarmCancel').onclick=()=>{clearTimeout(timer);clearInterval(watch);stopRing();write({enabled:false});ui(null)};
+   $('#alarmStop').onclick=()=>{stopRing();write({enabled:false});ui(null)};
+   const a=read();if(a?.enabled)arm(a);else ui(null);
+   window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});
+ });
+})();
 </script>
 </body>
 </html>

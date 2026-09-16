@@ -583,7 +583,7 @@ body{background:#f7f5fb!important}
 .cloud-actions .data-btn[style*="display:none"]{display:none!important}
 @media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
 </style>
-</head>
+<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style></head>
 <script>
 (()=> {
   const P='lecture::';
@@ -594,7 +594,7 @@ body{background:#f7f5fb!important}
   Storage.prototype.removeItem=function(k){return r.call(this,keep(k)?k:P+k)};
 })();
 </script>
-<body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
+<body><div class="index-alarm-note">⏰ 알람 · ☁ 클라우드는 홈 상단에서 관리합니다.</div><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
 <div class="wrap">
@@ -3220,7 +3220,7 @@ async function uploadAllToCloud(){
 
 async function autoSyncFromCloud(){
   if(!sbClient || !cloudUser) return;
-  const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
+  const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ console.error('자동 동기화 불러오기 실패:', error); return; }
   const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
   if(lectureRows.length===0) return;
@@ -3250,7 +3250,7 @@ async function autoSyncFromCloud(){
 
 async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
-  const {data,error} = await sbClient.from('study_months').select('ym,data').order('ym');
+  const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+error.message); return; }
   const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
   if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
@@ -3735,7 +3735,7 @@ renderDay();
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.25', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=1.26', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });

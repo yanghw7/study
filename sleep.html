@@ -277,7 +277,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothi
 .cloud-actions .data-btn[style*="display:none"]{display:none!important}
 @media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
 </style>
-</head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
+<style id="v126-index-alarm-only">.alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style></head><body><div class="index-alarm-note">⏰ 알람 · ☁ 클라우드는 홈 상단에서 관리합니다.</div><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
 <div class="top-actions">
   <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
   <div class="top-right-actions">
@@ -1046,8 +1046,33 @@ document.addEventListener('touchend',e=>{
 },{passive:true});
 
 function initCloud(){try{if(window.supabase)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){}}async function cloudStatus(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';$('#logout').style.display=user?'':'none'}$('#syncBtn').onclick=async()=>{const btn=$('#syncBtn');if(btn?.disabled)return;if(btn){btn.disabled=true;btn.textContent='↻ 동기화 중…'}try{if(!sb)initCloud();await cloudStatus();if(!user){$('#cloudCard').classList.add('show');toast('클라우드 로그인 필요');return}const ok=await syncCloud();if(ok!==false)toast('클라우드 동기화 완료')}catch(e){console.error('수면 동기화 실패:',e);toast('동기화에 실패했어요')}finally{if(btn){btn.disabled=false;btn.textContent='↻ 동기화'}}}
-async function syncCloud(){if(!user)return false;let {data:r,error}=await sb.from('sleep_records').select('data').eq('user_id',user.id).maybeSingle();if(error&&error.code!=='PGRST116'){console.warn(error);toast('sleep_records 테이블 설정이 필요해요');return false}let remote=r?.data||{sessions:[]},map=new Map([...(remote.sessions||[]),...data.sessions].map(x=>[x.id,x]));data.sessions=[...map.values()].sort((a,b)=>a.start-b.start);save();let payload={sessions:data.sessions,settings};let q=r?sb.from('sleep_records').update({data:payload}).eq('user_id',user.id):sb.from('sleep_records').insert({user_id:user.id,data:payload});let {error:w}=await q;if(w){console.warn(w);toast('클라우드 저장 구조 확인 필요');return false}render();return true}
-$('#signup').onclick=async()=>{if(!sb)initCloud();let e=$('#email').value.trim(),p=$('#password').value;if(!e||p.length<6)return toast('이메일/비밀번호를 확인해주세요');let {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert(error.message);await cloudStatus();toast('회원가입 요청 완료')};$('#login').onclick=async()=>{if(!sb)initCloud();let {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);await cloudStatus();toast('로그인 완료')};$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();await cloudStatus();toast('로그아웃')};$('#upload').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');await syncCloud()};$('#download').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');let {data:r,error}=await sb.from('sleep_records').select('data').eq('user_id',user.id).maybeSingle();if(error||!r)return toast('클라우드 기록 없음');if(confirm('클라우드 기록으로 불러올까요?')){data.sessions=r.data?.sessions||[];save();render();toast('불러오기 완료')}}
+async function syncCloud(){
+  if(!user)return false;
+  const ym='S:ALL';
+  const {data:rows,error}=await sb.from('study_months').select('data,updated_at').eq('user_id',user.id).eq('ym',ym).limit(1);
+  if(error) throw error;
+  const row=rows&&rows[0];
+  const remote=row?.data||{sessions:[],settings:{}};
+  const mergedMap=new Map();
+  for(const x of [...(remote.sessions||[]),...(data.sessions||[])]){
+    const key=x?.id||`${x?.start||0}:${x?.end||0}`;
+    mergedMap.set(key,x);
+  }
+  data.sessions=[...mergedMap.values()].sort((a,b)=>(a.start||0)-(b.start||0));
+  const mergedSettings={...(remote.settings||{}),...settings};
+  Object.assign(settings,mergedSettings); save(); saveSet();
+  const payload={sessions:data.sessions,settings:mergedSettings};
+  const nowIso=new Date().toISOString();
+  let w;
+  if(row){
+    w=await sb.from('study_months').update({data:payload,updated_at:nowIso}).eq('user_id',user.id).eq('ym',ym);
+  }else{
+    w=await sb.from('study_months').insert({user_id:user.id,ym,data:payload,updated_at:nowIso});
+  }
+  if(w.error) throw w.error;
+  render(); return true;
+}
+$('#signup').onclick=async()=>{if(!sb)initCloud();let e=$('#email').value.trim(),p=$('#password').value;if(!e||p.length<6)return toast('이메일/비밀번호를 확인해주세요');let {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert(error.message);await cloudStatus();toast('회원가입 요청 완료')};$('#login').onclick=async()=>{if(!sb)initCloud();let {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);await cloudStatus();toast('로그인 완료')};$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();await cloudStatus();toast('로그아웃')};$('#upload').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');await syncCloud()};$('#download').onclick=async()=>{try{await cloudStatus();if(!user)return toast('로그인 필요');const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);if(error)throw error;const r=rows&&rows[0];if(!r)return toast('클라우드 기록 없음');if(confirm('클라우드 기록으로 불러올까요?')){data.sessions=r.data?.sessions||[];if(r.data?.settings)Object.assign(settings,r.data.settings);save();saveSet();render();toast('불러오기 완료')}}catch(e){console.error(e);toast('클라우드 불러오기 실패')}}
 $('#toggleCloudSetup').onclick=()=>$('#cloudSetup').classList.toggle('show');
 $('#backupData').onclick=()=>{const payload={version:1,type:'sleep-backup',exportedAt:new Date().toISOString(),data,settings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sleep-backup-${ymd(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('데이터 백업 완료')};
 $('#restoreData').onclick=()=>$('#restoreFile').click();
@@ -1625,7 +1650,7 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 // PWA v1.22: register the current service worker and ask it to check for updates.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.25', { scope: './' })
+    navigator.serviceWorker.register('./sw.js?v=1.26', { scope: './' })
       .then(reg => reg.update())
       .catch(err => console.error('Service worker registration failed:', err));
   });
