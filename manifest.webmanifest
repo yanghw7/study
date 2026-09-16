@@ -1,26 +1,21 @@
 {
-  "name": "공부·강의·수면 기록장",
+  "name": "공부 기록장",
   "short_name": "기록장",
-  "description": "공부시간, 강의시간, 수면 기록을 한 곳에서 관리하는 기록장",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f5f7f6",
   "theme_color": "#285f50",
-  "lang": "ko",
-  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }

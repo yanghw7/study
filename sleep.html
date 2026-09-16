@@ -1557,6 +1557,7 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
     }
   }
   function silence(){
+    clearTimeout(timeout); clearInterval(watcher); timeout=null; watcher=null;
     ringing=false;
     clearInterval(vibrateTimer); vibrateTimer=null;
     clearTimeout(autoStopTimer); autoStopTimer=null;
@@ -1565,7 +1566,8 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
       try{gain.gain.cancelScheduledValues(ctx.currentTime);gain.gain.setValueAtTime(.00001,ctx.currentTime)}catch(e){}
     }
     $('#alarmStopRing')?.classList.remove('show');
-    write({enabled:false});
+    write({enabled:false,due:null});
+    const ah=$('#alarmHours'),am=$('#alarmMinutes'); if(ah)ah.value='0'; if(am)am.value='0';
     clearLockIfMine();
     setUI(null);
     refreshLockUI();
@@ -1622,10 +1624,8 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
       write(a); writeLock(a.due); arm(a);
     });
     cancel?.addEventListener('click',()=>{
-      const a=read();
-      if(!a?.enabled){return}
       if(!confirm('설정한 알람을 정말 해제하시겠습니까?'))return;
-      clearTimeout(timeout);clearInterval(watcher);silence();
+      silence();
     });
     preview?.addEventListener('click',async()=>{
       await prime();
@@ -1695,6 +1695,23 @@ if ('serviceWorker' in navigator) {
  // Called by the final alarm firing path when available; returns true when custom audio started.
  window.yangStudyPlaySavedSleepAlarm=async()=>{if(!currentUrl)await loadSaved();return playCustom(true)};
  window.yangStudyStopSavedSleepAlarm=()=>{try{preview?.pause();preview.currentTime=0}catch(_){}};
+})();
+</script>
+
+<script id="vibration-repeat-fix-v1">
+(()=>{
+ let vt=null;
+ const pattern=[900,250,900,250,1200,300];
+ function stopV(){clearInterval(vt);vt=null;try{navigator.vibrate?.(0)}catch(e){}}
+ function startV(){stopV();const buzz=()=>{try{navigator.vibrate?.(pattern)}catch(e){}};buzz();vt=setInterval(buzz,4000)}
+ document.addEventListener('DOMContentLoaded',()=>{
+   const due=document.querySelector('#alarmDue');
+   const obs=due?new MutationObserver(()=>{if((due.textContent||'').includes('알람 시간'))startV()}):null;
+   if(obs)obs.observe(due,{childList:true,subtree:true,characterData:true});
+   ['#alarmCancel','#alarmCancel__OLD','#alarmStopRing'].forEach(sel=>document.querySelector(sel)?.addEventListener('click',stopV,true));
+   document.addEventListener('click',e=>{if(e.target?.id==='alarmStopRing')stopV()},true);
+ });
+ window.addEventListener('pagehide',stopV);
 })();
 </script>
 </body></html>
