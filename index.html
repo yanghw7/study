@@ -25,13 +25,14 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .alarmline strong{font-size:16px;line-height:1;white-space:nowrap;color:#26332f}
 .alarmline input{width:36px;height:30px;border:1px solid #dbe4e0;border-radius:8px;text-align:center;font-weight:800;font-size:13px;background:#f8faf9}
 .alarmline .unit{font-size:11px;font-weight:700;color:#6b7773;margin-left:-3px}
+.alarmline select{height:30px;min-width:86px;max-width:125px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 5px;font-size:10.5px;font-weight:800;color:#34423d}
 .alarmline button{height:30px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 6px;font-size:10.5px;font-weight:800;white-space:nowrap;color:#34423d}
 .alarmline button.primary{background:#285f50;border-color:#285f50;color:#fff}
 .alarmline button.danger{display:none;background:#b42318;border-color:#b42318;color:#fff}
 .alarmline button.danger.show{display:inline-block}
 #alarmFileName{min-width:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#77827e}
-#alarmStatus{margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#60706a}
-@media(max-width:560px){.alarmbar{padding:5px 6px}.alarmline{gap:4px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{display:none}}
+#alarmStatus{display:block;margin-top:5px;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}
+@media(max-width:560px){.alarmbar{padding:5px 6px}.alarmline{gap:4px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{font-size:13px}}
 
 .cloudbar{flex:0 0 auto;margin:4px 8px 0;padding:4px 6px;border:1px solid #dbe4e0;border-radius:10px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font:700 10px Inter,system-ui,sans-serif;color:#34423d}.cloudline{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:nowrap}.cloudline strong{font-size:11px;white-space:nowrap}.cloudline button{height:27px;border:1px solid #dbe4e0;border-radius:7px;background:#fff;padding:0 6px;font:800 9px Inter,system-ui,sans-serif;white-space:nowrap;color:#34423d}.cloudline button.primary{background:#285f50;border-color:#285f50;color:#fff}.cloudline input{height:27px;min-width:90px;flex:1;border:1px solid #dbe4e0;border-radius:7px;padding:0 6px;font:700 10px Inter,system-ui,sans-serif}.cloudstatus{margin-left:0;font-size:9px;color:#60706a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.cloudsetup{display:none;margin-top:4px;gap:4px;align-items:center}.cloudsetup.show{display:flex}.cloudlogout{display:none!important}.cloudlogout.show{display:inline-block!important}@media(max-width:560px){.cloudbar{padding:4px 5px}.cloudline{gap:3px}.cloudline strong{font-size:10px}.cloudline button{padding:0 5px;font-size:8.5px}.cloudsetup{flex-wrap:wrap}.cloudsetup input{min-width:0;width:calc(50% - 2px);flex:auto}.cloudstatus{font-size:8.5px}}
 </style>
@@ -52,14 +53,14 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
       <strong aria-label="알람">⏰</strong>
       <input id="alarmHours" type="number" min="0" max="48" value="" placeholder="" aria-label="시간"><span class="unit">시간</span>
       <input id="alarmMinutes" type="number" min="0" max="59" value="" placeholder="" aria-label="분"><span class="unit">분</span>
-      <button id="alarmFilePick" type="button">선택</button><input id="alarmFile" type="file" accept="audio/*" hidden>
-      <span id="alarmFileName" hidden>기본음</span>
+      <select id="alarmSoundSelect" aria-label="알람음"><option value="">알람음 불러오는 중...</option></select>
+      <span id="alarmFileName" hidden></span>
       <button id="alarmPreview" type="button">▶ 미리듣기</button>
       <button id="alarmStart" class="primary" type="button">시작</button>
       <button id="alarmCancel" type="button">해제</button>
       <button id="alarmStop" class="danger" type="button">🔕 끄기</button>
-      <span id="alarmStatus">설정 안 됨</span>
     </div>
+    <div id="alarmStatus"></div>
   </div>
   <div class="cloudbar" id="sharedCloudBar">
     <div class="cloudline">
@@ -191,35 +192,30 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
  });
 })();
 </script>
-<script id="v126-shared-alarm">
+<script id="v145-github-sounds-alarm">
 (()=>{
- const KEY='sharedAlarm:v126', DB='yangStudyLocalMedia', STORE='files', AUDIO='sharedAlarmAudio';
- const $=q=>document.querySelector(q); let timer=null,watch=null,ring=null,url=null,ctx=null,gain=null;
+ const KEY='sharedAlarm:v126', LIST_KEY='githubAlarmSounds:v1', SELECT_KEY='githubAlarmSelected:v1';
+ const API='https://api.github.com/repos/yanghw7/study/contents/sounds';
+ const CACHE='alarm-sounds-v1';
+ const $=q=>document.querySelector(q); let timer=null,watch=null,ring=null,ctx=null,gain=null;
  const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
- const write=v=>localStorage.setItem(KEY,JSON.stringify(v));
- const pad=n=>String(n).padStart(2,'0');
- function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
- async function saveFile(f){const db=await openDB();await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(f,AUDIO);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}
- async function loadFile(){try{const db=await openDB();const f=await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(AUDIO);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});db.close();if(f){setFile(f);return f}}catch(e){}return null}
- function setFile(f){if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);$('#alarmFileName').textContent=f.name||'선택한 알람음';localStorage.setItem('sharedAlarmAudioName',f.name||'')}
+ const write=v=>localStorage.setItem(KEY,JSON.stringify(v)); const pad=n=>String(n).padStart(2,'0');
+ const audioExt=/\.(mp3|m4a|aac|wav|ogg|flac)$/i;
+ function title(name){return decodeURIComponent(name).replace(audioExt,'')}
+ function savedList(){try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]')}catch(e){return []}}
+ function render(list){const sel=$('#alarmSoundSelect');if(!list.length){sel.innerHTML='<option value="">알람음 없음</option>';return}sel.innerHTML=list.map(x=>`<option value="${x.url.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${title(x.name)}</option>`).join('');const old=localStorage.getItem(SELECT_KEY);if(old&&list.some(x=>x.url===old))sel.value=old;else{sel.value=list[0].url;localStorage.setItem(SELECT_KEY,sel.value)}}
+ async function refreshSounds(){let list=[];try{const r=await fetch(API,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});if(!r.ok)throw new Error('GitHub '+r.status);const j=await r.json();list=j.filter(x=>x.type==='file'&&audioExt.test(x.name)).map(x=>({name:x.name,url:x.download_url}));localStorage.setItem(LIST_KEY,JSON.stringify(list))}catch(e){list=savedList()}render(list)}
+ async function cacheSelected(){const u=$('#alarmSoundSelect').value;if(!u)return false;localStorage.setItem(SELECT_KEY,u);try{const c=await caches.open(CACHE);let r=await c.match(u);if(!r){r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error();await c.put(u,r.clone())}return true}catch(e){return false}}
+ async function audioURL(){const u=$('#alarmSoundSelect').value||localStorage.getItem(SELECT_KEY);if(!u)return null;try{const c=await caches.open(CACHE);const r=await c.match(u);if(r){const b=await r.blob();return URL.createObjectURL(b)}}catch(e){}return u}
  async function beep(){ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const o=ctx.createOscillator();gain=ctx.createGain();o.frequency.value=880;gain.gain.value=.18;o.connect(gain);gain.connect(ctx.destination);o.start();o.stop(ctx.currentTime+1.2)}
- async function play(loop=false){if(url){try{ring?.pause();ring=new Audio(url);ring.loop=loop;await ring.play();return true}catch(e){}}await beep();return false}
+ async function play(loop=false){const u=await audioURL();if(u){try{ring?.pause();ring=new Audio(u);ring.loop=loop;await ring.play();return true}catch(e){}}await beep();return false}
  function stopRing(){try{ring?.pause();if(ring)ring.currentTime=0}catch(e){};try{navigator.vibrate?.(0)}catch(e){};$('#alarmStop').classList.remove('show')}
- function fmt(t){const d=new Date(t);return `${d.getHours()}시 ${pad(d.getMinutes())}분 예정`}
- function ui(a){if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmt(a.due)}else{$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='설정 안 됨'}}
+ function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${d.getMonth()+1}월 ${d.getDate()}일 ${ap} ${h}시 ${pad(d.getMinutes())}분에 울립니다`}
+ function ui(a){if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmt(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
+ function updatePreview(){const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;$('#alarmStatus').textContent=ms>=60000?fmt(Date.now()+ms):''}
  async function fire(){const a=read();if(!a?.enabled)return;write({...a,enabled:false});clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent='⏰ 알람 시간';$('#alarmStop').classList.add('show');try{navigator.vibrate?.([800,250,800,250,1200])}catch(e){};await play(true)}
  function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500)}
- document.addEventListener('DOMContentLoaded',async()=>{
-   const oldName=localStorage.getItem('sharedAlarmAudioName');if(oldName)$('#alarmFileName').textContent=oldName;await loadFile();
-   $('#alarmFilePick').onclick=()=>$('#alarmFile').click();
-   $('#alarmFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith('audio/')&&!/\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(f.name))return alert('오디오 파일을 선택해주세요.');await saveFile(f);setFile(f)};
-   $('#alarmPreview').onclick=async()=>{await play(false);setTimeout(()=>{try{ring?.pause()}catch(e){}},2500)};
-   $('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');await play(false);try{ring?.pause()}catch(e){};const a={enabled:true,due:Date.now()+ms};write(a);arm(a)};
-   $('#alarmCancel').onclick=()=>{clearTimeout(timer);clearInterval(watch);stopRing();write({enabled:false});ui(null)};
-   $('#alarmStop').onclick=()=>{stopRing();write({enabled:false});ui(null)};
-   const a=read();if(a?.enabled)arm(a);else ui(null);
-   window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});
- });
+ document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',updatePreview);$('#alarmMinutes').addEventListener('input',updatePreview);$('#alarmPreview').onclick=async()=>{await cacheSelected();await play(false);setTimeout(()=>{try{ring?.pause()}catch(e){}},2500)};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await cacheSelected();await play(false);try{ring?.pause()}catch(e){};const a={enabled:true,due:Date.now()+ms,sound:$('#alarmSoundSelect').value};write(a);arm(a)};$('#alarmCancel').onclick=()=>{clearTimeout(timer);clearInterval(watch);stopRing();write({enabled:false});ui(null)};$('#alarmStop').onclick=()=>{stopRing();write({enabled:false});ui(null)};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}})});
 })();
 </script>
 </body>
