@@ -21,11 +21,11 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .frame.active{display:block}
 </style>
 
-<link rel="manifest" href="./manifest.webmanifest?v=1.20">
+<link rel="manifest" href="./manifest.webmanifest?v=1.21">
 <meta name="theme-color" content="#285f50">
 <link rel="apple-touch-icon" href="./icon-192.png">
-</head>
-<body>
+<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style></head>
+<body><button id="pwaInstallBtn" type="button">앱 설치</button>
 <div class="shell" id="shell">
   <div class="tabs">
     <button id="studyTab" class="active study">📚 공부장</button>
@@ -110,14 +110,20 @@ window.addEventListener('message',ev=>{
 </script>
 
 <script>
-// PWA v1.20: register the current service worker and ask it to check for updates.
+// PWA v1.22: register the current service worker and ask it to check for updates.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.20', { scope: './' })
+    navigator.serviceWorker.register('./sw.js?v=1.21', { scope: './' })
       .then(reg => reg.update())
       .catch(err => console.error('Service worker registration failed:', err));
   });
 }
+</script>
+<script>
+let deferredInstallPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;document.getElementById('pwaInstallBtn')?.classList.add('show')});
+document.getElementById('pwaInstallBtn')?.addEventListener('click',async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;document.getElementById('pwaInstallBtn')?.classList.remove('show')});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.getElementById('pwaInstallBtn')?.classList.remove('show')});
 </script>
 </body>
 </html>

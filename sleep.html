@@ -243,9 +243,25 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothi
 @media(max-width:430px){.cloud-grid{grid-template-columns:1fr}}
 </style>
 
-<link rel="manifest" href="./manifest.webmanifest?v=1.20">
+<link rel="manifest" href="./manifest.webmanifest?v=1.21">
 <meta name="theme-color" content="#285f50">
 <link rel="apple-touch-icon" href="./icon-192.png">
+
+<style id="v121-final-exact-ui">
+/* v1.22 — 공부장과 수면장 상단~클라우드 UI 수치 완전 동일 */
+.top-actions{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:8px!important;margin-bottom:10px!important}
+.top-right-actions{display:flex!important;align-items:center!important;gap:8px!important;margin-left:auto!important}
+.sync-top-btn,.settings-top-btn{display:block!important;margin:0!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;padding:8px 7px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:13px!important;font-weight:700!important;line-height:normal!important;min-height:42px!important;white-space:nowrap!important}
+.top-chart-btn{flex:0 0 auto!important;width:auto!important;padding:8px 11px!important;border-radius:10px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:13px!important;font-weight:700!important;line-height:normal!important;min-height:42px!important;white-space:nowrap!important}
+.data-tools{display:flex!important;gap:8px!important;margin:-6px 0 14px!important}
+.data-btn{flex:1!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;padding:9px 10px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:12.5px!important;font-weight:600!important;line-height:normal!important;min-height:auto!important}
+.cloud-card{display:block!important;background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:12px!important;margin:-6px 0 14px!important}
+.cloud-title{font-size:13px!important;font-weight:700!important}.cloud-status{font-size:11.5px!important}
+.cloud-actions{display:flex!important;gap:7px!important;margin-top:8px!important;flex-wrap:wrap!important}
+.cloud-actions .data-btn{min-width:120px!important;white-space:nowrap!important}
+#download{white-space:nowrap!important}
+@media(max-width:430px){.top-actions{gap:8px!important}.top-right-actions{gap:8px!important}.sync-top-btn,.settings-top-btn{padding:8px 7px!important;font-size:13px!important}.top-chart-btn{padding:8px 11px!important;font-size:13px!important}}
+</style>
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
 <div class="top-actions">
   <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
@@ -409,6 +425,7 @@ function overlappingSession(start,end,excludeId=null){
 
 function aggregate(days){let a=[];days.forEach(d=>a.push(...sessionsFor(d)));return a}
 function periodDays(){if(view==='day')return [new Date(cur)];let arr=[];if(view==='week'){let d=new Date(cur),delta=(d.getDay()-settings.weekStartDay+7)%7;d.setDate(d.getDate()-delta);for(let i=0;i<7;i++){let x=new Date(d);x.setDate(x.getDate()+i);arr.push(x)}}else if(view==='month'){let n=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();for(let i=1;i<=n;i++)arr.push(new Date(cur.getFullYear(),cur.getMonth(),i))}else{for(let m=0;m<12;m++){let n=new Date(cur.getFullYear(),m+1,0).getDate();for(let i=1;i<=n;i++)arr.push(new Date(cur.getFullYear(),m,i))}}return arr}
+function weekOfMonth(y,m,d){const first=new Date(y,m-1,1), offset=(first.getDay()-settings.weekStartDay+7)%7;return Math.floor((d+offset-1)/7)+1}
 function header(){
   maybeActivatePending();
   $('#dateBig').textContent=`${cur.getMonth()+1}월 ${cur.getDate()}일`;
@@ -417,7 +434,7 @@ function header(){
     if(b) b.disabled=(view==='day' && ymd(cur)===ymd(logicalToday()));
   });
   $('#dateSub').textContent=`${cur.getFullYear()}년 · ${DK[cur.getDay()]}요일`;
-  $('#weekMini').textContent=view==='day'?'수면장':view==='week'?'주별 통계':view==='month'?'월별 통계':'년도별 통계';
+  $('#weekMini').textContent=view==='day'?`${cur.getMonth()+1}월 ${weekOfMonth(cur.getFullYear(),cur.getMonth()+1,cur.getDate())}주차`:view==='week'?'주별 통계':view==='month'?'월별 통계':'년도별 통계';
   $('#dayRule').textContent=`하루 집계 기준 ${pad(settings.dayStartHour)}:00${settings.pendingDayStart?' · 변경 예약됨':''}`;
 }
 function render(){header();let days=periodDays(),arr=aggregate(days),ms=arr.map(x=>x.end-x.start),total=ms.reduce((a,b)=>a+b,0);$('#summaryTitle').textContent=view==='day'?'오늘 수면':view==='week'?'이번 주 수면':view==='month'?'이번 달 수면':'올해 수면';$('#count').textContent=`${arr.length}회`;$('#total').textContent=dur(total);$('#longest').textContent=arr.length?dur(Math.max(...ms)):'0분';$('#lastWake').textContent=arr.length?(()=>{
@@ -1590,13 +1607,41 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 
 
 <script>
-// PWA v1.20: register the current service worker and ask it to check for updates.
+// PWA v1.22: register the current service worker and ask it to check for updates.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.20', { scope: './' })
+    navigator.serviceWorker.register('./sw.js?v=1.21', { scope: './' })
       .then(reg => reg.update())
       .catch(err => console.error('Service worker registration failed:', err));
   });
 }
 </script>
 </body></html>
+<!-- v1.22 authoritative sleep alarm controller: shared alarm lock + selected audio -->
+<script>
+(()=>{
+ const LOCK='appAlarm:lock:v1', OWNER='sleep', KEY='sleepAlarm:v122';
+ const $=q=>document.querySelector(q); let timer=null,watch=null,customFile=null,customUrl=null,ringAudio=null,ctx=null;
+ const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
+ const write=a=>localStorage.setItem(KEY,JSON.stringify(a));
+ const lock=()=>{try{return JSON.parse(localStorage.getItem(LOCK)||'null')}catch(e){return null}};
+ const setLock=due=>localStorage.setItem(LOCK,JSON.stringify({owner:OWNER,due}));
+ const clearLock=()=>{const l=lock();if(l?.owner===OWNER)localStorage.removeItem(LOCK)};
+ const dur=()=>((Math.max(0,Math.min(48,parseInt($('#alarmHours')?.value||0)||0))*60)+Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||0)||0)))*60000;
+ const dueText=t=>{const d=new Date(t);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${String(d.getMinutes()).padStart(2,'0')}분 알람 예정`};
+ function ui(a){const b=$('#alarmSet__OLD'),d=$('#alarmDue');if(a?.enabled){b.textContent='⏰ 알람 중';b.classList.add('alarm-running');d.textContent=dueText(a.due);d.classList.add('alarm-active')}else{b.textContent='알람 시작';b.classList.remove('alarm-running');d.textContent='알람이 설정되지 않았습니다.';d.classList.remove('alarm-active')}}
+ async function builtin(sound){try{ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const f=sound==='gentle'?[440,523,659]:sound==='classic'?[880,660,880]:[784,988,1175];for(let i=0;i<80;i++){const o=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime+i*.4;o.frequency.value=f[i%f.length];g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.25,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+.3);o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.32)}}catch(e){}}
+ async function fire(){const a=read();if(!a?.enabled)return;write({...a,enabled:false});clearLock();clearTimeout(timer);clearInterval(watch);ui(null);$('#alarmDue').textContent='⏰ 알람 시간입니다.';try{navigator.vibrate?.([800,250,800,250,1200])}catch(e){} if(customUrl){try{ringAudio?.pause();ringAudio=new Audio(customUrl);ringAudio.loop=true;await ringAudio.play();return}catch(e){}} builtin(a.sound);}
+ function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500)}
+ function replace(id,handler){const old=$(id);if(!old)return null;const n=old.cloneNode(true);old.replaceWith(n);n.addEventListener('click',handler);return n}
+ document.addEventListener('DOMContentLoaded',()=>{
+   const input=$('#alarmSoundFile'),name=$('#alarmFileName');
+   input?.addEventListener('change',()=>{customFile=input.files?.[0]||null;if(customUrl)URL.revokeObjectURL(customUrl);customUrl=customFile?URL.createObjectURL(customFile):null;if(name)name.textContent=customFile?`선택: ${customFile.name}`:'';},true);
+   replace('#alarmSet__OLD',async e=>{e.preventDefault();const l=lock();if(l&&l.owner!==OWNER){alert(`다른 화면(${l.owner==='study'?'공부장':'강의기록장'})에서 알람이 진행 중입니다. 그 알람을 먼저 해제해주세요.`);return}const ms=dur();if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');try{ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(_){}const a={enabled:true,due:Date.now()+ms,sound:$('#alarmSound')?.value||'bright',customName:customFile?.name||''};write(a);setLock(a.due);arm(a)});
+   replace('#alarmCancel__OLD',e=>{e.preventDefault();clearTimeout(timer);clearInterval(watch);ringAudio?.pause();write({enabled:false});clearLock();ui(null)});
+   replace('#alarmPreview__OLD',async e=>{e.preventDefault();if(customUrl){try{ringAudio?.pause();ringAudio=new Audio(customUrl);await ringAudio.play();setTimeout(()=>ringAudio?.pause(),2500);return}catch(_){}}builtin($('#alarmSound')?.value||'bright')});
+   const a=read();if(a?.enabled){setLock(a.due);arm(a)}else ui(null);
+   window.addEventListener('storage',e=>{if(e.key===LOCK){const l=lock();const b=$('#alarmSet__OLD');if(b&&!read()?.enabled)b.disabled=!!(l&&l.owner!==OWNER)}});
+ });
+})();
+</script>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>공부장</title>
 
-<link rel="manifest" href="/study/manifest.webmanifest">
+<link rel="manifest" href="./manifest.webmanifest?v=1.21">
 <meta name="theme-color" content="#3B6E5C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -3424,7 +3424,7 @@ renderDay();
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/study/sw.js', {scope:'/study/'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=1.21', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });
