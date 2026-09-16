@@ -657,8 +657,8 @@ body{background:#f7f5fb!important}
       <input id="studyAlarmFile" type="file" accept="audio/*" hidden>
     </div>
     <div class="study-alarm-row alarm-time-row">
-      <input id="studyAlarmHours" type="number" inputmode="numeric" min="0" max="48" value="1"><span>시간</span>
-      <input id="studyAlarmMinutes" type="number" inputmode="numeric" min="0" max="59" value="0"><span>분 뒤</span>
+      <input id="studyAlarmHours" type="number" inputmode="numeric" min="0" max="48" value=""><span>시간</span>
+      <input id="studyAlarmMinutes" type="number" inputmode="numeric" min="0" max="59" value=""><span>분 뒤</span>
       <button class="alarm-start" id="studyAlarmStart" type="button">알람 시작</button>
       <button id="studyAlarmCancel" type="button">알람 해제</button>
     </div>
@@ -3725,11 +3725,23 @@ if ('serviceWorker' in navigator) {
 
 <script>
 (()=>{
- const KEY='studyAlarm:device:v1', $=q=>document.querySelector(q);
+ const KEY='lectureAlarm:device:v1', $=q=>document.querySelector(q);
+ const LOCK_KEY='appAlarm:lock:v1', OWNER='lecture';
  let ac=null,osc=null,gain=null,to=null,watch=null,ringing=false,file=null,fileAudio=null,vibe=null,autoStop=null;
  const pad=n=>String(n).padStart(2,'0');
  function get(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
  function put(v){localStorage.setItem(KEY,JSON.stringify(v))}
+ function readLock(){try{return JSON.parse(localStorage.getItem(LOCK_KEY)||'null')}catch(e){return null}}
+ function writeLock(due){try{localStorage.setItem(LOCK_KEY,JSON.stringify({owner:OWNER,due}))}catch(e){}}
+ function clearLockIfMine(){try{const l=readLock();if(l&&l.owner===OWNER)localStorage.removeItem(LOCK_KEY)}catch(e){}}
+ function ownActive(){return ringing||!!get()?.enabled}
+ function refreshLockUI(){
+   if(ownActive())return;
+   const lock=readLock(), btn=$('#studyAlarmStart'), d=$('#studyAlarmDue');
+   const blocked=!!(lock&&lock.owner!==OWNER);
+   if(btn)btn.disabled=blocked;
+   if(d)d.textContent=blocked?`다른 화면(${lock.owner==='study'?'공부장':lock.owner==='sleep'?'수면장':lock.owner})에서 알람이 진행 중입니다.`:'알람이 설정되지 않았습니다.';
+ }
  function dur(){
    const h=Math.max(0,Math.min(48,parseInt($('#studyAlarmHours')?.value||0,10)||0));
    const m=Math.max(0,Math.min(59,parseInt($('#studyAlarmMinutes')?.value||0,10)||0));
@@ -3754,7 +3766,7 @@ if ('serviceWorker' in navigator) {
    try{navigator.vibrate?.(0)}catch(e){}
    if(fileAudio){try{fileAudio.pause();fileAudio.currentTime=0}catch(e){}}
    if(gain&&ac){try{gain.gain.cancelScheduledValues(ac.currentTime);gain.gain.setValueAtTime(.00001,ac.currentTime)}catch(e){}}
-   $('#studyAlarmStop')?.classList.remove('show');put({enabled:false});ui(null);
+   $('#studyAlarmStop')?.classList.remove('show');put({enabled:false});clearLockIfMine();ui(null);refreshLockUI();
  }
  async function fire(){
    const a=get();if(!a?.enabled||ringing)return;
@@ -3782,8 +3794,10 @@ if ('serviceWorker' in navigator) {
  }
  document.addEventListener('DOMContentLoaded',()=>{
    $('#studyAlarmStart')?.addEventListener('click',async()=>{
+     const lock=readLock();
+     if(lock&&lock.owner!==OWNER){alert('다른 화면에서 이미 알람이 실행 중입니다. 그 알람을 먼저 해제해주세요.');return}
      const ms=dur();if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
-     await prime();const a={enabled:true,due:due(ms),sound:$('#studyAlarmSound').value};put(a);arm(a);
+     await prime();const a={enabled:true,due:due(ms),sound:$('#studyAlarmSound').value};put(a);writeLock(a.due);arm(a);
    });
    $('#studyAlarmCancel')?.addEventListener('click',()=>{
      const a=get();if(!a?.enabled)return;
@@ -3801,7 +3815,8 @@ if ('serviceWorker' in navigator) {
      file=e.target.files?.[0]||null;
      if(file)fileAudio=new Audio(URL.createObjectURL(file));
    });
-   const a=get();if(a?.enabled)arm(a);else ui(null);
+   const a=get();if(a?.enabled){writeLock(a.due);arm(a)}else{ui(null);refreshLockUI()}
+   window.addEventListener('storage',e=>{if(e.key===LOCK_KEY)refreshLockUI()});
  });
 })();
 </script>
