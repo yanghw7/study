@@ -1,11 +1,11 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#3B6E5C"><title>수면장</title>
+<meta name="theme-color" content="#456D96"><title>수면장</title>
 <style>
-:root{--bg:#EFF1EC;--surface:#fff;--ink:#1F2A24;--soft:#57635C;--line:#DDE2D9;--accent:#3B6E5C;--accent-soft:#E4EEE9;--night:#35455d;--danger:#A13327;--r:14px}
+:root{--bg:#EEF3F8;--surface:#fff;--ink:#202A35;--soft:#5B6673;--line:#D9E1EA;--accent:#456D96;--accent-soft:#E5EEF7;--night:#35455D;--danger:#A13327;--r:14px}
 *{box-sizing:border-box}html,body{overscroll-behavior-y:contain}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Noto Sans KR",sans-serif;padding-bottom:80px}.wrap{max-width:520px;margin:auto;padding:20px 16px}
 button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:center;margin-bottom:12px}.top-actions button{border:1px solid var(--line);background:var(--surface);border-radius:10px;min-height:42px;padding:8px 10px;font-size:13px;font-weight:800;color:var(--ink)}#chartToggle{margin-right:auto}.datebar{display:flex;align-items:center;gap:8px;margin-bottom:12px}.datebar>button{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:18px}.date-center{text-align:center;flex:1}.week-mini,.date-sub,.day-rule{font-size:11px;color:var(--soft)}.date-big{font-size:26px;font-weight:800;margin:2px 0}.tabs{display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px}.tabs button{flex:1;border:0;background:none;padding:9px 0;border-radius:9px;font-weight:700;color:var(--soft)}.tabs button.active{background:var(--accent);color:#fff}
-.summary{background:linear-gradient(145deg,#263a35,#405d53);color:#fff;border-radius:20px;padding:17px;margin-bottom:12px;box-shadow:0 8px 24px #263a3518}.summary-head{display:flex;justify-content:space-between;align-items:center}.summary-title{font-size:15px;font-weight:800}.count{font-size:11px;opacity:.75}.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:13px}.metric{border:1px solid #ffffff1f;background:#ffffff0b;border-radius:12px;padding:10px}.metric span{font-size:10px;opacity:.7;font-weight:700}.metric b{display:block;font-size:19px;margin-top:3px;font-variant-numeric:tabular-nums}
+.summary{background:linear-gradient(145deg,#304A67,#55799E);color:#fff;border-radius:20px;padding:17px;margin-bottom:12px;box-shadow:0 8px 24px #304A6718}.summary-head{display:flex;justify-content:space-between;align-items:center}.summary-title{font-size:15px;font-weight:800}.count{font-size:11px;opacity:.75}.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:13px}.metric{border:1px solid #ffffff1f;background:#ffffff0b;border-radius:12px;padding:10px}.metric span{font-size:10px;opacity:.7;font-weight:700}.metric b{display:block;font-size:19px;margin-top:3px;font-variant-numeric:tabular-nums}
 .live{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:15px;margin-bottom:12px}.live-head{display:flex;justify-content:space-between;font-size:12px;color:var(--soft)}.live-head b{color:var(--ink)}.live-time{text-align:center;font-size:36px;font-weight:850;letter-spacing:.04em;margin:17px 0 3px;font-variant-numeric:tabular-nums}.live-note{text-align:center;font-size:11.5px;color:var(--soft);min-height:17px}
 .live-note.sleeping-note{font-size:17px;font-weight:850;color:var(--accent);line-height:1.5;margin-top:5px;letter-spacing:-.2px}.action{width:100%;border:0;border-radius:12px;padding:14px;margin-top:14px;background:var(--night);color:#fff;font-weight:850;font-size:16px}.action.stop{background:var(--accent)}
 .section-title{font-size:13px;font-weight:800;color:var(--soft);margin:17px 3px 8px}.history{display:grid;gap:8px}.row{background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px;display:flex;justify-content:space-between;gap:10px}.row-main{font-weight:800;font-size:14px}.row-sub{font-size:11px;color:var(--soft);margin-top:3px}.duration{font-weight:850;color:var(--accent);white-space:nowrap}.mini-btn{border:0;border-radius:8px;padding:5px 8px;margin-top:7px;font-size:11px;font-weight:800}.edit-btn{background:var(--accent-soft);color:var(--accent)}.delete-btn{background:#f7e7e2;color:var(--danger)}.empty{text-align:center;color:var(--soft);padding:24px;border:1px dashed var(--line);border-radius:13px;background:#ffffff88}
@@ -181,11 +181,11 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 }
 </style>
 
-
-<link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#285f50">
-<link rel="icon" href="./icon-192.png">
+<!-- sleep_v1.07: v46 기준 UI/그래프/10분 알람 보완 -->
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
+<div class="top-actions"><button id="chartToggle">📈 그래프 보기</button><button id="syncBtn">↻ 동기화</button><button type="button" id="todayJumpBtn">현재 날짜</button><button id="settingsBtn">⚙ 설정</button></div>
+<div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
+<div class="tabs"><button class="active" data-view="day">오늘</button><button data-view="week">주별</button><button data-view="month">월별</button><button data-view="year">년도별</button></div>
 <div class="fixed-core" id="fixedCore">
   <div class="section-title">알람</div>
 <div class="alarm-card">
@@ -226,14 +226,12 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
   <button class="action" id="manualAdd" style="margin:0 0 10px;background:var(--surface);color:var(--accent);border:1px solid var(--accent)">＋ 수면 기록</button>
 </div>
 
-<div class="top-actions"><button id="chartToggle">📈 그래프 보기</button><button id="syncBtn">↻ 동기화</button><button type="button" id="todayJumpBtn">현재 날짜</button><button id="settingsBtn">⚙ 설정</button></div>
-<div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
-<div class="tabs"><button class="active" data-view="day">오늘</button><button data-view="week">주별</button><button data-view="month">월별</button><button data-view="year">년도별</button></div>
+
 <section class="cloud-card" id="cloudCard"><b>☁ 클라우드 저장</b><div class="cloud-status" id="cloudStatus">로그인 필요</div><div class="cloud-grid"><input id="email" type="email" placeholder="이메일"><input id="password" type="password" placeholder="비밀번호 (6자 이상)"></div><div class="cloud-actions"><button id="signup">회원가입</button><button id="login">로그인</button><button id="logout">로그아웃</button><button id="upload">전체 클라우드 저장</button><button id="download">클라우드에서 불러오기</button></div></section>
 
 <section class="chart-card" id="chartCard">
   <div class="chart-head">
-    <div><b>수면시간 그래프</b><div class="chart-average" id="chartAverage">평균 수면시간 —</div></div>
+    <div><b>수면시간 그래프</b><div class="chart-average" id="chartAverage">평균 수면시간 —</div><div class="chart-average" id="chartTotal">총 수면시간 —</div></div>
     <span id="chartUnit">총 수면시간</span>
   </div>
   <div id="bars"></div>
@@ -421,10 +419,11 @@ function renderChart(days){
   // matching the practical "average sleep" meaning rather than counting empty future days.
   const recorded=points.filter(p=>Number(p.sleep)>0);
   const avg=recorded.length ? recorded.reduce((sum,p)=>sum+Number(p.sleep||0),0)/recorded.length : 0;
-  const total=points.reduce((sum,p)=>sum+Number(p.sleep||0),0);
   $('#chartAverage').textContent=recorded.length
-    ? `평균 수면시간 ${sleepTooltip(avg)} · 총 ${sleepTooltip(total)}`
-    : '평균 수면시간 — · 총 0분';
+    ? `평균 수면시간 ${sleepTooltip(avg)}`
+    : '평균 수면시간 —';
+  const chartTotal=points.reduce((sum,p)=>sum+Number(p.sleep||0),0);
+  $('#chartTotal').textContent=`총 수면시간 ${sleepTooltip(chartTotal)}`;
 
   bindSleepChartTooltip();
 }
@@ -710,7 +709,7 @@ if(overlap){
   alert(`현재 수면시간이 이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치는 기록을 먼저 수정하거나 삭제해주세요.`);
   return;
 }
-data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});data.sessions.sort((a,b)=>a.start-b.start);data.active=null;save();render();toast('수면 종료 · 저장 완료')}render()}
+data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});data.active=null;save();render();toast('수면 종료 · 저장 완료')}render()}
 function tick(){
   let n=Date.now();
   if(view==='day' && ymd(cur)===ymd(logicalToday())){
@@ -1335,7 +1334,7 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 (()=>{
   const KEY='sleepAlarm:clean:v46';
   const $=q=>document.querySelector(q);
-  let ctx=null, osc=null, gain=null, timeout=null, watcher=null, ringing=false;
+  let ctx=null, osc=null, gain=null, timeout=null, watcher=null, vibrateTimer=null, autoStopTimer=null, ringing=false;
 
   const pad=n=>String(n).padStart(2,'0');
   function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
@@ -1375,6 +1374,9 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
   }
   function silence(){
     ringing=false;
+    clearInterval(vibrateTimer); vibrateTimer=null;
+    clearTimeout(autoStopTimer); autoStopTimer=null;
+    try{navigator.vibrate?.(0)}catch(e){}
     if(gain&&ctx){
       try{gain.gain.cancelScheduledValues(ctx.currentTime);gain.gain.setValueAtTime(.00001,ctx.currentTime)}catch(e){}
     }
@@ -1397,14 +1399,21 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
     }else stop.classList.add('show');
     const now=ctx.currentTime;
     gain.gain.cancelScheduledValues(now);
-    // ring for up to 5 minutes or until user presses stop
-    for(let i=0;i<600;i++){
+    // ring for up to 10 minutes or until user presses stop
+    for(let i=0;i<1200;i++){
       const t=now+i*.5;
       gain.gain.setValueAtTime(.00001,t);
       gain.gain.linearRampToValueAtTime(.32,t+.03);
       gain.gain.linearRampToValueAtTime(.00001,t+.34);
     }
-    try{navigator.vibrate?.([800,250,800,250,1200])}catch(e){}
+    try{
+      const vibratePattern=[800,250,800,250,1200,300];
+      navigator.vibrate?.(vibratePattern);
+      clearInterval(vibrateTimer);
+      vibrateTimer=setInterval(()=>{ if(ringing) navigator.vibrate?.(vibratePattern); },3600);
+    }catch(e){}
+    clearTimeout(autoStopTimer);
+    autoStopTimer=setTimeout(silence,10*60*1000);
   }
   function arm(a){
     clearTimeout(timeout);clearInterval(watcher);
@@ -1447,9 +1456,4 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 })();
 </script>
 
-<script>
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-}
-</script>
 </body></html>
