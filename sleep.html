@@ -277,7 +277,48 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothi
 .cloud-actions .data-btn[style*="display:none"]{display:none!important}
 @media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
 </style>
-<style id="v126-index-alarm-only">.alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style></head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
+<style id="v126-index-alarm-only">.alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style>
+<style id="v-final-summary-unify">
+/* Sleep summary shell copied from study summary-card dimensions. */
+body .wrap > .summary{
+  position:static!important;top:auto!important;z-index:auto!important;
+  background:#FFFFFF!important;color:var(--ink)!important;
+  border:1px solid #DDE2D9!important;border-radius:14px!important;
+  padding:13px 16px 14px!important;margin:0 0 12px!important;
+  box-shadow:none!important;box-sizing:border-box!important;width:100%!important;
+}
+body .wrap > .summary .summary-head{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  gap:8px!important;margin-bottom:11px!important;position:relative!important;
+}
+body .wrap > .summary .summary-title{
+  font-size:15px!important;font-weight:600!important;color:#66736D!important;
+  margin:0!important;
+}
+body .wrap > .summary .count{
+  font-size:11.5px!important;font-weight:400!important;color:#66736D!important;opacity:1!important;
+}
+body .wrap > .summary .summary-grid{
+  display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:10px!important;margin:0!important;
+}
+body .wrap > .summary .metric{
+  background:transparent!important;border:0!important;border-radius:0!important;
+  padding:0!important;min-width:0!important;text-align:center!important;
+}
+body .wrap > .summary .metric:first-child{text-align:left!important}
+body .wrap > .summary .metric:last-child{text-align:right!important}
+body .wrap > .summary .metric b{
+  display:block!important;font-size:19px!important;font-weight:700!important;
+  color:var(--ink)!important;margin:0!important;font-variant-numeric:tabular-nums!important;white-space:nowrap!important;
+}
+body .wrap > .summary .metric span{
+  display:block!important;font-size:11.5px!important;font-weight:400!important;
+  color:#66736D!important;opacity:1!important;white-space:nowrap!important;
+}
+</style>
+</head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
+<section class="summary"><div class="summary-head"><div class="summary-title" id="summaryTitle">오늘 수면</div><div class="count" id="count"></div></div><div class="summary-grid"><div class="metric"><span>총 수면</span><b id="total">0분</b></div><div class="metric"><span>가장 긴 수면</span><b id="longest">0분</b></div><div class="metric"><span>최근 기상</span><b id="lastWake">-</b></div><div class="metric"><span>기상 후 경과시간</span><b id="gap">-</b></div></div></section>
 <div class="top-actions">
   <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
   <div class="top-right-actions">
@@ -322,8 +363,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothi
   </div>
   <div class="alarm-local-note">이 알람 설정은 이 기기에만 저장되며 동기화하지 않습니다.</div>
 </div>
-  <div class="section-title fixed-label">오늘 요약</div>
-  <section class="summary"><div class="summary-head"><div class="summary-title" id="summaryTitle">오늘 수면</div><div class="count" id="count"></div></div><div class="summary-grid"><div class="metric"><span>총 수면</span><b id="total">0분</b></div><div class="metric"><span>가장 긴 수면</span><b id="longest">0분</b></div><div class="metric"><span>최근 기상</span><b id="lastWake">-</b></div><div class="metric"><span>기상 후 경과시간</span><b id="gap">-</b></div></div></section>
+  
   <div class="section-title fixed-label">자동 입력</div>
   <section class="live" id="liveCard"><div class="live-head"><b id="state">깨어 있어요</b><span id="now"></span></div><div class="live-time" id="liveTime">00:00:00</div><div class="live-note" id="liveNote">잠들 때 수면 시작을 누르세요</div><button class="action" id="action">☾ 수면 시작</button></section>
   <div class="section-title fixed-label">직접 기록</div>
@@ -390,6 +430,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothi
 const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),DK=['일','월','화','수','목','금','토'];
 const DATA='sleepJournal:v2',SET='sleepSettings:v1';
 let data=JSON.parse(localStorage.getItem(DATA)||'{"sessions":[],"active":null}');
+if(data.active && !Number.isFinite(Number(data.active.timerStartedAt))) data.active.timerStartedAt=Number(data.active.start);
 let settings=JSON.parse(localStorage.getItem(SET)||'{"dayStartHour":11,"weekStartDay":6,"pendingDayStart":null}');
 if(!Number.isInteger(Number(settings.dayStartHour))) settings.dayStartHour=11;
 settings.dayStartHour=Number(settings.dayStartHour);
@@ -427,6 +468,28 @@ function effectiveStatus(){
 }
 function ymd(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}function logicalDate(ms=Date.now()){let d=new Date(ms),x=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(d.getHours()<settings.dayStartHour)x.setDate(x.getDate()-1);return x}function logicalToday(){return logicalDate()}
 function bounds(d){let s=new Date(d.getFullYear(),d.getMonth(),d.getDate(),settings.dayStartHour,0,0,0),e=new Date(s);e.setDate(e.getDate()+1);return [s.getTime(),e.getTime()]}
+// ---------- 기준시점 횡단 + 이어서 타이머 유지 ----------
+// 원칙: 수면 시작 -> data.active.start(=timerStartedAt) 기록
+// 기준시점을 넘긴 진행 중 수면만, 그 시점에 자동으로:
+//   이전 수면일: 종료시각 = 기준시점 1분 전으로 확정 저장
+//   다음 수면일: data.active.start = 기준시점으로 이어서 시작
+// 단, 화면에 표시되는 실시간 타이머(timerStartedAt)는 최초 시작값을 그대로 유지해
+// 끊기거나 0으로 리셋되지 않는다. 앱이 기준시점 동안 꺼져 있었어도 다시 열렸을 때
+// 현재 시각과 비교해 며칠치라도 순서대로 소급 분할한다.
+function checkSleepBoundaryRollover(){
+  let rolled=false;
+  while(data.active){
+    const activeDay=logicalDate(data.active.start);
+    const [,boundaryMs]=bounds(activeDay);
+    if(Date.now()<boundaryMs) break;
+    const originalStart=Number.isFinite(Number(data.active.timerStartedAt)) ? Number(data.active.timerStartedAt) : Number(data.active.start);
+    data.sessions.push({id:'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),start:data.active.start,end:boundaryMs-60000});
+    data.active={start:boundaryMs,timerStartedAt:originalStart};
+    rolled=true;
+  }
+  if(rolled){data.sessions.sort((a,b)=>a.start-b.start);save()}
+  return rolled;
+}
 function fmtHM(ms){let d=new Date(ms);return `${pad(d.getHours())}:${pad(d.getMinutes())}`}function dur(ms){let m=Math.max(0,Math.round(ms/60000)),h=Math.floor(m/60);m%=60;return h?`${h}시간 ${pad(m)}분`:`${m}분`}function live(ms){let s=Math.floor(Math.max(0,ms)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60);s%=60;return `${pad(h)}:${pad(m)}:${pad(s)}`}
 function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('#toast').classList.remove('show'),1400)}
 function sessionsFor(d){let [a,b]=bounds(d);return data.sessions.filter(x=>x.start>=a&&x.start<b).sort((x,y)=>x.start-y.start)}
@@ -839,7 +902,7 @@ window.addEventListener('message',ev=>{
   }catch(e){console.warn('자동 수면 종료 실패',e)}
   window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped},location.origin);
 });
-$('#action').onclick=async()=>{if(!data.active){if(!(await requestExclusiveSessionStart()))return;data.active={start:Date.now()};save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
+$('#action').onclick=async()=>{if(!data.active){if(!(await requestExclusiveSessionStart()))return;data.active={start:Date.now(),timerStartedAt:Date.now()};save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
 if(overlap){
   alert(`현재 수면시간이 이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치는 기록을 먼저 수정하거나 삭제해주세요.`);
   return;
@@ -847,6 +910,7 @@ if(overlap){
 data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});data.active=null;save();render();toast('수면 종료 · 저장 완료');if(window.parent!==window)window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin)}render()}
 function tick(){
   let n=Date.now();
+  checkSleepBoundaryRollover();
   if(view==='day' && ymd(cur)===ymd(logicalToday())){
     const todayArr=sessionsFor(cur);
     if(todayArr.length){
@@ -860,12 +924,12 @@ function tick(){
   }
   const changed=maybeActivatePending();
   $('#now').textContent=`현재 ${fmtHM(n)}`;
-  $('#liveTime').textContent=data.active?live(n-data.active.start):'00:00:00';
+  $('#liveTime').textContent=data.active?live(n-Number(data.active.timerStartedAt ?? data.active.start)):'00:00:00';
   $('#state').textContent=data.active?'수면 중':'깨어 있어요';
   $('#action').textContent=data.active?'☀ 수면 종료':'☾ 수면 시작';
   $('#action').classList.toggle('stop',!!data.active);
   if(data.active){
-  const sd=new Date(data.active.start);
+  const sd=new Date(Number(data.active.timerStartedAt ?? data.active.start));
   $('#liveNote').textContent=`${sd.getHours()}시 ${pad(sd.getMinutes())}분에 시작`;
   $('#liveNote').classList.add('sleeping-note');
 }else{
