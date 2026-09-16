@@ -196,6 +196,28 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 </style>
 
 <!-- sleep_v1.07: v46 기준 UI/그래프/10분 알람 보완 -->
+
+<style>
+/* v1.17: study/lecture/sleep header + backup/cloud layout consistency */
+.wrap{max-width:520px;margin:0 auto;padding:20px 16px 8px}
+.top-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.top-right-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.top-actions button{min-height:42px;padding:8px 7px;font-size:13px;font-weight:700;border-radius:10px;white-space:nowrap}
+#chartToggle{margin-right:auto;padding:8px 11px}
+.datebar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;position:relative}
+.datebar>button{width:38px;height:38px}
+.date-center{padding:3px 6px}
+.week-mini{font-size:11px;margin-bottom:1px;font-weight:600}.date-big{font-size:26px;font-weight:600}.date-sub{font-size:12.5px;margin-top:2px}.day-rule{font-size:10px;margin-top:3px}
+.tabs{margin-bottom:16px}
+.data-tools{display:flex;gap:8px;margin:-6px 0 14px}
+.data-btn{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:9px 10px;font-size:12.5px;font-weight:600;cursor:pointer}
+#restoreFile{display:none}
+.cloud-card{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin:-6px 0 14px}
+.cloud-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.cloud-title{font-size:13px;font-weight:700}.cloud-status{font-size:11.5px;color:var(--soft);margin:0}
+.cloud-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.cloud-actions .data-btn{min-width:120px}.cloud-setup{display:none;margin-top:8px}.cloud-setup.show{display:block}.cloud-note{font-size:11px;color:var(--soft);line-height:1.45;margin-top:7px}
+.cloud-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.cloud-grid input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:12.5px;background:var(--bg);color:var(--ink)}
+@media(max-width:430px){.cloud-grid{grid-template-columns:1fr}.top-actions button{padding:7px 8px;font-size:12px}}
+</style>
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
 <div class="top-actions">
   <button id="chartToggle">📈 그래프 보기</button>
@@ -207,6 +229,8 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 </div>
 <div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
 <div class="tabs"><button class="active" data-view="day">오늘</button><button data-view="week">주별</button><button data-view="month">월별</button><button data-view="year">년도별</button></div>
+<div class="data-tools"><button class="data-btn" id="backupData">데이터 백업</button><button class="data-btn" id="restoreData">데이터 복원</button><input type="file" id="restoreFile" accept="application/json,.json"></div>
+<section class="cloud-card" id="cloudCard"><div class="cloud-head"><div class="cloud-title">☁ 클라우드 저장</div><div class="cloud-status" id="cloudStatus">로그인 필요</div></div><div class="cloud-actions"><button class="data-btn" id="toggleCloudSetup">로그인 / 회원가입</button><button class="data-btn" id="upload">전체 클라우드 저장</button><button class="data-btn" id="download">클라우드에서 불러오기</button><button class="data-btn" id="logout" style="display:none">로그아웃</button></div><div class="cloud-setup" id="cloudSetup"><div class="cloud-grid"><input id="email" type="email" placeholder="이메일"><input id="password" type="password" placeholder="비밀번호 (6자 이상)"></div><div class="cloud-actions"><button class="data-btn" id="signup">회원가입</button><button class="data-btn" id="login">로그인</button></div><div class="cloud-note">로그인 후에는 수면 기록을 브라우저와 클라우드에 저장할 수 있습니다.</div></div></section>
 <div class="fixed-core" id="fixedCore">
   <div class="section-title">알람</div>
 <div class="alarm-card">
@@ -248,7 +272,7 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 </div>
 
 
-<section class="cloud-card" id="cloudCard"><b>☁ 클라우드 저장</b><div class="cloud-status" id="cloudStatus">로그인 필요</div><div class="cloud-grid"><input id="email" type="email" placeholder="이메일"><input id="password" type="password" placeholder="비밀번호 (6자 이상)"></div><div class="cloud-actions"><button id="signup">회원가입</button><button id="login">로그인</button><button id="logout">로그아웃</button><button id="upload">전체 클라우드 저장</button><button id="download">클라우드에서 불러오기</button></div></section>
+
 
 <section class="chart-card" id="chartCard">
   <div class="chart-head">
@@ -316,7 +340,7 @@ if(!settings.pendingDayStart || !Number.isInteger(Number(settings.pendingDayStar
 let cur=logicalToday(),view='day',editing=null;
 const SUPABASE_URL='https://nvpvxtwebzefhgulswsv.supabase.co',SUPABASE_KEY='sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';let sb=null,user=null;
 function save(){localStorage.setItem(DATA,JSON.stringify(data))}
-function saveSet(){localStorage.setItem(SET,JSON.stringify(settings))}
+function saveSet(){localStorage.setItem(SET,JSON.stringify(settings))}\n// v1.17 local backup / restore\n$('#backupData').onclick=()=>{\n  const payload={app:'sleep-journal',version:'1.17',exportedAt:new Date().toISOString(),data,settings};\n  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});\n  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);\n  a.download=`sleep_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();\n  setTimeout(()=>URL.revokeObjectURL(a.href),1000); toast('수면 데이터 백업 완료');\n};\n$('#restoreData').onclick=()=>$('#restoreFile').click();\n$('#restoreFile').onchange=async e=>{\n  const f=e.target.files?.[0]; if(!f)return;\n  try{\n    const obj=JSON.parse(await f.text()); const d=obj.data||obj;\n    if(!d || !Array.isArray(d.sessions)) throw new Error('invalid');\n    if(!confirm('백업 파일의 수면 기록으로 복원할까요?')){e.target.value='';return}\n    data=d; if(obj.settings){settings={...settings,...obj.settings};saveSet()} save(); render(); toast('데이터 복원 완료');\n  }catch(err){alert('올바른 수면장 백업 파일이 아닙니다.')} e.target.value='';\n};\n$('#toggleCloudSetup').onclick=()=>$('#cloudSetup').classList.toggle('show');\n
 function nextBoundaryForHour(hour,from=new Date()){
   const d=new Date(from);
   let b=new Date(d.getFullYear(),d.getMonth(),d.getDate(),hour,0,0,0);
@@ -961,7 +985,7 @@ document.addEventListener('touchend',e=>{
   touchMode='';pullReady=false;
 },{passive:true});
 
-function initCloud(){try{if(window.supabase)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}})}catch(e){}}async function cloudStatus(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요'}$('#syncBtn').onclick=async()=>{if(!sb)initCloud();await cloudStatus();if(!user){$('#cloudCard').classList.add('show');toast('클라우드 로그인 필요');return}await syncCloud();toast('동기화 완료')}
+function initCloud(){try{if(window.supabase)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}})}catch(e){}}async function cloudStatus(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요'; $('#logout').style.display=user?'block':'none'}$('#syncBtn').onclick=async()=>{if(!sb)initCloud();await cloudStatus();if(!user){$('#cloudSetup').classList.add('show');toast('클라우드 로그인 필요');return}await syncCloud();toast('동기화 완료')}
 async function syncCloud(){if(!user)return;let {data:r,error}=await sb.from('sleep_records').select('data').eq('user_id',user.id).maybeSingle();if(error&&error.code!=='PGRST116'){console.warn(error);toast('sleep_records 테이블 설정이 필요해요');return}let remote=r?.data||{sessions:[]},map=new Map([...(remote.sessions||[]),...data.sessions].map(x=>[x.id,x]));data.sessions=[...map.values()].sort((a,b)=>a.start-b.start);save();let payload={sessions:data.sessions,settings};let q=r?sb.from('sleep_records').update({data:payload}).eq('user_id',user.id):sb.from('sleep_records').insert({user_id:user.id,data:payload});let {error:w}=await q;if(w){console.warn(w);toast('클라우드 저장 구조 확인 필요');return}render()}
 $('#signup').onclick=async()=>{if(!sb)initCloud();let e=$('#email').value.trim(),p=$('#password').value;if(!e||p.length<6)return toast('이메일/비밀번호를 확인해주세요');let {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert(error.message);await cloudStatus();toast('회원가입 요청 완료')};$('#login').onclick=async()=>{if(!sb)initCloud();let {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);await cloudStatus();toast('로그인 완료')};$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();await cloudStatus();toast('로그아웃')};$('#upload').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');await syncCloud()};$('#download').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');let {data:r,error}=await sb.from('sleep_records').select('data').eq('user_id',user.id).maybeSingle();if(error||!r)return toast('클라우드 기록 없음');if(confirm('클라우드 기록으로 불러올까요?')){data.sessions=r.data?.sessions||[];save();render();toast('불러오기 완료')}}
 initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tick();setInterval(tick,500);
