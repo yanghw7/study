@@ -3364,6 +3364,9 @@ async function runManualCloudSync(){
   if(btn){ btn.disabled = true; btn.textContent = '↻ 동기화 중…'; }
   try{
     await saveMonth(ymKey(cur));
+    // 버튼을 누르는 순간 Supabase 세션을 다시 확인한다.
+    // PWA 복원/다른 탭 로그인 직후 cloudUser가 오래된 상태여도 동기화되게 한다.
+    await refreshCloudStatus();
     if(!cloudUser){
       showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
       return;
@@ -3732,7 +3735,7 @@ renderDay();
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.21', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=1.25', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });
