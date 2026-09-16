@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#456D96"><title>수면장</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600;700&display=swap');
 :root{--bg:#EEF3F8;--surface:#fff;--ink:#202A35;--soft:#5B6673;--line:#D9E1EA;--accent:#456D96;--accent-soft:#E5EEF7;--night:#35455D;--danger:#A13327;--r:14px}
 *{box-sizing:border-box}html,body{overscroll-behavior-y:contain}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Noto Sans KR",sans-serif;padding-bottom:80px}.wrap{max-width:520px;margin:auto;padding:20px 16px}
 button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:center;margin-bottom:12px}.top-actions button{border:1px solid var(--line);background:var(--surface);border-radius:10px;min-height:42px;padding:8px 10px;font-size:13px;font-weight:800;color:var(--ink)}#chartToggle{margin-right:auto}.datebar{display:flex;align-items:center;gap:8px;margin-bottom:12px}.datebar>button{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:18px}.date-center{text-align:center;flex:1}.week-mini,.date-sub,.day-rule{font-size:11px;color:var(--soft)}.date-big{font-size:26px;font-weight:800;margin:2px 0}.tabs{display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px}.tabs button{flex:1;border:0;background:none;padding:9px 0;border-radius:9px;font-weight:700;color:var(--soft)}.tabs button.active{background:var(--accent);color:#fff}
@@ -213,13 +214,41 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 </style>
 
 <!-- sleep_v1.07: v46 기준 UI/그래프/10분 알람 보완 -->
+
+<style id="v119-exact-alignment">
+/* Exact header/data/cloud typography and sizing shared with 공부장/강의장 */
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:88px}
+.wrap{max-width:520px;margin:0 auto;padding:20px 16px 8px}
+.top-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.top-right-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.sync-top-btn,.settings-top-btn{display:block;margin:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 7px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);position:relative;z-index:5;min-height:42px;white-space:nowrap}
+.top-chart-btn{flex:0 0 auto;width:auto;padding:8px 11px!important;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.05);font-size:13px!important;border-radius:10px!important;position:relative;z-index:5;min-height:42px;font-weight:700!important}
+.chart-toggle-btn{display:block;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.datebar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;position:relative}
+.datebar>button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:17px;cursor:pointer}
+.date-center{text-align:center;flex:1;cursor:pointer;border-radius:10px;padding:3px 6px}
+.week-mini{font-size:11px;color:var(--soft);margin-bottom:1px;font-weight:600}
+.date-big{font-family:'Source Serif 4',serif;font-size:26px;font-weight:600;letter-spacing:-.01em;margin:0}
+.date-sub{font-size:12.5px;color:var(--soft);margin-top:2px}
+.day-rule{font-size:10px;color:var(--soft);opacity:.7;margin-top:3px}
+.tabs{display:flex;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px}
+.tabs button{flex:1;border:none;background:none;padding:9px 0;font-size:13.5px;font-weight:600;color:var(--soft);border-radius:9px;cursor:pointer}
+.tabs button.active{background:var(--accent);color:#fff}
+.data-tools{display:flex;gap:8px;margin:-6px 0 14px}
+.data-btn{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:9px 10px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:auto}
+.cloud-card{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin:-6px 0 14px}
+.cloud-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.cloud-title{font-size:13px;font-weight:700}.cloud-status{font-size:11.5px;color:var(--soft);margin:0}
+.cloud-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.cloud-grid input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:12.5px;background:var(--bg);color:var(--ink)}
+.cloud-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.cloud-actions .data-btn{min-width:120px}.cloud-setup{display:none;margin-top:8px}.cloud-setup.show{display:block}.cloud-note{font-size:11px;color:var(--soft);line-height:1.45;margin-top:7px}
+@media(max-width:430px){.cloud-grid{grid-template-columns:1fr}}
+</style>
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
 <div class="top-actions">
-  <button id="chartToggle">📈 그래프 보기</button>
+  <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
   <div class="top-right-actions">
-    <button type="button" id="todayJumpBtn">현재 날짜</button>
-    <button id="syncBtn">↻ 동기화</button>
-    <button id="settingsBtn">⚙ 설정</button>
+    <button class="sync-top-btn" type="button" id="todayJumpBtn">현재 날짜</button>
+    <button class="sync-top-btn" id="syncBtn">↻ 동기화</button>
+    <button class="settings-top-btn" id="settingsBtn">⚙ 설정</button>
   </div>
 </div>
 <div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
@@ -988,7 +1017,7 @@ $('#backupData').onclick=()=>{const payload={version:1,type:'sleep-backup',expor
 $('#restoreData').onclick=()=>$('#restoreFile').click();
 $('#restoreFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const j=JSON.parse(await f.text());const src=j.data||j;if(!Array.isArray(src.sessions))throw new Error('올바른 수면 백업 파일이 아닙니다.');if(!confirm('백업 파일의 수면 기록을 복원할까요?'))return;data.sessions=src.sessions||[];data.active=src.active||null;if(j.settings)Object.assign(settings,j.settings);save();saveSet();render();toast('데이터 복원 완료')}catch(err){alert('데이터 복원 실패: '+err.message)}finally{e.target.value=''}};
 $('#cloudGoogle').onclick=async()=>{if(!sb)initCloud();if(!sb)return alert('클라우드 연결을 시작하지 못했어요.');if(window.AndroidAuth&&typeof window.AndroidAuth.openOAuth==='function'){const {data:d,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'yangstudy://auth/callback',skipBrowserRedirect:true}});if(error)return alert('Google 로그인 실패: '+error.message);if(!d?.url)return alert('Google 로그인 주소를 만들지 못했어요.');window.AndroidAuth.openOAuth(d.url);return}const redirectTo=window.location.origin+window.location.pathname;const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo}});if(error)alert('Google 로그인 실패: '+error.message)};
-window.yangStudyHandleOAuthCallback=async function(callbackUrl){try{if(!sb)initCloud();const u=new URL(callbackUrl);const code=u.searchParams.get('code');if(code){const {error}=await sb.auth.exchangeCodeForSession(code);if(error)throw error}await cloudStatus();if(user){await syncCloud();toast('Google 로그인 완료')}}catch(e){alert('Google 로그인 처리 실패: '+e.message)}};
+window.yangStudyHandleOAuthCallback=async function(callbackUrl){try{if(!sb)initCloud();if(!sb)throw new Error('Supabase 연결 실패');const u=new URL(callbackUrl);const oauthError=u.searchParams.get('error_description')||u.searchParams.get('error');if(oauthError)throw new Error(oauthError);const code=u.searchParams.get('code');if(!code)throw new Error('Google 로그인 인증 코드가 없습니다.');const {data:authData,error}=await sb.auth.exchangeCodeForSession(code);if(error)throw error;user=authData?.session?.user||authData?.user||null;await cloudStatus();if(user){await syncCloud();toast('Google 로그인이 완료됐어요');return true}throw new Error('로그인 세션을 확인하지 못했습니다.')}catch(e){console.error('Google OAuth callback 실패:',e);alert('Google 로그인 완료 처리 실패: '+(e?.message||e));return false}};
 initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tick();setInterval(tick,500);
 </script>
 <script>
