@@ -25,7 +25,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 <div class="shell" id="shell">
   <div class="tabs">
     <button id="studyTab" class="active study">📚 공부장</button>
-    <button id="lectureTab" class="lecture">🎓 강의기록</button>
+    <button id="lectureTab" class="lecture">🎓 강의기록장</button>
     <button id="sleepTab" class="sleep">🌙 수면장</button>
   </div>
   <iframe id="studyFrame" class="frame active" src="study.html"></iframe>
@@ -57,7 +57,7 @@ try{const saved=localStorage.getItem('journal:lastTab');if(saved&&tabs[saved])fi
 openTab(first);
 
 
-const baseTabLabels={study:'📚 공부장',lecture:'🎓 강의기록',sleep:'🌙 수면장'};
+const baseTabLabels={study:'📚 공부장',lecture:'🎓 강의기록장',sleep:'🌙 수면장'};
 function setExclusiveTabStatus(kind){
   Object.entries(tabs).forEach(([key,item])=>{
     if(key==='study') item.button.textContent = kind==='study' ? '📚 공부장 기록중' : baseTabLabels.study;
@@ -75,7 +75,7 @@ function stopExclusive(kind){
     const frame=exclusiveFrames[kind];
     if(!frame?.contentWindow){resolve(true);return}
     const req='stop-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-    const timer=setTimeout(()=>{window.removeEventListener('message',done);resolve(true)},2200);
+    const timer=setTimeout(()=>{window.removeEventListener('message',done);resolve(true)},400);
     function done(ev){
       if(ev.origin!==location.origin||ev.source!==frame.contentWindow||
          ev.data?.type!=='exclusive-session-stopped'||ev.data?.req!==req)return;
@@ -95,10 +95,8 @@ window.addEventListener('message',ev=>{
   const kind=ev.data.kind, req=ev.data.req;
   if(!exclusiveFrames[kind])return;
   exclusiveQueue=exclusiveQueue.then(async()=>{
-    // Ask both other pages to stop. This also repairs state if index was reloaded.
-    for(const other of Object.keys(exclusiveFrames)){
-      if(other!==kind) await stopExclusive(other);
-    }
+    // Stop the other recorders in parallel so Start reacts without multi-second lag.
+    await Promise.all(Object.keys(exclusiveFrames).filter(other=>other!==kind).map(stopExclusive));
     exclusiveActive=kind;
     setExclusiveTabStatus(kind);
     ev.source?.postMessage({type:'exclusive-session-result',req,ok:true},location.origin);

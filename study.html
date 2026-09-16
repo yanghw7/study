@@ -340,6 +340,7 @@
 #dayView > .study-alarm-card{position:sticky!important;top:8px!important;z-index:22!important}
 #dayView > .summary-card{position:sticky!important;top:116px!important;z-index:21!important}
 
+.ko-time-label{font-size:11px;font-weight:800;color:var(--ink-soft,var(--soft));margin-top:4px}
 </style>
 </head>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
@@ -598,6 +599,7 @@ let currentView = 'day';
 function ymKey(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}`; }
 function dKey(date){ return String(date.getDate()); }
 
+function koDateTimeLabel(date,time){if(!date||!time)return '';const m=/^(\d{2}):(\d{2})/.exec(time);return m?`${m[1]}시 ${m[2]}분`:time;}
 function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function hm(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 
@@ -1629,7 +1631,7 @@ function renderPeriods(){
         </div>
         <div class="field time">
           <label>시작일시</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}">
+          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime)}</div>
         </div>
         <div class="field">
           <label>끝 페이지</label>
@@ -1637,7 +1639,7 @@ function renderPeriods(){
         </div>
         <div class="field time">
           <label>종료일시</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}">
+          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime)}</div>
         </div>
       </div>
       <div class="period-stats">
@@ -1881,7 +1883,7 @@ async function requestExclusiveSessionStart(){
   try{
     const req='study-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     return await new Promise(resolve=>{
-      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},2500);
+      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
       function onMsg(ev){
         if(ev.source!==window.parent || ev.data?.type!=='exclusive-session-result' || ev.data?.req!==req) return;
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
