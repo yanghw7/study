@@ -1,0 +1,1455 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3B6E5C"><title>수면장</title>
+<style>
+:root{--bg:#EFF1EC;--surface:#fff;--ink:#1F2A24;--soft:#57635C;--line:#DDE2D9;--accent:#3B6E5C;--accent-soft:#E4EEE9;--night:#35455d;--danger:#A13327;--r:14px}
+*{box-sizing:border-box}html,body{overscroll-behavior-y:contain}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Noto Sans KR",sans-serif;padding-bottom:80px}.wrap{max-width:520px;margin:auto;padding:20px 16px}
+button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:center;margin-bottom:12px}.top-actions button{border:1px solid var(--line);background:var(--surface);border-radius:10px;min-height:42px;padding:8px 10px;font-size:13px;font-weight:800;color:var(--ink)}#chartToggle{margin-right:auto}.datebar{display:flex;align-items:center;gap:8px;margin-bottom:12px}.datebar>button{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:18px}.date-center{text-align:center;flex:1}.week-mini,.date-sub,.day-rule{font-size:11px;color:var(--soft)}.date-big{font-size:26px;font-weight:800;margin:2px 0}.tabs{display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px}.tabs button{flex:1;border:0;background:none;padding:9px 0;border-radius:9px;font-weight:700;color:var(--soft)}.tabs button.active{background:var(--accent);color:#fff}
+.summary{background:linear-gradient(145deg,#263a35,#405d53);color:#fff;border-radius:20px;padding:17px;margin-bottom:12px;box-shadow:0 8px 24px #263a3518}.summary-head{display:flex;justify-content:space-between;align-items:center}.summary-title{font-size:15px;font-weight:800}.count{font-size:11px;opacity:.75}.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:13px}.metric{border:1px solid #ffffff1f;background:#ffffff0b;border-radius:12px;padding:10px}.metric span{font-size:10px;opacity:.7;font-weight:700}.metric b{display:block;font-size:19px;margin-top:3px;font-variant-numeric:tabular-nums}
+.live{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:15px;margin-bottom:12px}.live-head{display:flex;justify-content:space-between;font-size:12px;color:var(--soft)}.live-head b{color:var(--ink)}.live-time{text-align:center;font-size:36px;font-weight:850;letter-spacing:.04em;margin:17px 0 3px;font-variant-numeric:tabular-nums}.live-note{text-align:center;font-size:11.5px;color:var(--soft);min-height:17px}
+.live-note.sleeping-note{font-size:17px;font-weight:850;color:var(--accent);line-height:1.5;margin-top:5px;letter-spacing:-.2px}.action{width:100%;border:0;border-radius:12px;padding:14px;margin-top:14px;background:var(--night);color:#fff;font-weight:850;font-size:16px}.action.stop{background:var(--accent)}
+.section-title{font-size:13px;font-weight:800;color:var(--soft);margin:17px 3px 8px}.history{display:grid;gap:8px}.row{background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px;display:flex;justify-content:space-between;gap:10px}.row-main{font-weight:800;font-size:14px}.row-sub{font-size:11px;color:var(--soft);margin-top:3px}.duration{font-weight:850;color:var(--accent);white-space:nowrap}.mini-btn{border:0;border-radius:8px;padding:5px 8px;margin-top:7px;font-size:11px;font-weight:800}.edit-btn{background:var(--accent-soft);color:var(--accent)}.delete-btn{background:#f7e7e2;color:var(--danger)}.empty{text-align:center;color:var(--soft);padding:24px;border:1px dashed var(--line);border-radius:13px;background:#ffffff88}
+.chart-card{display:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:12px}.chart-card.show{display:block}
+.chart-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.chart-head span{font-size:11px;color:var(--soft)}
+.bar-chart{display:block;width:100%;height:auto;min-height:126px;overflow:visible}
+.chart-grid{stroke:#DDE2D9;stroke-width:1;stroke-dasharray:3 3}
+.chart-axis-label{fill:#7A857E;font-size:9px;font-weight:650}
+.chart-bar-sleep{fill:var(--accent)}
+.chart-bar-sleep:focus{outline:none;opacity:.78}
+.chart-empty{padding:28px 0;text-align:center;color:var(--soft);font-size:12px}
+.chart-average{font-size:12px;color:var(--soft);font-weight:750;margin-top:3px}
+.chart-tooltip{position:fixed;z-index:250;display:none;background:#1F2A24;color:#fff;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:nowrap}
+.chart-tooltip.show{display:block}
+.chart-bar-sleep{cursor:pointer;transition:opacity .12s,filter .12s}
+.chart-bar-sleep:hover,.chart-bar-sleep:focus{opacity:.72}
+.overlay{position:fixed;inset:0;background:#1f2a2466;z-index:50;display:none;align-items:flex-end;justify-content:center;padding:16px}.overlay.show{display:flex}.panel{width:min(520px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:18px}.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.panel-head b{font-size:17px}.close{border:0;background:none;font-size:22px}.setting-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}.setting-row:first-of-type{border-top:0}.setting-label{font-size:13px;font-weight:800}.setting-desc{font-size:11px;color:var(--soft);margin-top:3px;line-height:1.4}.setting-row select{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:8px}.panel-actions{display:flex;gap:8px;margin-top:12px}.panel-actions button{flex:1;border-radius:10px;padding:10px;font-weight:800}.save-btn{border:0;background:var(--accent);color:#fff}.cancel-btn{border:1px solid var(--line);background:#fff}.danger{width:100%;margin-top:15px;border:1px solid #dc2626;color:#dc2626;background:#fff;border-radius:10px;padding:10px;font-weight:800}
+.edit-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}.field{background:var(--bg);padding:10px;border-radius:10px;min-width:0}.field label{display:block;font-size:11px;color:var(--soft);font-weight:800;margin-bottom:4px}.field input{width:100%;min-width:0;border:0;background:none;font-weight:700}.cloud-card{display:none;background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px}.cloud-card.show{display:block}.cloud-status{font-size:11px;color:var(--soft);margin-bottom:8px}.cloud-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.cloud-grid input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px}.cloud-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.cloud-actions button{flex:1;min-width:100px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px;font-size:12px;font-weight:750}
+.toast{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:100;background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}.toast.show{opacity:1}@media(max-width:430px){.edit-grid,.cloud-grid{grid-template-columns:1fr}.top-actions button{padding:7px 8px;font-size:12px}}
+
+.swipe-stage{will-change:transform,opacity}
+.swipe-stage.swipe-animating{transition:transform .20s ease,opacity .20s ease}
+.swipe-exit-left{transform:translateX(-100%);opacity:.35}
+.swipe-exit-right{transform:translateX(100%);opacity:.35}
+.sync-blur{position:fixed;inset:0;z-index:90;pointer-events:none;backdrop-filter:blur(0);background:#eff1ec00;transition:.16s}
+.sync-blur.show{backdrop-filter:blur(4px);background:#eff1ec38}
+.pull-indicator{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;z-index:99;transform:translate(-50%,-70px);opacity:0;background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:15px;font-weight:800;box-shadow:0 4px 16px #1f2a2424;transition:.16s}
+.pull-indicator.show{opacity:1;transform:translate(-50%,0)}
+.pull-indicator.ready{color:var(--accent);border-color:var(--accent)}
+
+#manualEnd:disabled{opacity:.48;cursor:not-allowed}
+
+
+
+.seg-time input{font-size:18px;padding:9px 2px}}
+
+#manualOverlay .panel,#manualOverlay input,#manualOverlay button{pointer-events:auto}
+#manualStart,#manualEnd{position:relative;z-index:2;touch-action:manipulation}
+
+.date-time-field{width:100%;border:0;background:transparent;padding:8px 0;display:flex;align-items:center;justify-content:space-between;text-align:left;font-size:18px;font-weight:850;color:var(--ink);touch-action:manipulation}
+.date-time-field:disabled{opacity:.42}
+.date-time-field b{font-size:25px;font-weight:500}
+.dial-overlay{z-index:130;touch-action:none;overscroll-behavior:contain}
+.dial-panel{max-width:390px}
+.dial-date-row{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px;margin:3px 0 4px}
+.dial-date-row button{border:1px solid var(--line);background:#fff;border-radius:12px;height:44px;font-size:25px}.dial-date-row button:disabled{opacity:.25}
+.dial-date-row div{text-align:center}.dial-date-row b{display:block;font-size:18px}.dial-date-row span{font-size:11px;color:var(--soft)}
+.dial-readout{text-align:center;font-size:50px;font-weight:900;letter-spacing:-2px;margin:5px 0 9px}
+.dial-readout span{display:inline-block;min-width:65px}.dial-readout i{font-style:normal;color:var(--soft);padding:0 2px}
+.clock-face{touch-action:none;overscroll-behavior:contain;position:relative;width:min(76vw,300px);height:min(76vw,300px);margin:0 auto;border-radius:50%;background:#f1f3ef;touch-action:none;user-select:none}
+.clock-number{position:absolute;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;z-index:4}
+.clock-number.active{background:var(--accent);color:#fff}
+.clock-hand{position:absolute;left:50%;top:50%;height:2px;background:var(--accent);transform-origin:0 50%;z-index:2;opacity:.75}
+.clock-center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:var(--accent);transform:translate(-50%,-50%);z-index:3}
+.dial-help{text-align:center;color:var(--soft);font-size:13px;font-weight:750;margin:9px 0 2px}
+
+#todayJumpBtn{touch-action:manipulation}
+#todayJumpBtn:disabled{opacity:.38}
+
+/* device-only relative alarm */
+.alarm-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:18px;margin:0 0 24px;box-shadow:0 2px 8px rgba(0,0,0,.03)}
+.alarm-title{font-size:20px;font-weight:900;color:var(--text)}
+.alarm-sub{margin-top:5px;font-size:12px;line-height:1.45;color:var(--soft)}
+.alarm-time-grid{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:16px}
+.alarm-time-grid label span{display:block;font-size:12px;font-weight:800;color:var(--soft);margin:0 0 6px 3px}
+.alarm-time-grid input{width:100%;box-sizing:border-box;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:13px 8px;text-align:center;font-size:24px;font-weight:900;color:var(--text)}
+.alarm-unit{padding-bottom:14px;font-size:14px;font-weight:800;color:var(--soft)}
+.alarm-sound-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:14px}
+.alarm-sound-row label{font-size:13px;font-weight:850;color:var(--text)}
+.alarm-sound-row select{min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px;font-weight:750;color:var(--text)}
+.mini-btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;font-weight:850;color:var(--accent)}
+.alarm-due{margin-top:15px;padding:13px;border-radius:14px;background:var(--bg);font-size:16px;font-weight:900;color:var(--accent);text-align:center}
+.alarm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.alarm-set,.alarm-cancel{border-radius:14px;padding:14px 10px;font-size:16px;font-weight:900}
+.alarm-set{border:0;background:var(--accent);color:white}.alarm-cancel{border:1px solid var(--line);background:var(--surface);color:var(--text)}
+.alarm-local-note{margin-top:10px;font-size:11px;color:var(--soft);text-align:center}
+@media(max-width:430px){.alarm-time-grid{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto}.alarm-sound-row{grid-template-columns:1fr auto}.alarm-sound-row label{grid-column:1/-1}}
+</style>
+<style>
+.alarm-card{padding:12px 14px !important;margin-bottom:16px !important;border-radius:18px !important}
+.alarm-title{font-size:17px !important}
+.alarm-sub{font-size:10.5px !important;margin-top:2px !important}
+.alarm-time-grid{margin-top:9px !important;gap:6px !important}
+.alarm-time-grid label span{font-size:10px !important;margin-bottom:3px !important}
+.alarm-time-grid input{padding:8px 5px !important;font-size:20px !important;border-radius:11px !important}
+.alarm-unit{padding-bottom:9px !important;font-size:12px !important}
+.alarm-sound-row{margin-top:8px !important;gap:6px !important}
+.alarm-sound-row label{font-size:11px !important}
+.alarm-sound-row select,.mini-btn{padding:7px 8px !important;font-size:11px !important;border-radius:10px !important}
+.alarm-due{margin-top:8px !important;padding:8px !important;font-size:13px !important;border-radius:11px !important}
+.alarm-actions{margin-top:7px !important;gap:7px !important}
+.alarm-set,.alarm-cancel{padding:9px 7px !important;font-size:13px !important;border-radius:11px !important}
+.alarm-local-note{margin-top:5px !important;font-size:9.5px !important}
+</style>
+
+
+<style>
+.alarm-sound-row{grid-template-columns:auto minmax(0,1fr) auto auto !important}
+.alarm-file-name{font-size:9.5px;color:var(--soft);text-align:right;margin-top:3px;min-height:0}
+@media(max-width:430px){.alarm-sound-row{grid-template-columns:minmax(0,1fr) auto auto !important}.alarm-sound-row label{grid-column:1/-1}}
+</style>
+
+
+<style>
+.fixed-core{
+  position:sticky;
+  top:0;
+  z-index:30;
+  background:var(--bg);
+  padding:4px 0 8px;
+  margin-bottom:8px;
+  max-height:72vh;
+  overflow:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:none;
+  box-shadow:0 10px 18px rgba(28,45,39,.07);
+}
+.fixed-core::-webkit-scrollbar{display:none}
+.fixed-core>.section-title:first-child{margin-top:2px}
+.fixed-core .section-title{margin-top:7px;margin-bottom:5px}
+.fixed-core .alarm-card{margin-bottom:5px!important}
+.fixed-core .summary{margin-bottom:5px!important}
+.fixed-core .live{margin-bottom:5px!important}
+.fixed-core #manualAdd{margin-bottom:2px!important;padding:10px!important;font-size:13px!important}
+.fixed-label{font-size:11px!important}
+@media(max-height:760px){.fixed-core{max-height:66vh}}
+</style>
+
+
+<style>
+/* v39: much smaller fixed area */
+.fixed-core{
+  max-height:none !important;
+  overflow:visible !important;
+  padding:2px 0 5px !important;
+  margin-bottom:6px !important;
+  box-shadow:0 5px 10px rgba(28,45,39,.05) !important;
+}
+.fixed-core .section-title{font-size:10px!important;margin:3px 0!important}
+.fixed-core .alarm-card{padding:7px 9px!important;margin:0 0 3px!important;border-radius:13px!important}
+.fixed-core .alarm-title{font-size:14px!important}
+.fixed-core .alarm-sub,.fixed-core .alarm-local-note{display:none!important}
+.fixed-core .alarm-sound-row{margin-top:3px!important}
+.fixed-core .alarm-time-grid{margin-top:4px!important}
+.fixed-core .alarm-time-grid label span{display:none!important}
+.fixed-core .alarm-time-grid input{padding:5px 3px!important;font-size:17px!important}
+.fixed-core .alarm-unit{padding-bottom:6px!important;font-size:10px!important}
+.fixed-core .alarm-sound-row select,.fixed-core .mini-btn{padding:5px 6px!important;font-size:10px!important}
+.fixed-core .alarm-due{margin-top:4px!important;padding:5px!important;font-size:11px!important}
+.fixed-core .alarm-actions{margin-top:4px!important}
+.fixed-core .alarm-set,.fixed-core .alarm-cancel{padding:6px!important;font-size:11px!important}
+.fixed-core .summary{gap:4px!important;margin:0 0 3px!important}
+.fixed-core .summary .card{padding:6px 4px!important;min-height:0!important}
+.fixed-core .summary .label{font-size:9px!important}
+.fixed-core .summary .value{font-size:13px!important;margin-top:1px!important}
+.fixed-core .live{padding:7px 9px!important;margin:0 0 3px!important}
+.fixed-core .live-note{min-height:13px!important;font-size:9.5px!important;margin-top:1px!important}
+.fixed-core .live-note.sleeping-note{font-size:13px!important}
+.fixed-core #manualAdd{padding:7px!important;font-size:11px!important;margin:0!important}
+</style>
+
+
+<style>
+/* v40: fixed layout/order only — NOT fixed to the phone viewport */
+.fixed-core{
+  position:static !important;
+  top:auto !important;
+  z-index:auto !important;
+  max-height:none !important;
+  overflow:visible !important;
+  box-shadow:none !important;
+  background:transparent !important;
+}
+</style>
+
+
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#285f50">
+<link rel="icon" href="./icon-192.png">
+</head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
+<div class="fixed-core" id="fixedCore">
+  <div class="section-title">알람</div>
+<div class="alarm-card">
+  <div class="alarm-head">
+    <div>
+      <div class="alarm-title">⏰ 기기 알람</div>
+      <div class="alarm-sub">수면장 기준시점과 관계없이 지금부터 설정한 시간 뒤에 울립니다.</div>
+    </div>
+  </div>
+  <div class="alarm-sound-row">
+    <label for="alarmSound">알람 소리</label>
+    <select id="alarmSound">
+      <option value="bright">밝은 알람</option>
+      <option value="classic">기본 알람</option>
+      <option value="gentle">부드러운 알람</option>
+    </select>
+    <button class="mini-btn" id="alarmPreview" type="button">미리듣기</button><button class="mini-btn" id="alarmFilePick" type="button">파일 선택</button><input id="alarmSoundFile" type="file" accept="audio/*" style="display:none">
+  </div>
+<div class="alarm-time-grid">
+    <label><span>시간</span><input id="alarmHours" type="number" inputmode="numeric" min="0" max="48" value="8"></label>
+    <div class="alarm-unit">시간</div>
+    <label><span>분</span><input id="alarmMinutes" type="number" inputmode="numeric" min="0" max="59" value="0"></label>
+    <div class="alarm-unit">분 뒤</div>
+  </div>
+  
+  <div id="alarmDue" class="alarm-due">알람이 설정되지 않았습니다.</div>
+  <div class="alarm-actions">
+    <button class="alarm-set" id="alarmSet" type="button">알람 시작</button>
+    <button class="alarm-cancel" id="alarmCancel" type="button">알람 해제</button>
+  </div>
+  <div class="alarm-local-note">이 알람 설정은 이 기기에만 저장되며 동기화하지 않습니다.</div>
+</div>
+  <div class="section-title fixed-label">오늘 요약</div>
+  <section class="summary"><div class="summary-head"><div class="summary-title" id="summaryTitle">오늘 수면</div><div class="count" id="count"></div></div><div class="summary-grid"><div class="metric"><span>총 수면</span><b id="total">0분</b></div><div class="metric"><span>가장 긴 수면</span><b id="longest">0분</b></div><div class="metric"><span>최근 기상</span><b id="lastWake">-</b></div><div class="metric"><span>기상 후 경과시간</span><b id="gap">-</b></div></div></section>
+  <div class="section-title fixed-label">자동 입력</div>
+  <section class="live" id="liveCard"><div class="live-head"><b id="state">깨어 있어요</b><span id="now"></span></div><div class="live-time" id="liveTime">00:00:00</div><div class="live-note" id="liveNote">잠들 때 수면 시작을 누르세요</div><button class="action" id="action">☾ 수면 시작</button></section>
+  <div class="section-title fixed-label">직접 기록</div>
+  <button class="action" id="manualAdd" style="margin:0 0 10px;background:var(--surface);color:var(--accent);border:1px solid var(--accent)">＋ 수면 기록</button>
+</div>
+
+<div class="top-actions"><button id="chartToggle">📈 그래프 보기</button><button id="syncBtn">↻ 동기화</button><button type="button" id="todayJumpBtn">현재 날짜</button><button id="settingsBtn">⚙ 설정</button></div>
+<div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
+<div class="tabs"><button class="active" data-view="day">오늘</button><button data-view="week">주별</button><button data-view="month">월별</button><button data-view="year">년도별</button></div>
+<section class="cloud-card" id="cloudCard"><b>☁ 클라우드 저장</b><div class="cloud-status" id="cloudStatus">로그인 필요</div><div class="cloud-grid"><input id="email" type="email" placeholder="이메일"><input id="password" type="password" placeholder="비밀번호 (6자 이상)"></div><div class="cloud-actions"><button id="signup">회원가입</button><button id="login">로그인</button><button id="logout">로그아웃</button><button id="upload">전체 클라우드 저장</button><button id="download">클라우드에서 불러오기</button></div></section>
+
+<section class="chart-card" id="chartCard">
+  <div class="chart-head">
+    <div><b>수면시간 그래프</b><div class="chart-average" id="chartAverage">평균 수면시간 —</div></div>
+    <span id="chartUnit">총 수면시간</span>
+  </div>
+  <div id="bars"></div>
+  <div class="chart-tooltip" id="chartTooltip"></div>
+</section>
+
+
+
+
+<div class="section-title">수면 기록</div><section class="history" id="history"></section>
+</main>
+<div class="overlay" id="settingsOverlay"><div class="panel"><div class="panel-head"><b>설정</b><button class="close" data-close="settingsOverlay">×</button></div><div class="setting-row"><div><div class="setting-label">하루 집계 기준시간</div><div class="setting-desc">00:00~11:00 중 선택합니다. 날짜 계산·통계·수정 범위에 모두 적용되며, 현재 수면일이 겹치지 않도록 다음 안전한 기준시점부터 전환됩니다.</div><div class="setting-desc" id="dayStartStatus" style="font-weight:800;color:var(--accent);margin-top:5px"></div></div><select id="dayStart"></select></div><div class="setting-row"><div><div class="setting-label">일주일 시작 요일</div><div class="setting-desc">주별 통계 계산에 적용됩니다.</div></div><select id="weekStart"></select></div><div class="panel-actions"><button class="cancel-btn" data-close="settingsOverlay">취소</button><button class="save-btn" id="saveSettings">저장</button></div><button class="danger" id="deleteAll">모든 수면 기록 삭제</button></div></div>
+
+<div class="overlay dial-overlay" id="dialOverlay">
+  <div class="panel dial-panel">
+    <div class="panel-head"><b id="dialTitle">수면 시작</b><button class="close" id="dialClose">×</button></div>
+    <div class="dial-date-row">
+      <button type="button" id="dialPrevDate">‹</button>
+      <div><b id="dialDateText"></b><span>날짜</span></div>
+      <button type="button" id="dialNextDate">›</button>
+    </div>
+    <div class="dial-readout"><span id="dialHourRead">00</span><i>:</i><span id="dialMinuteRead">00</span></div>
+    <div class="clock-face" id="clockFace">
+      <div class="clock-hand" id="clockHand"></div>
+      <div class="clock-center"></div>
+      <div class="clock-numbers" id="clockNumbers"></div>
+    </div>
+    <div class="dial-help" id="dialHelp">시간을 선택하세요</div>
+    <div class="panel-actions">
+      <button class="cancel-btn" id="dialCancel">취소</button>
+      <button class="save-btn" id="dialOk">다음</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="manualOverlay"><div class="panel">
+  <div class="panel-head"><b>수면 기록</b><button class="close" data-close="manualOverlay">×</button></div>
+  <div class="setting-desc" id="manualDayLabel" style="margin-bottom:10px;font-weight:800;color:var(--accent)"></div>
+  
+  <div class="edit-grid" id="manualPickerFields">
+    <div class="field"><label>수면 시작</label><button type="button" class="date-time-field" id="manualStartBtn"><span id="manualStartText">날짜 · 시간 선택</span><b>›</b></button><input id="manualStart" type="hidden"></div>
+    <div class="field"><label>수면 종료</label><button type="button" class="date-time-field" id="manualEndBtn" disabled><span id="manualEndText">날짜 · 시간 선택</span><b>›</b></button><input id="manualEnd" type="hidden"></div>
+  </div>
+  <div class="setting-desc" id="manualRange" style="margin-top:8px"></div>
+  <div class="panel-actions">
+    <button class="cancel-btn" data-close="manualOverlay">취소</button>
+    <button class="save-btn" id="saveManual">기록 저장</button>
+  </div>
+</div></div>
+
+<div class="overlay" id="editOverlay"><div class="panel"><div class="panel-head"><b>수면 기록 수정</b><button class="close" data-close="editOverlay">×</button></div><div class="edit-grid"><div class="field"><label>수면 시작</label><button type="button" class="date-time-field" id="editStartBtn"><span id="editStartText">날짜 · 시간 선택</span><b>›</b></button><input id="editStart" type="hidden"></div><div class="field"><label>수면 종료</label><button type="button" class="date-time-field" id="editEndBtn"><span id="editEndText">날짜 · 시간 선택</span><b>›</b></button><input id="editEnd" type="hidden"></div></div><div class="setting-desc" id="editRange" style="margin-top:8px"></div><div class="panel-actions"><button class="cancel-btn" data-close="editOverlay">취소</button><button class="save-btn" id="saveEdit">수정 저장</button></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),DK=['일','월','화','수','목','금','토'];
+const DATA='sleepJournal:v2',SET='sleepSettings:v1';
+let data=JSON.parse(localStorage.getItem(DATA)||'{"sessions":[],"active":null}');
+let settings=JSON.parse(localStorage.getItem(SET)||'{"dayStartHour":11,"weekStartDay":6,"pendingDayStart":null}');
+if(!Number.isInteger(Number(settings.dayStartHour))) settings.dayStartHour=11;
+settings.dayStartHour=Number(settings.dayStartHour);
+if(!Number.isInteger(Number(settings.weekStartDay))) settings.weekStartDay=6;
+settings.weekStartDay=Number(settings.weekStartDay);
+if(!settings.pendingDayStart || !Number.isInteger(Number(settings.pendingDayStart.hour)) || !settings.pendingDayStart.effectiveAt) settings.pendingDayStart=null;
+let cur=logicalToday(),view='day',editing=null;
+const SUPABASE_URL='https://nvpvxtwebzefhgulswsv.supabase.co',SUPABASE_KEY='sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';let sb=null,user=null;
+function save(){localStorage.setItem(DATA,JSON.stringify(data))}
+function saveSet(){localStorage.setItem(SET,JSON.stringify(settings))}
+function nextBoundaryForHour(hour,from=new Date()){
+  const d=new Date(from);
+  let b=new Date(d.getFullYear(),d.getMonth(),d.getDate(),hour,0,0,0);
+  if(b<=d) b.setDate(b.getDate()+1);
+  return b;
+}
+function maybeActivatePending(){
+  const p=settings.pendingDayStart;
+  if(!p) return false;
+  const at=new Date(p.effectiveAt);
+  if(!Number.isFinite(at.getTime())){settings.pendingDayStart=null;saveSet();return false}
+  if(Date.now()>=at.getTime()){
+    settings.dayStartHour=Number(p.hour);
+    settings.pendingDayStart=null;
+    saveSet();
+    return true;
+  }
+  return false;
+}
+function effectiveStatus(){
+  const p=settings.pendingDayStart;
+  if(!p) return '';
+  const d=new Date(p.effectiveAt);
+  return `변경 예약: ${pad(Number(p.hour))}:00 · ${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}부터 적용`;
+}
+function ymd(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}function logicalDate(ms=Date.now()){let d=new Date(ms),x=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(d.getHours()<settings.dayStartHour)x.setDate(x.getDate()-1);return x}function logicalToday(){return logicalDate()}
+function bounds(d){let s=new Date(d.getFullYear(),d.getMonth(),d.getDate(),settings.dayStartHour,0,0,0),e=new Date(s);e.setDate(e.getDate()+1);return [s.getTime(),e.getTime()]}
+function fmtHM(ms){let d=new Date(ms);return `${pad(d.getHours())}:${pad(d.getMinutes())}`}function dur(ms){let m=Math.max(0,Math.round(ms/60000)),h=Math.floor(m/60);m%=60;return h?`${h}시간 ${pad(m)}분`:`${m}분`}function live(ms){let s=Math.floor(Math.max(0,ms)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60);s%=60;return `${pad(h)}:${pad(m)}:${pad(s)}`}
+function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('#toast').classList.remove('show'),1400)}
+function sessionsFor(d){let [a,b]=bounds(d);return data.sessions.filter(x=>x.start>=a&&x.start<b).sort((x,y)=>x.start-y.start)}
+function overlappingSession(start,end,excludeId=null){
+  return data.sessions.find(x =>
+    x.id!==excludeId &&
+    start < x.end &&
+    end > x.start
+  ) || null;
+}
+
+function aggregate(days){let a=[];days.forEach(d=>a.push(...sessionsFor(d)));return a}
+function periodDays(){if(view==='day')return [new Date(cur)];let arr=[];if(view==='week'){let d=new Date(cur),delta=(d.getDay()-settings.weekStartDay+7)%7;d.setDate(d.getDate()-delta);for(let i=0;i<7;i++){let x=new Date(d);x.setDate(x.getDate()+i);arr.push(x)}}else if(view==='month'){let n=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();for(let i=1;i<=n;i++)arr.push(new Date(cur.getFullYear(),cur.getMonth(),i))}else{for(let m=0;m<12;m++){let n=new Date(cur.getFullYear(),m+1,0).getDate();for(let i=1;i<=n;i++)arr.push(new Date(cur.getFullYear(),m,i))}}return arr}
+function header(){
+  maybeActivatePending();
+  $('#dateBig').textContent=`${cur.getMonth()+1}월 ${cur.getDate()}일`;
+  requestAnimationFrame(()=>{
+    const b=$('#todayJumpBtn');
+    if(b) b.disabled=(view==='day' && ymd(cur)===ymd(logicalToday()));
+  });
+  $('#dateSub').textContent=`${cur.getFullYear()}년 · ${DK[cur.getDay()]}요일`;
+  $('#weekMini').textContent=view==='day'?'수면장':view==='week'?'주별 통계':view==='month'?'월별 통계':'년도별 통계';
+  $('#dayRule').textContent=`하루 집계 기준 ${pad(settings.dayStartHour)}:00${settings.pendingDayStart?' · 변경 예약됨':''}`;
+}
+function render(){header();let days=periodDays(),arr=aggregate(days),ms=arr.map(x=>x.end-x.start),total=ms.reduce((a,b)=>a+b,0);$('#summaryTitle').textContent=view==='day'?'오늘 수면':view==='week'?'이번 주 수면':view==='month'?'이번 달 수면':'올해 수면';$('#count').textContent=`${arr.length}회`;$('#total').textContent=dur(total);$('#longest').textContent=arr.length?dur(Math.max(...ms)):'0분';$('#lastWake').textContent=arr.length?(()=>{
+  const d=new Date(arr[arr.length-1].end);
+  return `${d.getHours()}시 ${pad(d.getMinutes())}분`;
+})():'-';
+if(arr.length){
+  const latestWake=arr[arr.length-1].end;
+  const isCurrentSleepDay=(view==='day' && ymd(cur)===ymd(logicalToday()));
+  if(isCurrentSleepDay){
+    $('#gap').textContent=Date.now()>=latestWake?dur(Date.now()-latestWake):'-';
+  }else{
+    $('#gap').textContent='-';
+  }
+}else{
+  $('#gap').textContent='-';
+}$('#liveCard').style.display=view==='day'&&ymd(cur)===ymd(logicalToday())?'':'none';let h=$('#history');h.innerHTML='';let shown=view==='day'?arr:arr.slice().reverse().slice(0,30);if(!shown.length)h.innerHTML='<div class="empty">이 기간의 수면 기록이 없습니다.</div>';shown.slice().reverse().forEach(x=>{let r=document.createElement('div');r.className='row';r.innerHTML=`<div><div class="row-main">${fmtHM(x.start)} → ${fmtHM(x.end)}</div><div class="row-sub">${ymd(logicalDate(x.start))} 수면일</div><button class="mini-btn edit-btn">수정</button> <button class="mini-btn delete-btn">삭제</button></div><div class="duration">${dur(x.end-x.start)}</div>`;r.querySelector('.edit-btn').onclick=()=>openEdit(x.id);r.querySelector('.delete-btn').onclick=()=>{if(confirm('이 기록을 삭제할까요?')){data.sessions=data.sessions.filter(s=>s.id!==x.id);save();render()}};h.appendChild(r)});renderChart(days)}
+function sleepTooltip(minutes){
+  const mins=Math.max(0,Math.round(Number(minutes)||0));
+  const h=Math.floor(mins/60), m=mins%60;
+  return h?`${h}시간 ${m}분`:`${m}분`;
+}
+function sleepChartSvg(points){
+  if(!points.length)return '<div class="chart-empty">표시할 데이터가 없어요.</div>';
+  const W=360,H=126,L=34,R=8,T=8,B=24;
+  const vals=points.map(p=>Math.max(0,Number(p.sleep)||0));
+  let max=Math.max(...vals,60);
+  // Sleep chart axis in minutes, rounded to practical 2-hour blocks.
+  max=Math.max(480,Math.ceil(max/120)*120);
+  const innerW=W-L-R,innerH=H-T-B;
+  const y=v=>T+innerH-(v/max)*innerH;
+  const grid=[0,.5,1].map(fr=>{
+    const gy=T+innerH-innerH*fr;
+    const mins=Math.round(max*fr);
+    const label=mins===0?'0':`${Math.round(mins/60)}h`;
+    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/><text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${label}</text>`;
+  }).join('');
+  const n=Math.max(points.length,1),slot=innerW/n;
+  const barW=Math.max(4,Math.min(22,slot*.58));
+  const bars=points.map((p,i)=>{
+    const v=Math.max(0,Number(p.sleep)||0),x=L+i*slot+(slot-barW)/2,yy=y(v),h=Math.max(v>0?2:0,T+innerH-yy);
+    const value=sleepTooltip(v);
+    return `<rect class="chart-bar-sleep" data-chart-label="${p.label}" data-chart-value="${value}" tabindex="0" x="${x}" y="${yy}" width="${barW}" height="${h}" rx="2"><title>${p.label}: ${value}</title></rect>`;
+  }).join('');
+  const labelEvery=points.length>16?5:points.length>10?2:1;
+  const labels=points.map((p,i)=>{
+    if(i%labelEvery!==0 && i!==points.length-1)return '';
+    const x=L+i*slot+slot/2;
+    return `<text class="chart-axis-label" x="${x}" y="${H-6}" text-anchor="middle">${p.label}</text>`;
+  }).join('');
+  return `<svg class="bar-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="수면시간 막대그래프">${grid}${bars}${labels}</svg>`;
+}
+function renderChart(days){
+  let points=[];
+  if(view==='year'){
+    points=[...Array(12)].map((_,m)=>{
+      let total=0,n=new Date(cur.getFullYear(),m+1,0).getDate();
+      for(let d=1;d<=n;d++) total+=sessionsFor(new Date(cur.getFullYear(),m,d)).reduce((a,x)=>a+x.end-x.start,0);
+      return {label:`${m+1}월`,sleep:total/60000};
+    });
+    $('#chartUnit').textContent='월 총 수면';
+  }else{
+    points=days.map(d=>({
+      label:view==='month'?`${d.getDate()}`:`${d.getMonth()+1}/${d.getDate()}`,
+      sleep:sessionsFor(d).reduce((a,x)=>a+x.end-x.start,0)/60000
+    }));
+    $('#chartUnit').textContent='총 수면시간';
+  }
+  $('#bars').innerHTML=sleepChartSvg(points);
+
+  // Average is based on days/months that actually contain sleep records,
+  // matching the practical "average sleep" meaning rather than counting empty future days.
+  const recorded=points.filter(p=>Number(p.sleep)>0);
+  const avg=recorded.length ? recorded.reduce((sum,p)=>sum+Number(p.sleep||0),0)/recorded.length : 0;
+  const total=points.reduce((sum,p)=>sum+Number(p.sleep||0),0);
+  $('#chartAverage').textContent=recorded.length
+    ? `평균 수면시간 ${sleepTooltip(avg)} · 총 ${sleepTooltip(total)}`
+    : '평균 수면시간 — · 총 0분';
+
+  bindSleepChartTooltip();
+}
+
+function bindSleepChartTooltip(){
+  const tip=$('#chartTooltip');
+  const bars=document.querySelectorAll('.chart-bar-sleep');
+
+  function showTip(el,x,y){
+    const label=el.dataset.chartLabel||'';
+    const value=el.dataset.chartValue||'';
+    tip.textContent=`${label} · ${value}`;
+    tip.classList.add('show');
+    const w=tip.offsetWidth||110, h=tip.offsetHeight||30;
+    const left=Math.max(8,Math.min(window.innerWidth-w-8,x-w/2));
+    const top=Math.max(8,y-h-14);
+    tip.style.left=left+'px';
+    tip.style.top=top+'px';
+  }
+  function hideTip(){ tip.classList.remove('show'); }
+
+  bars.forEach(el=>{
+    el.addEventListener('mouseenter',e=>showTip(el,e.clientX,e.clientY));
+    el.addEventListener('mousemove',e=>showTip(el,e.clientX,e.clientY));
+    el.addEventListener('mouseleave',hideTip);
+    el.addEventListener('focus',()=>{
+      const r=el.getBoundingClientRect();
+      showTip(el,r.left+r.width/2,r.top);
+    });
+    el.addEventListener('blur',hideTip);
+    el.addEventListener('pointerdown',e=>{
+      showTip(el,e.clientX,e.clientY);
+      if(e.pointerType==='touch'){
+        clearTimeout(window.__sleepTipTimer);
+        window.__sleepTipTimer=setTimeout(hideTip,1800);
+      }
+    });
+    el.addEventListener('click',e=>{
+      const r=el.getBoundingClientRect();
+      showTip(el,e.clientX||r.left+r.width/2,e.clientY||r.top);
+      clearTimeout(window.__sleepTipTimer);
+      window.__sleepTipTimer=setTimeout(hideTip,1800);
+    });
+  });
+}
+
+function localVal(ms){let d=new Date(ms);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
+
+
+let dialTarget='start', dialStep='hour', dialDate=null, dialHour=0, dialMinute=0;
+
+function isoLocalFromParts(d,h,m){
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(h)}:${pad(m)}`;
+}
+function displayDateTime(v){
+  if(!v)return '날짜 · 시간 선택';
+  const d=new Date(v);
+  return `${d.getFullYear()}. ${pad(d.getMonth()+1)}. ${pad(d.getDate())}. ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function dialAllowedDates(){
+  const [lo,hi]=bounds(cur);
+  const a=new Date(lo), b=new Date(hi-1);
+  return [
+    new Date(a.getFullYear(),a.getMonth(),a.getDate()),
+    new Date(b.getFullYear(),b.getMonth(),b.getDate())
+  ].filter((d,i,arr)=>i===0 || d.getTime()!==arr[0].getTime());
+}
+function dialDateAllowed(d){
+  return dialAllowedDates().some(x =>
+    x.getFullYear()===d.getFullYear() &&
+    x.getMonth()===d.getMonth() &&
+    x.getDate()===d.getDate()
+  );
+}
+function renderClock(){
+  $('#dialDateText').textContent=`${dialDate.getFullYear()}. ${pad(dialDate.getMonth()+1)}. ${pad(dialDate.getDate())}`;
+  const allowed=dialAllowedDates();
+  const idx=allowed.findIndex(x=>x.getFullYear()===dialDate.getFullYear()&&x.getMonth()===dialDate.getMonth()&&x.getDate()===dialDate.getDate());
+  $('#dialPrevDate').disabled=idx<=0;
+  $('#dialNextDate').disabled=idx<0 || idx>=allowed.length-1;
+  $('#dialHourRead').textContent=pad(dialHour);
+  $('#dialMinuteRead').textContent=pad(dialMinute);
+  $('#dialHelp').textContent=dialStep==='hour'?'시간을 선택하세요':'분을 선택하세요';
+  $('#dialOk').textContent=dialStep==='hour'?'다음':'확인';
+
+  const box=$('#clockNumbers'); box.innerHTML='';
+  const face=$('#clockFace');
+  const size=face.clientWidth||300, c=size/2, radius=size*.405;
+  const values=dialStep==='hour'
+    ? Array.from({length:24},(_,i)=>i)
+    : Array.from({length:12},(_,i)=>i*5);
+
+  values.forEach((v,i)=>{
+    const el=document.createElement('div');
+    el.className='clock-number '+((dialStep==='hour'?dialHour:dialMinute)===v?'active':'');
+    el.textContent=pad(v);
+    // 24-hour clock: 0-11 outer ring, 12-23 inner ring.
+    let angle, r;
+    if(dialStep==='hour'){
+      const ring=v<12?radius:radius*.66;
+      const pos=v%12;
+      angle=(pos*30-90)*Math.PI/180; r=ring;
+    }else{
+      angle=(i*30-90)*Math.PI/180; r=radius;
+    }
+    el.style.left=(c+Math.cos(angle)*r)+'px';
+    el.style.top=(c+Math.sin(angle)*r)+'px';
+    el.onclick=()=>{
+      if(dialStep==='hour'){dialHour=v;renderClock();}
+      else {dialMinute=v;renderClock();}
+    };
+    box.appendChild(el);
+  });
+
+  const val=dialStep==='hour'?dialHour:dialMinute;
+  const deg=dialStep==='hour'?(val%12)*30:val*6;
+  const r=dialStep==='hour'?(val<12?radius:radius*.66):radius;
+  $('#clockHand').style.width=r+'px';
+  $('#clockHand').style.transform=`rotate(${deg-90}deg)`;
+}
+
+function dialValueFromPointer(clientX,clientY){
+  const face=$('#clockFace');
+  const r=face.getBoundingClientRect();
+  const cx=r.left+r.width/2, cy=r.top+r.height/2;
+  const dx=clientX-cx, dy=clientY-cy;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  // Angle: 0 at 12 o'clock, clockwise.
+  let deg=(Math.atan2(dy,dx)*180/Math.PI+90+360)%360;
+
+  if(dialStep==='minute'){
+    // Snap to 1-minute increments while rotating.
+    return Math.round(deg/6)%60;
+  }
+
+  // 24-hour dial: outer ring = 00–11, inner ring = 12–23.
+  const outerThreshold=r.width*0.34;
+  const h12=Math.round(deg/30)%12;
+  return dist < outerThreshold ? h12+12 : h12;
+}
+let dialDragging=false;
+function updateDialFromPointer(x,y){
+  const v=dialValueFromPointer(x,y);
+  if(dialStep==='hour') dialHour=v;
+  else dialMinute=v;
+  renderClock();
+}
+const clockFaceEl=$('#clockFace');
+clockFaceEl.addEventListener('pointerdown',e=>{
+  dialDragging=true;
+  clockFaceEl.setPointerCapture?.(e.pointerId);
+  updateDialFromPointer(e.clientX,e.clientY);
+  e.preventDefault();
+  e.stopPropagation();
+});
+clockFaceEl.addEventListener('pointermove',e=>{
+  if(!dialDragging)return;
+  updateDialFromPointer(e.clientX,e.clientY);
+  e.preventDefault();
+  e.stopPropagation();
+});
+clockFaceEl.addEventListener('pointerup',e=>{
+  if(!dialDragging)return;
+  updateDialFromPointer(e.clientX,e.clientY);
+  dialDragging=false;
+  clockFaceEl.releasePointerCapture?.(e.pointerId);
+  e.preventDefault();
+  e.stopPropagation();
+});
+clockFaceEl.addEventListener('pointercancel',()=>{dialDragging=false});
+
+function dialInputSelector(target){return target==='start'?'#manualStart':target==='end'?'#manualEnd':target==='editStart'?'#editStart':'#editEnd'}
+function dialTextSelector(target){return target==='start'?'#manualStartText':target==='end'?'#manualEndText':target==='editStart'?'#editStartText':'#editEndText'}
+function openDial(target){
+  dialTarget=target; dialStep='hour';
+  const existing=$(dialInputSelector(target)).value;
+  const base=existing?new Date(existing):new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),12,0);
+  dialDate=new Date(base.getFullYear(),base.getMonth(),base.getDate());
+  if(!dialDateAllowed(dialDate)){
+    const allowed=dialAllowedDates();
+    dialDate=new Date(allowed[0]);
+  }
+  dialHour=existing?base.getHours():settings.dayStartHour;
+  dialMinute=existing?base.getMinutes():0;
+  $('#dialTitle').textContent=(target==='start'||target==='editStart')?'수면 시작':'수면 종료';
+  $('#dialOverlay').classList.add('show');
+  requestAnimationFrame(renderClock);
+}
+function closeDial(){ $('#dialOverlay').classList.remove('show'); }
+
+// 다이얼 조작 중에는 배경의 날짜 좌우 스와이프/상하 동기화 제스처를 완전히 차단한다.
+const dialOverlayEl=$('#dialOverlay');
+['touchstart','touchmove','touchend','touchcancel'].forEach(type=>{
+  dialOverlayEl.addEventListener(type,e=>{
+    e.stopPropagation();
+  },{passive:type!=='touchmove'});
+});
+$('#clockFace').addEventListener('touchmove',e=>{
+  e.preventDefault();
+  e.stopPropagation();
+},{passive:false});
+
+$('#dialClose').onclick=closeDial;
+$('#dialCancel').onclick=closeDial;
+$('#dialPrevDate').onclick=()=>{
+  const allowed=dialAllowedDates();
+  const idx=allowed.findIndex(x=>x.getFullYear()===dialDate.getFullYear()&&x.getMonth()===dialDate.getMonth()&&x.getDate()===dialDate.getDate());
+  if(idx>0){ dialDate=new Date(allowed[idx-1]); renderClock(); }
+};
+$('#dialNextDate').onclick=()=>{
+  const allowed=dialAllowedDates();
+  const idx=allowed.findIndex(x=>x.getFullYear()===dialDate.getFullYear()&&x.getMonth()===dialDate.getMonth()&&x.getDate()===dialDate.getDate());
+  if(idx>=0 && idx<allowed.length-1){ dialDate=new Date(allowed[idx+1]); renderClock(); }
+};
+$('#dialOk').onclick=()=>{
+  if(dialStep==='hour'){dialStep='minute';renderClock();return}
+  const value=isoLocalFromParts(dialDate,dialHour,dialMinute);
+  const ms=new Date(value).getTime(), [lo,hi]=bounds(cur);
+  if(ms<lo||ms>=hi){
+    alert(`현재 수면장의 기록 가능 범위를 벗어났습니다.\n${localVal(lo).replace('T',' ')} ~ ${localVal(hi-60000).replace('T',' ')}`);
+    return;
+  }
+  if(dialTarget==='end'||dialTarget==='editEnd'){
+    const startSel=dialTarget==='end'?'#manualStart':'#editStart';
+    const start=new Date($(startSel).value).getTime();
+    if(!Number.isFinite(start)){alert('수면 시작시간을 먼저 선택해주세요.');return}
+    if(ms<=start){alert('수면 종료시간은 시작시간보다 뒤여야 합니다.');return}
+  }
+  $(dialInputSelector(dialTarget)).value=value;
+  $(dialTextSelector(dialTarget)).textContent=displayDateTime(value);
+  if(dialTarget==='start'){
+    $('#manualEnd').value='';$('#manualEndText').textContent='날짜 · 시간 선택';$('#manualEndBtn').disabled=false;
+  }
+  closeDial();
+};
+$('#manualStartBtn').onclick=()=>openDial('start');
+$('#manualEndBtn').onclick=()=>{
+  if(!$('#manualStart').value){alert('수면 시작시간을 먼저 선택해주세요.');return}
+  openDial('end');
+};
+$('#editStartBtn').onclick=()=>openDial('editStart');
+$('#editEndBtn').onclick=()=>{
+  if(!$('#editStart').value){alert('수면 시작시간을 먼저 선택해주세요.');return}
+  openDial('editEnd');
+};
+
+function openManual(){
+  const [lo,hi]=bounds(cur);
+  $('#manualStart').value=''; $('#manualEnd').value='';
+  $('#manualStartText').textContent='날짜 · 시간 선택';
+  $('#manualEndText').textContent='날짜 · 시간 선택';
+  $('#manualEndBtn').disabled=true;
+  $('#manualDayLabel').textContent=`${cur.getFullYear()}년 ${cur.getMonth()+1}월 ${cur.getDate()}일 수면장`;
+  $('#manualRange').textContent=`기록 가능 범위: ${localVal(lo).replace('T',' ')} ~ ${localVal(hi-60000).replace('T',' ')}`;
+  $('#manualOverlay').classList.add('show');
+}
+$('#manualAdd').onclick=openManual;
+
+$('#saveManual').onclick=()=>{
+  if(!$('#manualStart').value)return alert('수면 시작시간을 먼저 선택해주세요.');
+  if(!$('#manualEnd').value)return alert('수면 종료시간을 선택해주세요.');
+  const start=new Date($('#manualStart').value).getTime(), end=new Date($('#manualEnd').value).getTime();
+  const [lo,hi]=bounds(cur);
+  if(start<lo||start>=hi||end<lo||end>=hi)return alert('현재 수면장의 기록 가능 범위를 벗어났습니다.');
+  if(end<=start)return alert('수면 종료시간은 시작시간보다 뒤여야 합니다.');
+  if(ymd(cur)===ymd(logicalToday())&&end>Date.now())return alert('미래 시간은 기록할 수 없습니다.');
+  const overlap=overlappingSession(start,end);
+  if(overlap)return alert(`이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치지 않는 시간으로 입력해주세요.`);
+  data.sessions.push({id:'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),start,end});
+  data.sessions.sort((a,b)=>a.start-b.start);save();
+  $('#manualOverlay').classList.remove('show');render();toast('수면 기록을 추가했어요');
+};
+
+function openEdit(id){let x=data.sessions.find(s=>s.id===id);if(!x)return;editing=id;let ld=logicalDate(x.start),[a,b]=bounds(ld);$('#editStart').min=localVal(a);$('#editStart').max=localVal(b-60000);$('#editEnd').min=localVal(a);$('#editEnd').max=localVal(b-60000);$('#editStart').value=localVal(x.start);$('#editEnd').value=localVal(x.end);$('#editStartText').textContent=displayDateTime(localVal(x.start));$('#editEndText').textContent=displayDateTime(localVal(x.end));$('#editRange').textContent=`수정 가능 범위: ${localVal(a).replace('T',' ')} ~ ${localVal(b-60000).replace('T',' ')}`;$('#editOverlay').classList.add('show')}
+$('#saveEdit').onclick=()=>{let x=data.sessions.find(s=>s.id===editing),a=new Date($('#editStart').value).getTime(),b=new Date($('#editEnd').value).getTime();if(!x)return;if(b<=a)return toast('종료시간을 확인해주세요');let [lo,hi]=bounds(logicalDate(x.start));if(a<lo||a>=hi||b<lo||b>=hi)return toast('해당 수면일 기준 범위를 벗어났어요');
+  const overlap=overlappingSession(a,b,x.id);
+  if(overlap){
+    return alert(`이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치지 않는 시간으로 수정해주세요.`);
+  }
+  x.start=a;x.end=b;data.sessions.sort((x,y)=>x.start-y.start);save();$('#editOverlay').classList.remove('show');render();toast('수정했어요')}
+$('#action').onclick=()=>{if(!data.active){data.active={start:Date.now()};save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
+if(overlap){
+  alert(`현재 수면시간이 이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치는 기록을 먼저 수정하거나 삭제해주세요.`);
+  return;
+}
+data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});data.sessions.sort((a,b)=>a.start-b.start);data.active=null;save();render();toast('수면 종료 · 저장 완료')}render()}
+function tick(){
+  let n=Date.now();
+  if(view==='day' && ymd(cur)===ymd(logicalToday())){
+    const todayArr=sessionsFor(cur);
+    if(todayArr.length){
+      const latestWake=todayArr[todayArr.length-1].end;
+      $('#gap').textContent=n>=latestWake?dur(n-latestWake):'-';
+      {
+        const d=new Date(latestWake);
+        $('#lastWake').textContent=`${d.getHours()}시 ${pad(d.getMinutes())}분`;
+      }
+    }
+  }
+  const changed=maybeActivatePending();
+  $('#now').textContent=`현재 ${fmtHM(n)}`;
+  $('#liveTime').textContent=data.active?live(n-data.active.start):'00:00:00';
+  $('#state').textContent=data.active?'수면 중':'깨어 있어요';
+  $('#action').textContent=data.active?'☀ 수면 종료':'☾ 수면 시작';
+  $('#action').classList.toggle('stop',!!data.active);
+  if(data.active){
+  const sd=new Date(data.active.start);
+  $('#liveNote').textContent=`${sd.getHours()}시 ${pad(sd.getMinutes())}분에 시작`;
+  $('#liveNote').classList.add('sleeping-note');
+}else{
+  $('#liveNote').textContent='잠들 때 수면 시작을 누르세요';
+  $('#liveNote').classList.remove('sleeping-note');
+}
+  const lt=logicalToday();
+  if(changed){cur=lt;render();toast(`새 집계 기준 ${pad(settings.dayStartHour)}:00 적용`);return}
+  // 과거 날짜를 보고 있을 때는 현재 수면일로 강제 복귀시키지 않는다.
+  // 실제 rollover가 발생했고 사용자가 rollover 직전의 '오늘'을 보고 있던 경우에만 새 오늘로 이동한다.
+  if(tick.lastLogicalToday && ymd(lt)!==tick.lastLogicalToday && view==='day' && ymd(cur)===tick.lastLogicalToday){
+    cur=lt; render();
+  }
+  tick.lastLogicalToday=ymd(lt);
+}
+for(let h=0;h<=11;h++)$('#dayStart').add(new Option(`${pad(h)}:00`,h));
+DK.forEach((d,i)=>$('#weekStart').add(new Option(`${d}요일`,i)));
+$('#settingsBtn').onclick=()=>{
+  maybeActivatePending();
+  $('#dayStart').value=settings.pendingDayStart ? Number(settings.pendingDayStart.hour) : settings.dayStartHour;
+  $('#weekStart').value=settings.weekStartDay;
+  $('#dayStartStatus').textContent=effectiveStatus() || `현재 적용 중: ${pad(settings.dayStartHour)}:00`;
+  $('#settingsOverlay').classList.add('show');
+};
+$('#saveSettings').onclick=()=>{
+  maybeActivatePending();
+  const requestedHour=Number($('#dayStart').value);
+  settings.weekStartDay=Number($('#weekStart').value);
+  if(requestedHour===settings.dayStartHour){
+    settings.pendingDayStart=null;
+    saveSet();
+    cur=logicalToday();
+    $('#settingsOverlay').classList.remove('show');
+    render(); toast('설정을 저장했어요'); return;
+  }
+  const now=new Date();
+  const oldBoundary=nextBoundaryForHour(settings.dayStartHour,now);
+  const newBoundary=nextBoundaryForHour(requestedHour,now);
+  const effectiveAt=new Date(Math.max(oldBoundary.getTime(),newBoundary.getTime()));
+  settings.pendingDayStart={hour:requestedHour,effectiveAt:effectiveAt.toISOString()};
+  saveSet();
+  $('#settingsOverlay').classList.remove('show');
+  render();
+  toast(`${pad(requestedHour)}:00 기준 · ${effectiveAt.getMonth()+1}/${effectiveAt.getDate()} ${pad(effectiveAt.getHours())}:${pad(effectiveAt.getMinutes())}부터 적용`);
+};document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>$('#'+x.dataset.close).classList.remove('show'));$('#deleteAll').onclick=()=>{if(confirm('모든 수면 기록을 삭제할까요?')){data={sessions:[],active:null};save();render();toast('모든 기록 삭제 완료')}}
+function movePeriod(dir){
+  let n=new Date(cur);
+  if(view==='day') n.setDate(n.getDate()+dir);
+  else if(view==='week') n.setDate(n.getDate()+7*dir);
+  else if(view==='month') n.setMonth(n.getMonth()+dir);
+  else n.setFullYear(n.getFullYear()+dir);
+  const today=logicalToday();
+  if(dir>0 && n>today) n=today;
+  cur=n; render();
+}
+$('#prevDay').onclick=()=>movePeriod(-1);
+$('#todayJumpBtn').onclick=()=>{
+  // 기준시점(dayStartHour)을 반영한 '현재 수면장 날짜'로 즉시 복귀.
+  cur=new Date(logicalToday());
+  render();
+};
+$('#nextDay').onclick=()=>movePeriod(1);document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');view=b.dataset.view;render()});$('#chartToggle').onclick=()=>{$('#chartCard').classList.toggle('show');$('#chartToggle').textContent=$('#chartCard').classList.contains('show')?'📉 그래프 닫기':'📈 그래프 보기'}
+
+let touchStartX=0,touchStartY=0,touchLastY=0,touchMode='',pullReady=false;
+const SWIPE_X=55,PULL_Y=72;
+function atTop(){return window.scrollY<=2}
+function atBottom(){return window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-3}
+function showPull(text,ready=false){
+  $('#pullIndicator').textContent=text;
+  $('#pullIndicator').classList.add('show');
+  $('#pullIndicator').classList.toggle('ready',ready);
+  $('#syncBlur').classList.add('show');
+}
+function hidePull(){
+  $('#pullIndicator').classList.remove('show','ready');
+  $('#syncBlur').classList.remove('show');
+}
+async function gestureSync(){
+  showPull('↻ 동기화 중…',true);
+  // Cloud is optional for now: local UI/data refresh always works.
+  if(sb){await cloudStatus(); if(user) await syncCloud();}
+  render();
+  setTimeout(()=>{hidePull();toast(user?'동기화 완료':'로컬 기록 새로고침 완료')},180);
+}
+function canMovePeriod(dir){
+  if(dir<0) return true;
+  const n=new Date(cur);
+  if(view==='day') n.setDate(n.getDate()+1);
+  else if(view==='week') n.setDate(n.getDate()+7);
+  else if(view==='month') n.setMonth(n.getMonth()+1);
+  else n.setFullYear(n.getFullYear()+1);
+  return n<=logicalToday();
+}
+function animateMove(dir){
+  const st=$('#swipeStage');
+
+  // 미래 기간으로 갈 수 없으면 화면 전환 자체를 시작하지 않는다.
+  // 살짝 저항감만 보여주고 현재 화면으로 복귀한다.
+  if(!canMovePeriod(dir)){
+    st.classList.add('swipe-animating');
+    st.style.transform=dir>0?'translateX(-5%)':'translateX(5%)';
+    st.style.opacity='.88';
+    setTimeout(()=>{
+      st.style.transform='translateX(0)';
+      st.style.opacity='1';
+      setTimeout(()=>{
+        st.classList.remove('swipe-animating');
+        st.style.transition='';st.style.transform='';st.style.opacity='';
+      },200);
+    },70);
+    return;
+  }
+
+  // dir +1 = 다음 날짜: 현재 화면 왼쪽 퇴장 → 새 화면 오른쪽 진입
+  // dir -1 = 이전 날짜: 현재 화면 오른쪽 퇴장 → 새 화면 왼쪽 진입
+  const exitClass=dir>0?'swipe-exit-left':'swipe-exit-right';
+  const enterFrom=dir>0?'100%':'-100%';
+  st.classList.add('swipe-animating',exitClass);
+  setTimeout(()=>{
+    movePeriod(dir);
+    st.classList.remove('swipe-animating',exitClass);
+    st.style.transition='none';
+    st.style.transform=`translateX(${enterFrom})`;
+    st.style.opacity='.35';
+    void st.offsetWidth;
+    st.classList.add('swipe-animating');
+    st.style.transform='translateX(0)';
+    st.style.opacity='1';
+    setTimeout(()=>{
+      st.classList.remove('swipe-animating');
+      st.style.transition='';
+      st.style.transform='';
+      st.style.opacity='';
+    },210);
+  },200);
+}
+document.addEventListener('touchstart',e=>{
+  if($('#dialOverlay')?.classList.contains('show') || $('#manualOverlay')?.classList.contains('show') || $('#editOverlay')?.classList.contains('show') || $('#settingsOverlay')?.classList.contains('show')) return;
+  if(e.touches.length!==1)return;
+  const t=e.touches[0];touchStartX=t.clientX;touchStartY=t.clientY;touchLastY=t.clientY;touchMode='';pullReady=false;
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if($('#dialOverlay')?.classList.contains('show') || $('#manualOverlay')?.classList.contains('show') || $('#editOverlay')?.classList.contains('show') || $('#settingsOverlay')?.classList.contains('show')) return;
+  if(e.touches.length!==1)return;
+  const t=e.touches[0],dx=t.clientX-touchStartX,dy=t.clientY-touchStartY;touchLastY=t.clientY;
+  if(!touchMode){
+    if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2)touchMode='x';
+    else if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)*1.2){
+      if(dy>0&&atTop())touchMode='down';
+      else if(dy<0&&atBottom())touchMode='up';
+    }
+  }
+  if(touchMode==='down'){
+    pullReady=dy>PULL_Y;showPull(pullReady?'↻ 놓으면 동기화':'↓ 당겨서 동기화',pullReady);
+    if(dy>0)e.preventDefault();
+  }else if(touchMode==='up'){
+    pullReady=(-dy)>PULL_Y;showPull(pullReady?'↻ 놓으면 동기화':'↑ 당겨서 동기화',pullReady);
+    if(dy<0)e.preventDefault();
+  }
+},{passive:false});
+document.addEventListener('touchend',e=>{
+  if($('#dialOverlay')?.classList.contains('show') || $('#manualOverlay')?.classList.contains('show') || $('#editOverlay')?.classList.contains('show') || $('#settingsOverlay')?.classList.contains('show')) {touchMode='';pullReady=false;return}
+  const dx=(e.changedTouches[0]?.clientX??touchStartX)-touchStartX;
+  const dy=(e.changedTouches[0]?.clientY??touchLastY)-touchStartY;
+  if(touchMode==='x'&&Math.abs(dx)>SWIPE_X){
+    // finger left = later date, finger right = previous date
+    animateMove(dx<0?1:-1);
+  }else if((touchMode==='down'||touchMode==='up')&&pullReady){
+    gestureSync();
+  }else hidePull();
+  touchMode='';pullReady=false;
+},{passive:true});
+
+function initCloud(){try{if(window.supabase)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}})}catch(e){}}async function cloudStatus(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요'}$('#syncBtn').onclick=async()=>{if(!sb)initCloud();await cloudStatus();if(!user){$('#cloudCard').classList.add('show');toast('클라우드 로그인 필요');return}await syncCloud();toast('동기화 완료')}
+async function syncCloud(){if(!user)return;let {data:r,error}=await sb.from('sleep_records').select('data').eq('user_id',user.id).maybeSingle();if(error&&error.code!=='PGRST116'){console.warn(error);toast('sleep_records 테이블 설정이 필요해요');return}let remote=r?.data||{sessions:[]},map=new Map([...(remote.sessions||[]),...data.sessions].map(x=>[x.id,x]));data.sessions=[...map.values()].sort((a,b)=>a.start-b.start);save();let payload={sessions:data.sessions,settings};let q=r?sb.from('sleep_records').update({data:payload}).eq('user_id',user.id):sb.from('sleep_records').insert({user_id:user.id,data:payload});let {error:w}=await q;if(w){console.warn(w);toast('클라우드 저장 구조 확인 필요');return}render()}
+$('#signup').onclick=async()=>{if(!sb)initCloud();let e=$('#email').value.trim(),p=$('#password').value;if(!e||p.length<6)return toast('이메일/비밀번호를 확인해주세요');let {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert(error.message);await cloudStatus();toast('회원가입 요청 완료')};$('#login').onclick=async()=>{if(!sb)initCloud();let {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);await cloudStatus();toast('로그인 완료')};$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();await cloudStatus();toast('로그아웃')};$('#upload').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');await syncCloud()};$('#download').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');let {data:r,error}=await sb.from('sleep_records').select('data').eq('user_id',user.id).maybeSingle();if(error||!r)return toast('클라우드 기록 없음');if(confirm('클라우드 기록으로 불러올까요?')){data.sessions=r.data?.sessions||[];save();render();toast('불러오기 완료')}}
+initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tick();setInterval(tick,500);
+</script>
+<script>
+(()=>{
+ const KEY='sleepAlarm:local:v1';
+ let timer=null, audioCtx=null;
+ const $a=(q)=>document.querySelector(q);
+ const pad2=n=>String(n).padStart(2,'0');
+ function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+ function write(v){localStorage.setItem(KEY,JSON.stringify(v))}
+ function fmtDue(ms){const d=new Date(ms);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad2(d.getMinutes())}분`}
+ function tones(kind){
+   if(kind==='gentle') return [440,523,659];
+   if(kind==='classic') return [880,660,880,660];
+   return [784,988,1175,988];
+ }
+ function sound(kind='bright', seconds=12){
+   try{
+     audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+     audioCtx.resume();
+     const arr=tones(kind), start=audioCtx.currentTime;
+     for(let i=0;i<Math.max(1,Math.floor(seconds*2));i++){
+       const o=audioCtx.createOscillator(), g=audioCtx.createGain(), t=start+i*.5;
+       o.frequency.value=arr[i%arr.length]; g.gain.setValueAtTime(.0001,t);
+       g.gain.exponentialRampToValueAtTime(.18,t+.03); g.gain.exponentialRampToValueAtTime(.0001,t+.35);
+       o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+.4);
+     }
+   }catch(e){}
+ }
+ function render(){
+   const a=read(), el=$a('#alarmDue'); if(!el)return;
+   if(a&&a.enabled&&a.due>Date.now()) el.textContent=`${fmtDue(a.due)} 알람 예정`;
+   else if(a&&a.enabled) el.textContent='알람 시간이 되었습니다.';
+   else el.textContent='알람이 설정되지 않았습니다.';
+ }
+ function scheduleWeb(){
+   if(timer){clearTimeout(timer);timer=null}
+   const a=read(); if(!a||!a.enabled)return render();
+   const wait=a.due-Date.now();
+   if(wait<=0){fireWeb(a);return}
+   timer=setTimeout(()=>fireWeb(a),Math.min(wait,2147483647)); render();
+ }
+ function fireWeb(a){
+   const cur=read(); if(!cur||!cur.enabled)return;
+   cur.enabled=false;write(cur);render();
+   sound(cur.sound,20);
+   try{navigator.vibrate&&navigator.vibrate([800,300,800,300,1200])}catch(e){}
+   alert('⏰ 설정한 알람 시간입니다.');
+ }
+ function nativeSet(a){
+   // Android APK wrapper can expose this bridge. It is intentionally device-local.
+   try{
+     if(window.SleepAlarmAndroid&&typeof window.SleepAlarmAndroid.setAlarm==='function'){
+       window.SleepAlarmAndroid.setAlarm(String(a.due),a.sound); return true;
+     }
+   }catch(e){}
+   return false;
+ }
+ function nativeCancel(){
+   try{if(window.SleepAlarmAndroid&&typeof window.SleepAlarmAndroid.cancelAlarm==='function')window.SleepAlarmAndroid.cancelAlarm()}catch(e){}
+ }
+ document.addEventListener('DOMContentLoaded',()=>{
+   const h=$a('#alarmHours'),m=$a('#alarmMinutes'),snd=$a('#alarmSound');
+   const old=read(); if(old){if(Number.isFinite(old.hours))h.value=old.hours;if(Number.isFinite(old.minutes))m.value=old.minutes;if(old.sound)snd.value=old.sound}
+   $a('#alarmPreview__OLD')?.addEventListener('click',()=>sound(snd.value,2.5));
+   $a('#alarmSet__OLD')?.addEventListener('click',()=>{
+     let hh=Math.max(0,Math.min(48,parseInt(h.value||'0',10)||0));
+     let mm=Math.max(0,Math.min(59,parseInt(m.value||'0',10)||0));
+     h.value=hh;m.value=mm;
+     if(hh===0&&mm===0){alert('알람 시간을 1분 이상 설정해주세요.');return}
+     const a={enabled:true,due:Date.now()+(hh*60+mm)*60000,hours:hh,minutes:mm,sound:snd.value};
+     write(a); nativeSet(a); scheduleWeb();
+   });
+   $a('#alarmCancel__OLD')?.addEventListener('click',()=>{const a=read()||{};a.enabled=false;write(a);nativeCancel();scheduleWeb()});
+   document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleWeb()});
+   scheduleWeb();
+ });
+})();
+</script>
+
+
+<script>
+(()=>{
+ let chosenAlarmFile=null, previewAudio=null;
+ document.addEventListener('DOMContentLoaded',()=>{
+   const pick=document.querySelector('#alarmFilePick');
+   const input=document.querySelector('#alarmSoundFile');
+   const name=document.querySelector('#alarmFileName');
+   pick?.addEventListener('click',()=>input?.click());
+   input?.addEventListener('change',()=>{
+     chosenAlarmFile=input.files&&input.files[0]?input.files[0]:null;
+     if(name) name.textContent=chosenAlarmFile?`선택: ${chosenAlarmFile.name}`:'';
+     if(chosenAlarmFile){
+       try{ if(previewAudio){previewAudio.pause()} previewAudio=new Audio(URL.createObjectURL(chosenAlarmFile)); }catch(e){}
+     }
+   });
+   // Capture preview first when a user file is selected; otherwise existing built-in preview remains.
+   document.querySelector('#alarmPreview__OLD')?.addEventListener('click',(e)=>{
+     if(!chosenAlarmFile)return;
+     e.stopImmediatePropagation();
+     try{previewAudio.currentTime=0;previewAudio.play()}catch(err){}
+   },true);
+   // Expose selected file name for APK wrapper integration without adding it to Supabase sync.
+   window.getLocalAlarmAudioFile=()=>chosenAlarmFile;
+ });
+})();
+</script>
+
+
+<script>
+(()=>{
+  const $=q=>document.querySelector(q);
+  const KEY='sleepAlarm:local:v1';
+  const pad=n=>String(n).padStart(2,'0');
+
+  function alarmDurationMs(){
+    const h=Math.max(0,Math.min(48,parseInt($('#alarmHours')?.value||'0',10)||0));
+    const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||'0',10)||0));
+    return (h*60+m)*60000;
+  }
+  function dueLabel(ms){
+    const d=new Date(ms);
+    return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad(d.getMinutes())}분 알람 예정`;
+  }
+  function previewDue(){
+    const el=$('#alarmDue'); if(!el)return;
+    const delta=alarmDurationMs();
+    if(delta<=0){ el.textContent='알람 시간을 설정해주세요.'; return; }
+    el.textContent=dueLabel(Date.now()+delta);
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    const h=$('#alarmHours'),m=$('#alarmMinutes'),set=$('#alarmSet__OLD');
+    h?.addEventListener('input',previewDue);
+    m?.addEventListener('input',previewDue);
+
+    // Run before the existing alarm-set listener so both storage and display use
+    // the same exact timestamp.
+    set?.addEventListener('click',()=>{
+      const delta=alarmDurationMs();
+      if(delta<=0)return;
+      const due=Date.now()+delta;
+      const sound=$('#alarmSound')?.value||'bright';
+      const a={
+        enabled:true,due,
+        hours:Math.floor(delta/3600000),
+        minutes:Math.floor((delta%3600000)/60000),
+        sound
+      };
+      localStorage.setItem(KEY,JSON.stringify(a));
+      const el=$('#alarmDue'); if(el)el.textContent=dueLabel(due);
+    },true);
+
+    previewDue();
+  });
+})();
+</script>
+
+
+<style>
+#alarmSet__OLD.alarm-running{background:#244f43!important;color:#fff!important}
+#alarmDue.alarm-active{background:#e5f0eb!important;color:#245f4e!important}
+</style>
+<script>
+(()=>{
+ const KEY='sleepAlarm:local:v2';
+ const $=q=>document.querySelector(q);
+ let ctx=null, timeoutId=null, ticker=null, unlocked=false;
+
+ function pad(n){return String(n).padStart(2,'0')}
+ function duration(){
+   const h=Math.max(0,Math.min(48,parseInt($('#alarmHours')?.value||0,10)||0));
+   const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||0,10)||0));
+   return (h*60+m)*60000;
+ }
+ function label(ms){
+   const d=new Date(ms);
+   return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad(d.getMinutes())}분 알람 예정`;
+ }
+ function save(a){localStorage.setItem(KEY,JSON.stringify(a))}
+ function load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+
+ async function unlockAudio(){
+   try{
+     ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+     if(ctx.state==='suspended') await ctx.resume();
+     // silent buffer created from the user's button gesture
+     const b=ctx.createBuffer(1,1,22050), src=ctx.createBufferSource();
+     src.buffer=b;src.connect(ctx.destination);src.start(0);
+     unlocked=true;
+   }catch(e){unlocked=false}
+ }
+ function ring(){
+   const a=load();
+   if(!a||!a.enabled)return;
+   a.enabled=false; save(a);
+   clearTimeout(timeoutId); clearInterval(ticker);
+   const btn=$('#alarmSet__OLD'), due=$('#alarmDue');
+   if(btn){btn.textContent='알람 시작';btn.classList.remove('alarm-running')}
+   if(due){due.textContent='⏰ 알람 시간입니다';due.classList.remove('alarm-active')}
+   try{
+     ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+     if(ctx.state==='suspended')ctx.resume();
+     const freqs=a.sound==='gentle'?[440,523,659]:a.sound==='classic'?[880,660,880,660]:[784,988,1175,988];
+     const start=ctx.currentTime;
+     for(let i=0;i<36;i++){
+       const o=ctx.createOscillator(),g=ctx.createGain(),t=start+i*.42;
+       o.frequency.value=freqs[i%freqs.length];
+       g.gain.setValueAtTime(.0001,t);
+       g.gain.exponentialRampToValueAtTime(.28,t+.025);
+       g.gain.exponentialRampToValueAtTime(.0001,t+.32);
+       o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.34);
+     }
+   }catch(e){}
+   try{navigator.vibrate&&navigator.vibrate([800,250,800,250,1200])}catch(e){}
+   setTimeout(()=>alert('⏰ 설정한 알람 시간입니다.'),120);
+ }
+ function update(){
+   const a=load(), btn=$('#alarmSet__OLD'), due=$('#alarmDue');
+   if(!a||!a.enabled)return;
+   const left=a.due-Date.now();
+   if(left<=0){ring();return}
+   if(btn){btn.textContent='⏰ 알람 중';btn.classList.add('alarm-running')}
+   if(due){due.textContent=label(a.due);due.classList.add('alarm-active')}
+ }
+ function arm(a){
+   clearTimeout(timeoutId);clearInterval(ticker);
+   const left=a.due-Date.now();
+   if(left<=0){ring();return}
+   // timeout plus 1-second watchdog prevents a single throttled timeout from being the only trigger
+   timeoutId=setTimeout(ring,left);
+   ticker=setInterval(update,1000);
+   update();
+ }
+ document.addEventListener('DOMContentLoaded',()=>{
+   const set=$('#alarmSet__OLD'), cancel=$('#alarmCancel__OLD');
+   set?.addEventListener('click',async e=>{
+     e.preventDefault();e.stopImmediatePropagation();
+     const ms=duration();
+     if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
+     await unlockAudio();
+     const a={enabled:true,due:Date.now()+ms,sound:$('#alarmSound')?.value||'bright'};
+     save(a);arm(a);
+   },true);
+   cancel?.addEventListener('click',e=>{
+     e.preventDefault();e.stopImmediatePropagation();
+     clearTimeout(timeoutId);clearInterval(ticker);
+     save({enabled:false});
+     const btn=$('#alarmSet__OLD'),due=$('#alarmDue');
+     if(btn){btn.textContent='알람 시작';btn.classList.remove('alarm-running')}
+     if(due){due.textContent='알람이 설정되지 않았습니다.';due.classList.remove('alarm-active')}
+   },true);
+   const a=load(); if(a?.enabled)arm(a);
+ });
+})();
+</script>
+
+
+<script>
+(()=>{
+ const K='sleepAlarm:test:v43';
+ const $=q=>document.querySelector(q);
+ let ac=null, osc=null, gain=null, alarmTO=null, watch=null;
+
+ function getDur(){
+   const h=Math.max(0,parseInt($('#alarmHours')?.value||'0',10)||0);
+   const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||'0',10)||0));
+   return (h*60+m)*60000;
+ }
+ function p(n){return String(n).padStart(2,'0')}
+ function dueText(t){const d=new Date(t);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${p(d.getMinutes())}분 알람 예정`}
+ function read(){try{return JSON.parse(localStorage.getItem(K)||'null')}catch(e){return null}}
+ function write(x){localStorage.setItem(K,JSON.stringify(x))}
+ async function prime(){
+   ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+   await ac.resume();
+   if(!osc){
+     osc=ac.createOscillator(); gain=ac.createGain();
+     osc.type='sine'; osc.frequency.value=880; gain.gain.value=0.00001;
+     osc.connect(gain);gain.connect(ac.destination);osc.start();
+   }
+ }
+ function ui(a){
+   const b=$('#alarmSet__OLD'),d=$('#alarmDue');
+   if(a?.enabled){
+     if(b){b.textContent='⏰ 알람 중';b.classList.add('alarm-running')}
+     if(d){d.textContent=dueText(a.due);d.classList.add('alarm-active')}
+   }else{
+     if(b){b.textContent='알람 시작';b.classList.remove('alarm-running')}
+     if(d){d.textContent='알람이 설정되지 않았습니다.';d.classList.remove('alarm-active')}
+   }
+ }
+ function stopRing(){
+   if(gain&&ac){try{gain.gain.cancelScheduledValues(ac.currentTime);gain.gain.setValueAtTime(.00001,ac.currentTime)}catch(e){}}
+ }
+ async function fire(){
+   let a=read(); if(!a?.enabled)return;
+   a.enabled=false;write(a);
+   clearTimeout(alarmTO);clearInterval(watch);
+   try{
+     await prime();
+     const now=ac.currentTime;
+     gain.gain.cancelScheduledValues(now);
+     for(let i=0;i<40;i++){
+       const t=now+i*.35;
+       gain.gain.setValueAtTime(.00001,t);
+       gain.gain.linearRampToValueAtTime(.35,t+.03);
+       gain.gain.linearRampToValueAtTime(.00001,t+.25);
+     }
+   }catch(e){}
+   try{navigator.vibrate?.([700,250,700,250,1000])}catch(e){}
+   const b=$('#alarmSet__OLD'),d=$('#alarmDue');
+   if(b){b.textContent='알람 시작';b.classList.remove('alarm-running')}
+   if(d){d.textContent='⏰ 알람 시간입니다';d.classList.remove('alarm-active')}
+   setTimeout(()=>alert('⏰ 알람 시간입니다.'),50);
+ }
+ function arm(a){
+   clearTimeout(alarmTO);clearInterval(watch);
+   const left=a.due-Date.now();
+   if(left<=0)return fire();
+   alarmTO=setTimeout(fire,left);
+   watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},250);
+   ui(a);
+ }
+ document.addEventListener('DOMContentLoaded',()=>{
+   const start=$('#alarmSet__OLD'),cancel=$('#alarmCancel__OLD');
+   start?.addEventListener('click',async e=>{
+     e.preventDefault();e.stopImmediatePropagation();
+     const ms=getDur();
+     if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
+     try{await prime()}catch(err){}
+     const a={enabled:true,due:Date.now()+ms,sound:$('#alarmSound')?.value||'bright'};
+     write(a);arm(a);
+   },true);
+   cancel?.addEventListener('click',e=>{
+     e.preventDefault();e.stopImmediatePropagation();
+     const a=read();
+     if(!a?.enabled){ui(null);return}
+     if(!confirm('설정한 알람을 정말 해제하시겠습니까?'))return;
+     clearTimeout(alarmTO);clearInterval(watch);stopRing();write({enabled:false});ui(null);
+   },true);
+   const a=read(); if(a?.enabled)arm(a); else ui(null);
+ });
+})();
+</script>
+
+
+<style>
+.alarm-stop-ring{display:none;border:0;background:#b42318;color:#fff;border-radius:11px;padding:8px 10px;font-size:12px;font-weight:900;width:100%;margin-top:6px}
+.alarm-stop-ring.show{display:block}
+</style>
+<script>
+(()=>{
+ const $=q=>document.querySelector(q);
+ let stopBtn=null;
+ function ensureStop(){
+   if(stopBtn)return stopBtn;
+   stopBtn=document.createElement('button');
+   stopBtn.type='button'; stopBtn.id='alarmStopRing'; stopBtn.className='alarm-stop-ring';
+   stopBtn.textContent='🔕 알람 끄기';
+   const actions=$('.alarm-actions');
+   actions?.insertAdjacentElement('afterend',stopBtn);
+   stopBtn.addEventListener('click',()=>{
+     // Stop every WebAudio context/HTML audio element this page can reach.
+     try{
+       document.querySelectorAll('audio').forEach(a=>{a.pause();a.currentTime=0});
+     }catch(e){}
+     try{
+       // v43 controller keeps its own audio graph; reloading is the only reliable
+       // way to terminate all legacy oscillators created by earlier stacked controllers.
+       localStorage.setItem('sleepAlarm:test:v43',JSON.stringify({enabled:false}));
+       localStorage.setItem('sleepAlarm:local:v2',JSON.stringify({enabled:false}));
+       localStorage.setItem('sleepAlarm:local:v1',JSON.stringify({enabled:false}));
+     }catch(e){}
+     stopBtn.classList.remove('show');
+     const d=$('#alarmDue'); if(d)d.textContent='알람이 종료되었습니다.';
+     setTimeout(()=>location.reload(),80);
+   });
+   return stopBtn;
+ }
+ document.addEventListener('DOMContentLoaded',()=>{
+   ensureStop();
+   // When alarm due UI changes to alarm-time state, expose an explicit stop button.
+   const due=$('#alarmDue');
+   if(due){
+     new MutationObserver(()=>{
+       if(due.textContent.includes('알람 시간'))ensureStop().classList.add('show');
+     }).observe(due,{childList:true,subtree:true,characterData:true});
+   }
+ });
+})();
+</script>
+
+
+<script>
+(()=>{
+ const $=q=>document.querySelector(q);
+ function minuteAlignedDue(){
+   const h=Math.max(0,parseInt($('#alarmHours')?.value||'0',10)||0);
+   const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||'0',10)||0));
+   const total=(h*60+m)*60000;
+   const now=new Date();
+   now.setSeconds(0,0);
+   return {due:now.getTime()+total,total};
+ }
+ document.addEventListener('DOMContentLoaded',()=>{
+   const b=$('#alarmSet__OLD');
+   b?.addEventListener('click',e=>{
+     const x=minuteAlignedDue();
+     if(x.total<60000)return;
+     // Update all alarm stores used by prior controllers before their timers arm.
+     const sound=$('#alarmSound')?.value||'bright';
+     const a={enabled:true,due:x.due,sound};
+     try{
+       localStorage.setItem('sleepAlarm:test:v43',JSON.stringify(a));
+       localStorage.setItem('sleepAlarm:local:v2',JSON.stringify(a));
+       localStorage.setItem('sleepAlarm:local:v1',JSON.stringify(a));
+     }catch(err){}
+   },true);
+ },true);
+})();
+</script>
+
+
+<script>
+(()=>{
+  const KEY='sleepAlarm:clean:v46';
+  const $=q=>document.querySelector(q);
+  let ctx=null, osc=null, gain=null, timeout=null, watcher=null, ringing=false;
+
+  const pad=n=>String(n).padStart(2,'0');
+  function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+  function write(v){localStorage.setItem(KEY,JSON.stringify(v))}
+  function vals(){
+    const h=Math.max(0,Math.min(48,parseInt($('#alarmHours')?.value||'0',10)||0));
+    const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||'0',10)||0));
+    return {h,m,ms:(h*60+m)*60000};
+  }
+  function alignedDue(ms){
+    const n=new Date();
+    n.setSeconds(0,0);                 // discard seconds FIRST
+    return n.getTime()+ms;             // then add requested duration
+  }
+  function fmt(t){
+    const d=new Date(t);
+    return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad(d.getMinutes())}분 알람 예정`;
+  }
+  async function prime(){
+    ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==='suspended') await ctx.resume();
+    if(!osc){
+      osc=ctx.createOscillator(); gain=ctx.createGain();
+      osc.type='square'; osc.frequency.value=880; gain.gain.value=.00001;
+      osc.connect(gain); gain.connect(ctx.destination); osc.start();
+    }
+  }
+  function setUI(a){
+    const b=$('#alarmSet'),d=$('#alarmDue');
+    if(a?.enabled){
+      b.textContent='⏰ 알람 중'; b.classList.add('alarm-running');
+      d.textContent=fmt(a.due); d.classList.add('alarm-active');
+    }else if(!ringing){
+      b.textContent='알람 시작'; b.classList.remove('alarm-running');
+      d.textContent='알람이 설정되지 않았습니다.'; d.classList.remove('alarm-active');
+    }
+  }
+  function silence(){
+    ringing=false;
+    if(gain&&ctx){
+      try{gain.gain.cancelScheduledValues(ctx.currentTime);gain.gain.setValueAtTime(.00001,ctx.currentTime)}catch(e){}
+    }
+    $('#alarmStopRing')?.classList.remove('show');
+    write({enabled:false});
+    setUI(null);
+  }
+  async function fire(){
+    const a=read(); if(!a?.enabled||ringing)return;
+    ringing=true; a.enabled=false; write(a);
+    clearTimeout(timeout); clearInterval(watcher);
+    await prime();
+    const d=$('#alarmDue'); if(d)d.textContent='⏰ 알람 시간입니다';
+    let stop=$('#alarmStopRing');
+    if(!stop){
+      stop=document.createElement('button');stop.id='alarmStopRing';stop.type='button';
+      stop.className='alarm-stop-ring show';stop.textContent='🔕 알람 끄기';
+      $('.alarm-actions')?.insertAdjacentElement('afterend',stop);
+      stop.addEventListener('click',silence);
+    }else stop.classList.add('show');
+    const now=ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    // ring for up to 5 minutes or until user presses stop
+    for(let i=0;i<600;i++){
+      const t=now+i*.5;
+      gain.gain.setValueAtTime(.00001,t);
+      gain.gain.linearRampToValueAtTime(.32,t+.03);
+      gain.gain.linearRampToValueAtTime(.00001,t+.34);
+    }
+    try{navigator.vibrate?.([800,250,800,250,1200])}catch(e){}
+  }
+  function arm(a){
+    clearTimeout(timeout);clearInterval(watcher);
+    setUI(a);
+    const left=a.due-Date.now();
+    if(left<=0){fire();return}
+    timeout=setTimeout(fire,left);
+    watcher=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},250);
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    const start=$('#alarmSet'), cancel=$('#alarmCancel'), preview=$('#alarmPreview');
+    start?.addEventListener('click',async()=>{
+      const v=vals();
+      if(v.ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
+      await prime(); // user gesture unlocks audio
+      const a={enabled:true,due:alignedDue(v.ms),sound:$('#alarmSound')?.value||'bright'};
+      write(a); arm(a);
+    });
+    cancel?.addEventListener('click',()=>{
+      const a=read();
+      if(!a?.enabled){return}
+      if(!confirm('설정한 알람을 정말 해제하시겠습니까?'))return;
+      clearTimeout(timeout);clearInterval(watcher);silence();
+    });
+    preview?.addEventListener('click',async()=>{
+      await prime();
+      const now=ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      for(let i=0;i<6;i++){
+        const t=now+i*.35;
+        gain.gain.setValueAtTime(.00001,t);
+        gain.gain.linearRampToValueAtTime(.22,t+.03);
+        gain.gain.linearRampToValueAtTime(.00001,t+.25);
+      }
+    });
+    const a=read();
+    if(a?.enabled) arm(a); else setUI(null);
+  });
+})();
+</script>
+
+<script>
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
+</body></html>
