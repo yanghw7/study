@@ -20,6 +20,10 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .frame{display:none;flex:1 1 auto;width:100%;min-height:0;border:0;background:#fff}
 .frame.active{display:block}
 </style>
+
+<link rel="manifest" href="./manifest.webmanifest?v=1.20">
+<meta name="theme-color" content="#285f50">
+<link rel="apple-touch-icon" href="./icon-192.png">
 </head>
 <body>
 <div class="shell" id="shell">
@@ -103,6 +107,17 @@ window.addEventListener('message',ev=>{
   });
 });
 
+</script>
+
+<script>
+// PWA v1.20: register the current service worker and ask it to check for updates.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js?v=1.20', { scope: './' })
+      .then(reg => reg.update())
+      .catch(err => console.error('Service worker registration failed:', err));
+  });
+}
 </script>
 </body>
 </html>

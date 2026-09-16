@@ -242,6 +242,10 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothi
 .cloud-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.cloud-actions .data-btn{min-width:120px}.cloud-setup{display:none;margin-top:8px}.cloud-setup.show{display:block}.cloud-note{font-size:11px;color:var(--soft);line-height:1.45;margin-top:7px}
 @media(max-width:430px){.cloud-grid{grid-template-columns:1fr}}
 </style>
+
+<link rel="manifest" href="./manifest.webmanifest?v=1.20">
+<meta name="theme-color" content="#285f50">
+<link rel="apple-touch-icon" href="./icon-192.png">
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
 <div class="top-actions">
   <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
@@ -1584,4 +1588,15 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 })();
 </script>
 
+
+<script>
+// PWA v1.20: register the current service worker and ask it to check for updates.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js?v=1.20', { scope: './' })
+      .then(reg => reg.update())
+      .catch(err => console.error('Service worker registration failed:', err));
+  });
+}
+</script>
 </body></html>
