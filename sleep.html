@@ -318,7 +318,7 @@ body .wrap > .summary .metric span{
 }
 </style>
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
-<section class="summary"><div class="summary-head"><div class="summary-title" id="summaryTitle">오늘 수면</div><div class="count" id="count"></div></div><div class="summary-grid"><div class="metric"><span>총 수면</span><b id="total">0분</b></div><div class="metric"><span>가장 긴 수면</span><b id="longest">0분</b></div><div class="metric"><span>최근 기상</span><b id="lastWake">-</b></div><div class="metric"><span>기상 후 경과시간</span><b id="gap">-</b></div></div></section>
+<section class="summary"><div class="summary-head"><div class="summary-title" id="summaryTitle">오늘 수면 합계</div><div class="count" id="count"></div></div><div class="summary-grid"><div class="metric"><span>총 수면</span><b id="total">0분</b></div><div class="metric"><span>가장 긴 수면</span><b id="longest">0분</b></div><div class="metric"><span>최근 기상</span><b id="lastWake">-</b></div><div class="metric"><span>기상 후 경과시간</span><b id="gap">-</b></div></div></section>
 <div class="top-actions">
   <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
   <div class="top-right-actions">
@@ -515,7 +515,7 @@ function header(){
   $('#weekMini').textContent=view==='day'?`${cur.getMonth()+1}월 ${weekOfMonth(cur.getFullYear(),cur.getMonth()+1,cur.getDate())}주차`:view==='week'?'주별 통계':view==='month'?'월별 통계':'년도별 통계';
   $('#dayRule').textContent=`하루 집계 기준 ${pad(settings.dayStartHour)}:00${settings.pendingDayStart?' · 변경 예약됨':''}`;
 }
-function render(){header();let days=periodDays(),arr=aggregate(days),ms=arr.map(x=>x.end-x.start),total=ms.reduce((a,b)=>a+b,0);$('#summaryTitle').textContent=view==='day'?'오늘 수면':view==='week'?'이번 주 수면':view==='month'?'이번 달 수면':'올해 수면';$('#count').textContent=`${arr.length}회`;$('#total').textContent=dur(total);$('#longest').textContent=arr.length?dur(Math.max(...ms)):'0분';$('#lastWake').textContent=arr.length?(()=>{
+function render(){header();let days=periodDays(),arr=aggregate(days),ms=arr.map(x=>x.end-x.start),total=ms.reduce((a,b)=>a+b,0);$('#summaryTitle').textContent=view==='day'?'오늘 수면 합계':view==='week'?'이번 주 수면':view==='month'?'이번 달 수면':'올해 수면';$('#count').textContent=`${arr.length}회`;$('#total').textContent=dur(total);$('#longest').textContent=arr.length?dur(Math.max(...ms)):'0분';$('#lastWake').textContent=arr.length?(()=>{
   const d=new Date(arr[arr.length-1].end);
   return `${d.getHours()}시 ${pad(d.getMinutes())}분`;
 })():'-';
