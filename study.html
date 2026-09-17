@@ -2188,34 +2188,7 @@ $('#periodList').addEventListener('input', async (e) => {
   if(reordered) renderPeriods();
 });
 
-// 종료 페이지 최종값 검증: 입력 중에는 건드리지 않고, change/focusout 때만 검사한다.
-async function validateEndPageFinal(t){
-  if(!t || t.tagName !== 'INPUT' || t.dataset.k !== 'endPage') return;
-  const idx = Number(t.dataset.idx);
-  const day = getDayData();
-  const p = day.periods[idx];
-  if(!p) return;
-  const start = Number(String(p.startPage ?? '').trim());
-  const end = Number(String(t.value ?? '').trim());
-  if(Number.isFinite(start) && start > 0 && Number.isFinite(end) && end > 0 && end < start){
-    p.endPage = '';
-    p.endDate = '';
-    p.endTime = '';
-    p.timerEndedAt = null;
-    t.value = '';
-    const endDT = $('#periodList').querySelector(`input[data-k="end"][data-idx="${idx}"]`);
-    if(endDT){
-      endDT.value = '';
-      const labelEl = endDT.nextElementSibling;
-      if(labelEl && labelEl.classList.contains('ko-time-label')) labelEl.textContent = '';
-    }
-    showToast('종료 페이지는 시작 페이지보다 작을 수 없어요');
-    refreshStats();
-    await persistToday();
-  }
-}
-$('#periodList').addEventListener('change', e => { validateEndPageFinal(e.target); });
-$('#periodList').addEventListener('focusout', e => { validateEndPageFinal(e.target); });
+
 
 // 자동 동기화 중 재렌더링이 보류됐으면, 입력칸을 완전히 벗어난 뒤 한 번만 반영한다.
 $('#periodList').addEventListener('focusout', () => {
