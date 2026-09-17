@@ -528,7 +528,7 @@ body{background:#f7f5fb!important}
 .lecture-confirm-overlay{
   position:fixed;inset:0;z-index:10050;
   background:rgba(48,43,61,.38);
-  display:flex;align-items:flex-end;justify-content:center;
+  display:flex;align-items:center;justify-content:center;
   padding:16px;
 }
 .lecture-confirm-panel{
@@ -546,6 +546,42 @@ body{background:#f7f5fb!important}
 .lecture-confirm-yes.danger{background:#a43c31}
 </style>
 
+
+<style id="lecture-cancel-alert-android-style">
+/* 시작 취소 / 종료 취소 확인창: Android alert 느낌, 화면 중앙 */
+.lecture-confirm-overlay{
+  position:fixed!important;inset:0!important;z-index:10050!important;
+  background:rgba(0,0,0,.58)!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  padding:20px!important;
+}
+.lecture-confirm-panel{
+  width:min(480px,calc(100% - 8px))!important;
+  min-height:230px!important;
+  background:#fff!important;border:0!important;border-radius:30px!important;
+  padding:28px 28px 22px!important;box-shadow:0 18px 50px rgba(0,0,0,.22)!important;
+  display:flex!important;flex-direction:column!important;
+}
+.lecture-confirm-panel::before{
+  content:'이 페이지 내용:';display:block;margin:0 0 28px!important;
+  color:#111!important;font-size:21px!important;font-weight:800!important;line-height:1.25!important;
+}
+.lecture-confirm-msg{
+  margin:0!important;color:#111!important;font-size:15px!important;font-weight:700!important;
+  line-height:1.55!important;white-space:pre-line!important;
+}
+.lecture-confirm-actions{
+  margin-top:auto!important;padding-top:30px!important;display:flex!important;
+  justify-content:flex-end!important;gap:24px!important;
+}
+.lecture-confirm-actions button{
+  flex:0 0 auto!important;border:0!important;background:transparent!important;
+  padding:8px 4px!important;border-radius:6px!important;font-size:14px!important;font-weight:800!important;
+  color:#2563eb!important;box-shadow:none!important;
+}
+.lecture-confirm-yes.danger{background:transparent!important;color:#2563eb!important}
+.lecture-confirm-no{color:#6b7280!important}
+</style>
 
 <style id="lecture-card-actions-normal-size">
 .lecture-action-field{
