@@ -243,7 +243,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothi
 @media(max-width:430px){.cloud-grid{grid-template-columns:1fr}}
 </style>
 
-<link rel="manifest" href="./manifest.webmanifest?v=1.21">
+<link rel="manifest" href="./manifest.webmanifest?v=1.29">
 <meta name="theme-color" content="#285f50">
 <link rel="apple-touch-icon" href="./icon-192.png">
 
@@ -1109,7 +1109,7 @@ document.addEventListener('touchend',e=>{
   touchMode='';pullReady=false;
 },{passive:true});
 
-function initCloud(){try{if(window.supabase)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){}}async function cloudStatus(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';$('#logout').style.display=user?'':'none'}$('#syncBtn').onclick=async()=>{const btn=$('#syncBtn');if(btn?.disabled)return;if(btn){btn.disabled=true;btn.textContent='↻ 동기화 중…'}try{if(!sb)initCloud();await cloudStatus();if(!user){$('#cloudCard').classList.add('show');toast('클라우드 로그인 필요');return}const ok=await syncCloud();if(ok!==false)toast('클라우드 동기화 완료')}catch(e){console.error('수면 동기화 실패:',e);toast('동기화에 실패했어요')}finally{if(btn){btn.disabled=false;btn.textContent='↻ 동기화'}}}
+function initCloud(){try{if(window.supabase)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){}}async function cloudStatus(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';$('#logout').style.display=user?'':'none'}$('#syncBtn').onclick=async()=>{const btn=$('#syncBtn');if(btn?.disabled)return;if(btn){btn.disabled=true;btn.textContent='↻ 동기화 중…'}try{if(!sb)initCloud();await cloudStatus();if(!user){$('#cloudCard').classList.add('show');toast('클라우드 로그인 필요');return}const ok=await syncCloud();if(ok!==false)toast('클라우드 동기화 완료')}catch(e){console.error('수면 동기화 실패:',e);toast('동기화 실패: '+(e?.message||e?.code||String(e)))}finally{if(btn){btn.disabled=false;btn.textContent='↻ 동기화'}}}
 async function syncCloud(){
   if(!user)return false;
   const ym='S:ALL';
@@ -1136,7 +1136,7 @@ async function syncCloud(){
   if(w.error) throw w.error;
   render(); return true;
 }
-$('#signup').onclick=async()=>{if(!sb)initCloud();let e=$('#email').value.trim(),p=$('#password').value;if(!e||p.length<6)return toast('이메일/비밀번호를 확인해주세요');let {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert(error.message);await cloudStatus();toast('회원가입 요청 완료')};$('#login').onclick=async()=>{if(!sb)initCloud();let {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);await cloudStatus();toast('로그인 완료')};$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();await cloudStatus();toast('로그아웃')};$('#upload').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');await syncCloud()};$('#download').onclick=async()=>{try{await cloudStatus();if(!user)return toast('로그인 필요');const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);if(error)throw error;const r=rows&&rows[0];if(!r)return toast('클라우드 기록 없음');if(confirm('클라우드 기록으로 불러올까요?')){data.sessions=r.data?.sessions||[];if(r.data?.settings)Object.assign(settings,r.data.settings);save();saveSet();render();toast('불러오기 완료')}}catch(e){console.error(e);toast('클라우드 불러오기 실패')}}
+$('#signup').onclick=async()=>{if(!sb)initCloud();let e=$('#email').value.trim(),p=$('#password').value;if(!e||p.length<6)return toast('이메일/비밀번호를 확인해주세요');let {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert(error.message);await cloudStatus();toast('회원가입 요청 완료')};$('#login').onclick=async()=>{if(!sb)initCloud();let {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);await cloudStatus();toast('로그인 완료')};$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();await cloudStatus();toast('로그아웃')};$('#upload').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');await syncCloud()};$('#download').onclick=async()=>{try{await cloudStatus();if(!user)return toast('로그인 필요');const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);if(error)throw error;const r=rows&&rows[0];if(!r)return toast('클라우드 기록 없음');if(confirm('클라우드 기록으로 불러올까요?')){data.sessions=r.data?.sessions||[];if(r.data?.settings)Object.assign(settings,r.data.settings);save();saveSet();render();toast('불러오기 완료')}}catch(e){console.error(e);toast('클라우드 불러오기 실패: '+(e?.message||e?.code||String(e)))}}
 $('#toggleCloudSetup').onclick=()=>$('#cloudSetup').classList.toggle('show');
 $('#backupData').onclick=()=>{const payload={version:1,type:'sleep-backup',exportedAt:new Date().toISOString(),data,settings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sleep-backup-${ymd(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('데이터 백업 완료')};
 $('#restoreData').onclick=()=>$('#restoreFile').click();
@@ -1145,348 +1145,18 @@ $('#cloudGoogle').onclick=async()=>{if(!sb)initCloud();if(!sb)return alert('클�
 window.yangStudyHandleOAuthCallback=async function(callbackUrl){try{if(!sb)initCloud();if(!sb)throw new Error('Supabase 연결 실패');const u=new URL(callbackUrl);const oauthError=u.searchParams.get('error_description')||u.searchParams.get('error');if(oauthError)throw new Error(oauthError);const code=u.searchParams.get('code');if(!code)throw new Error('Google 로그인 인증 코드가 없습니다.');const {data:authData,error}=await sb.auth.exchangeCodeForSession(code);if(error)throw error;user=authData?.session?.user||authData?.user||null;await cloudStatus();if(user){await syncCloud();toast('Google 로그인이 완료됐어요');return true}throw new Error('로그인 세션을 확인하지 못했습니다.')}catch(e){console.error('Google OAuth callback 실패:',e);alert('Google 로그인 완료 처리 실패: '+(e?.message||e));return false}};
 initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tick();setInterval(tick,500);
 </script>
-<script>
-(()=>{
- const KEY='sleepAlarm:local:v1';
- let timer=null, audioCtx=null;
- const $a=(q)=>document.querySelector(q);
- const pad2=n=>String(n).padStart(2,'0');
- function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
- function write(v){localStorage.setItem(KEY,JSON.stringify(v))}
- function fmtDue(ms){const d=new Date(ms);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad2(d.getMinutes())}분`}
- function tones(kind){
-   if(kind==='gentle') return [440,523,659];
-   if(kind==='classic') return [880,660,880,660];
-   return [784,988,1175,988];
- }
- function sound(kind='bright', seconds=12){
-   try{
-     audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-     audioCtx.resume();
-     const arr=tones(kind), start=audioCtx.currentTime;
-     for(let i=0;i<Math.max(1,Math.floor(seconds*2));i++){
-       const o=audioCtx.createOscillator(), g=audioCtx.createGain(), t=start+i*.5;
-       o.frequency.value=arr[i%arr.length]; g.gain.setValueAtTime(.0001,t);
-       g.gain.exponentialRampToValueAtTime(.18,t+.03); g.gain.exponentialRampToValueAtTime(.0001,t+.35);
-       o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+.4);
-     }
-   }catch(e){}
- }
- function render(){
-   const a=read(), el=$a('#alarmDue'); if(!el)return;
-   if(a&&a.enabled&&a.due>Date.now()) el.textContent=`${fmtDue(a.due)} 알람 예정`;
-   else if(a&&a.enabled) el.textContent='알람 시간이 되었습니다.';
-   else el.textContent='알람이 설정되지 않았습니다.';
- }
- function scheduleWeb(){
-   if(timer){clearTimeout(timer);timer=null}
-   const a=read(); if(!a||!a.enabled)return render();
-   const wait=a.due-Date.now();
-   if(wait<=0){fireWeb(a);return}
-   timer=setTimeout(()=>fireWeb(a),Math.min(wait,2147483647)); render();
- }
- function fireWeb(a){
-   const cur=read(); if(!cur||!cur.enabled)return;
-   cur.enabled=false;write(cur);render();
-   if(window.yangStudyPlaySavedSleepAlarm){window.yangStudyPlaySavedSleepAlarm().then(ok=>{if(!ok)sound(cur.sound,20)});}else sound(cur.sound,20);
-   try{navigator.vibrate&&navigator.vibrate([800,300,800,300,1200])}catch(e){}
-   alert('⏰ 설정한 알람 시간입니다.');
- }
- function nativeSet(a){
-   // Android APK wrapper can expose this bridge. It is intentionally device-local.
-   try{
-     if(window.SleepAlarmAndroid&&typeof window.SleepAlarmAndroid.setAlarm==='function'){
-       window.SleepAlarmAndroid.setAlarm(String(a.due),a.sound); return true;
-     }
-   }catch(e){}
-   return false;
- }
- function nativeCancel(){
-   try{if(window.SleepAlarmAndroid&&typeof window.SleepAlarmAndroid.cancelAlarm==='function')window.SleepAlarmAndroid.cancelAlarm()}catch(e){}
- }
- document.addEventListener('DOMContentLoaded',()=>{
-   const h=$a('#alarmHours'),m=$a('#alarmMinutes'),snd=$a('#alarmSound');
-   const old=read(); if(old){if(Number.isFinite(old.hours))h.value=old.hours;if(Number.isFinite(old.minutes))m.value=old.minutes;if(old.sound)snd.value=old.sound}
-   $a('#alarmPreview__OLD')?.addEventListener('click',()=>sound(snd.value,2.5));
-   $a('#alarmSet__OLD')?.addEventListener('click',()=>{
-     let hh=Math.max(0,Math.min(48,parseInt(h.value||'0',10)||0));
-     let mm=Math.max(0,Math.min(59,parseInt(m.value||'0',10)||0));
-     h.value=hh;m.value=mm;
-     if(hh===0&&mm===0){alert('알람 시간을 1분 이상 설정해주세요.');return}
-     const a={enabled:true,due:Date.now()+(hh*60+mm)*60000,hours:hh,minutes:mm,sound:snd.value};
-     write(a); nativeSet(a); scheduleWeb();
-   });
-   $a('#alarmCancel__OLD')?.addEventListener('click',()=>{const a=read()||{};a.enabled=false;write(a);nativeCancel();scheduleWeb()});
-   document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleWeb()});
-   scheduleWeb();
- });
-})();
-</script>
 
 
-<script>
-(()=>{
- let chosenAlarmFile=null, previewAudio=null;
- document.addEventListener('DOMContentLoaded',()=>{
-   const pick=document.querySelector('#alarmFilePick');
-   const input=document.querySelector('#alarmSoundFile');
-   const name=document.querySelector('#alarmFileName');
-   pick?.addEventListener('click',()=>input?.click());
-   input?.addEventListener('change',()=>{
-     chosenAlarmFile=input.files&&input.files[0]?input.files[0]:null;
-     if(name) name.textContent=chosenAlarmFile?`선택: ${chosenAlarmFile.name}`:'';
-     if(chosenAlarmFile){
-       try{ if(previewAudio){previewAudio.pause()} previewAudio=new Audio(URL.createObjectURL(chosenAlarmFile)); }catch(e){}
-     }
-   });
-   // Capture preview first when a user file is selected; otherwise existing built-in preview remains.
-   document.querySelector('#alarmPreview__OLD')?.addEventListener('click',(e)=>{
-     if(!chosenAlarmFile)return;
-     e.stopImmediatePropagation();
-     try{previewAudio.currentTime=0;previewAudio.play()}catch(err){}
-   },true);
-   // Expose selected file name for APK wrapper integration without adding it to Supabase sync.
-   window.getLocalAlarmAudioFile=()=>chosenAlarmFile;
- });
-})();
-</script>
 
 
-<script>
-(()=>{
-  const $=q=>document.querySelector(q);
-  const KEY='sleepAlarm:local:v1';
-  const pad=n=>String(n).padStart(2,'0');
-
-  function alarmDurationMs(){
-    const h=Math.max(0,Math.min(48,parseInt($('#alarmHours')?.value||'0',10)||0));
-    const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||'0',10)||0));
-    return (h*60+m)*60000;
-  }
-  function dueLabel(ms){
-    const d=new Date(ms);
-    return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad(d.getMinutes())}분 알람 예정`;
-  }
-  function previewDue(){
-    const el=$('#alarmDue'); if(!el)return;
-    const delta=alarmDurationMs();
-    if(delta<=0){ el.textContent='알람 시간을 설정해주세요.'; return; }
-    el.textContent=dueLabel(Date.now()+delta);
-  }
-  document.addEventListener('DOMContentLoaded',()=>{
-    const h=$('#alarmHours'),m=$('#alarmMinutes'),set=$('#alarmSet__OLD');
-    h?.addEventListener('input',previewDue);
-    m?.addEventListener('input',previewDue);
-
-    // Run before the existing alarm-set listener so both storage and display use
-    // the same exact timestamp.
-    set?.addEventListener('click',()=>{
-      const delta=alarmDurationMs();
-      if(delta<=0)return;
-      const due=Date.now()+delta;
-      const sound=$('#alarmSound')?.value||'bright';
-      const a={
-        enabled:true,due,
-        hours:Math.floor(delta/3600000),
-        minutes:Math.floor((delta%3600000)/60000),
-        sound
-      };
-      localStorage.setItem(KEY,JSON.stringify(a));
-      const el=$('#alarmDue'); if(el)el.textContent=dueLabel(due);
-    },true);
-
-    previewDue();
-  });
-})();
-</script>
 
 
 <style>
-#alarmSet__OLD.alarm-running{background:#244f43!important;color:#fff!important}
+#alarmSet.alarm-running{background:#244f43!important;color:#fff!important}
 #alarmDue.alarm-active{background:#e5f0eb!important;color:#245f4e!important}
 </style>
-<script>
-(()=>{
- const KEY='sleepAlarm:local:v2';
- const $=q=>document.querySelector(q);
- let ctx=null, timeoutId=null, ticker=null, unlocked=false;
-
- function pad(n){return String(n).padStart(2,'0')}
- function duration(){
-   const h=Math.max(0,Math.min(48,parseInt($('#alarmHours')?.value||0,10)||0));
-   const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||0,10)||0));
-   return (h*60+m)*60000;
- }
- function label(ms){
-   const d=new Date(ms);
-   return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad(d.getMinutes())}분 알람 예정`;
- }
- function save(a){localStorage.setItem(KEY,JSON.stringify(a))}
- function load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
-
- async function unlockAudio(){
-   try{
-     ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
-     if(ctx.state==='suspended') await ctx.resume();
-     // silent buffer created from the user's button gesture
-     const b=ctx.createBuffer(1,1,22050), src=ctx.createBufferSource();
-     src.buffer=b;src.connect(ctx.destination);src.start(0);
-     unlocked=true;
-   }catch(e){unlocked=false}
- }
- function ring(){
-   const a=load();
-   if(!a||!a.enabled)return;
-   a.enabled=false; save(a);
-   clearTimeout(timeoutId); clearInterval(ticker);
-   const btn=$('#alarmSet__OLD'), due=$('#alarmDue');
-   if(btn){btn.textContent='알람 시작';btn.classList.remove('alarm-running')}
-   if(due){due.textContent='⏰ 알람 시간입니다';due.classList.remove('alarm-active')}
-   try{
-     ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
-     if(ctx.state==='suspended')ctx.resume();
-     const freqs=a.sound==='gentle'?[440,523,659]:a.sound==='classic'?[880,660,880,660]:[784,988,1175,988];
-     const start=ctx.currentTime;
-     for(let i=0;i<36;i++){
-       const o=ctx.createOscillator(),g=ctx.createGain(),t=start+i*.42;
-       o.frequency.value=freqs[i%freqs.length];
-       g.gain.setValueAtTime(.0001,t);
-       g.gain.exponentialRampToValueAtTime(.28,t+.025);
-       g.gain.exponentialRampToValueAtTime(.0001,t+.32);
-       o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.34);
-     }
-   }catch(e){}
-   try{navigator.vibrate&&navigator.vibrate([800,250,800,250,1200])}catch(e){}
-   setTimeout(()=>alert('⏰ 설정한 알람 시간입니다.'),120);
- }
- function update(){
-   const a=load(), btn=$('#alarmSet__OLD'), due=$('#alarmDue');
-   if(!a||!a.enabled)return;
-   const left=a.due-Date.now();
-   if(left<=0){ring();return}
-   if(btn){btn.textContent='⏰ 알람 중';btn.classList.add('alarm-running')}
-   if(due){due.textContent=label(a.due);due.classList.add('alarm-active')}
- }
- function arm(a){
-   clearTimeout(timeoutId);clearInterval(ticker);
-   const left=a.due-Date.now();
-   if(left<=0){ring();return}
-   // timeout plus 1-second watchdog prevents a single throttled timeout from being the only trigger
-   timeoutId=setTimeout(ring,left);
-   ticker=setInterval(update,1000);
-   update();
- }
- document.addEventListener('DOMContentLoaded',()=>{
-   const set=$('#alarmSet__OLD'), cancel=$('#alarmCancel__OLD');
-   set?.addEventListener('click',async e=>{
-     e.preventDefault();e.stopImmediatePropagation();
-     const ms=duration();
-     if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
-     await unlockAudio();
-     const a={enabled:true,due:Date.now()+ms,sound:$('#alarmSound')?.value||'bright'};
-     save(a);arm(a);
-   },true);
-   cancel?.addEventListener('click',e=>{
-     e.preventDefault();e.stopImmediatePropagation();
-     clearTimeout(timeoutId);clearInterval(ticker);
-     save({enabled:false});
-     const btn=$('#alarmSet__OLD'),due=$('#alarmDue');
-     if(btn){btn.textContent='알람 시작';btn.classList.remove('alarm-running')}
-     if(due){due.textContent='알람이 설정되지 않았습니다.';due.classList.remove('alarm-active')}
-   },true);
-   const a=load(); if(a?.enabled)arm(a);
- });
-})();
-</script>
 
 
-<script>
-(()=>{
- const K='sleepAlarm:test:v43';
- const $=q=>document.querySelector(q);
- let ac=null, osc=null, gain=null, alarmTO=null, watch=null;
-
- function getDur(){
-   const h=Math.max(0,parseInt($('#alarmHours')?.value||'0',10)||0);
-   const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||'0',10)||0));
-   return (h*60+m)*60000;
- }
- function p(n){return String(n).padStart(2,'0')}
- function dueText(t){const d=new Date(t);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${p(d.getMinutes())}분 알람 예정`}
- function read(){try{return JSON.parse(localStorage.getItem(K)||'null')}catch(e){return null}}
- function write(x){localStorage.setItem(K,JSON.stringify(x))}
- async function prime(){
-   ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-   await ac.resume();
-   if(!osc){
-     osc=ac.createOscillator(); gain=ac.createGain();
-     osc.type='sine'; osc.frequency.value=880; gain.gain.value=0.00001;
-     osc.connect(gain);gain.connect(ac.destination);osc.start();
-   }
- }
- function ui(a){
-   const b=$('#alarmSet__OLD'),d=$('#alarmDue');
-   if(a?.enabled){
-     if(b){b.textContent='⏰ 알람 중';b.classList.add('alarm-running')}
-     if(d){d.textContent=dueText(a.due);d.classList.add('alarm-active')}
-   }else{
-     if(b){b.textContent='알람 시작';b.classList.remove('alarm-running')}
-     if(d){d.textContent='알람이 설정되지 않았습니다.';d.classList.remove('alarm-active')}
-   }
- }
- function stopRing(){
-   if(gain&&ac){try{gain.gain.cancelScheduledValues(ac.currentTime);gain.gain.setValueAtTime(.00001,ac.currentTime)}catch(e){}}
- }
- async function fire(){
-   let a=read(); if(!a?.enabled)return;
-   a.enabled=false;write(a);
-   clearTimeout(alarmTO);clearInterval(watch);
-   try{
-     await prime();
-     const now=ac.currentTime;
-     gain.gain.cancelScheduledValues(now);
-     for(let i=0;i<40;i++){
-       const t=now+i*.35;
-       gain.gain.setValueAtTime(.00001,t);
-       gain.gain.linearRampToValueAtTime(.35,t+.03);
-       gain.gain.linearRampToValueAtTime(.00001,t+.25);
-     }
-   }catch(e){}
-   try{navigator.vibrate?.([700,250,700,250,1000])}catch(e){}
-   const b=$('#alarmSet__OLD'),d=$('#alarmDue');
-   if(b){b.textContent='알람 시작';b.classList.remove('alarm-running')}
-   if(d){d.textContent='⏰ 알람 시간입니다';d.classList.remove('alarm-active')}
-   setTimeout(()=>alert('⏰ 알람 시간입니다.'),50);
- }
- function arm(a){
-   clearTimeout(alarmTO);clearInterval(watch);
-   const left=a.due-Date.now();
-   if(left<=0)return fire();
-   alarmTO=setTimeout(fire,left);
-   watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},250);
-   ui(a);
- }
- document.addEventListener('DOMContentLoaded',()=>{
-   const start=$('#alarmSet__OLD'),cancel=$('#alarmCancel__OLD');
-   start?.addEventListener('click',async e=>{
-     e.preventDefault();e.stopImmediatePropagation();
-     const ms=getDur();
-     if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
-     try{await prime()}catch(err){}
-     const a={enabled:true,due:Date.now()+ms,sound:$('#alarmSound')?.value||'bright'};
-     write(a);arm(a);
-   },true);
-   cancel?.addEventListener('click',e=>{
-     e.preventDefault();e.stopImmediatePropagation();
-     const a=read();
-     if(!a?.enabled){ui(null);return}
-     if(!confirm('설정한 알람을 정말 해제하시겠습니까?'))return;
-     clearTimeout(alarmTO);clearInterval(watch);stopRing();write({enabled:false});ui(null);
-   },true);
-   const a=read(); if(a?.enabled)arm(a); else ui(null);
- });
-})();
-</script>
 
 
 <style>
@@ -1536,34 +1206,6 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 </script>
 
 
-<script>
-(()=>{
- const $=q=>document.querySelector(q);
- function minuteAlignedDue(){
-   const h=Math.max(0,parseInt($('#alarmHours')?.value||'0',10)||0);
-   const m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||'0',10)||0));
-   const total=(h*60+m)*60000;
-   const now=new Date();
-   now.setSeconds(0,0);
-   return {due:now.getTime()+total,total};
- }
- document.addEventListener('DOMContentLoaded',()=>{
-   const b=$('#alarmSet__OLD');
-   b?.addEventListener('click',e=>{
-     const x=minuteAlignedDue();
-     if(x.total<60000)return;
-     // Update all alarm stores used by prior controllers before their timers arm.
-     const sound=$('#alarmSound')?.value||'bright';
-     const a={enabled:true,due:x.due,sound};
-     try{
-       localStorage.setItem('sleepAlarm:test:v43',JSON.stringify(a));
-       localStorage.setItem('sleepAlarm:local:v2',JSON.stringify(a));
-       localStorage.setItem('sleepAlarm:local:v1',JSON.stringify(a));
-     }catch(err){}
-   },true);
- },true);
-})();
-</script>
 
 
 <script>
@@ -1714,7 +1356,7 @@ initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tic
 // PWA v1.22: register the current service worker and ask it to check for updates.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.26', { scope: './' })
+    navigator.serviceWorker.register('./sw.js?v=1.29', { scope: './' })
       .then(reg => reg.update())
       .catch(err => console.error('Service worker registration failed:', err));
   });
@@ -1772,38 +1414,10 @@ if ('serviceWorker' in navigator) {
    const due=document.querySelector('#alarmDue');
    const obs=due?new MutationObserver(()=>{if((due.textContent||'').includes('알람 시간'))startV()}):null;
    if(obs)obs.observe(due,{childList:true,subtree:true,characterData:true});
-   ['#alarmCancel','#alarmCancel__OLD','#alarmStopRing'].forEach(sel=>document.querySelector(sel)?.addEventListener('click',stopV,true));
+   ['#alarmCancel','#alarmStopRing'].forEach(sel=>document.querySelector(sel)?.addEventListener('click',stopV,true));
    document.addEventListener('click',e=>{if(e.target?.id==='alarmStopRing')stopV()},true);
  });
  window.addEventListener('pagehide',stopV);
 })();
 </script>
 </body></html>
-<!-- v1.22 authoritative sleep alarm controller: shared alarm lock + selected audio -->
-<script>
-(()=>{
- const LOCK='appAlarm:lock:v1', OWNER='sleep', KEY='sleepAlarm:v122';
- const $=q=>document.querySelector(q); let timer=null,watch=null,customFile=null,customUrl=null,ringAudio=null,ctx=null;
- const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
- const write=a=>localStorage.setItem(KEY,JSON.stringify(a));
- const lock=()=>{try{return JSON.parse(localStorage.getItem(LOCK)||'null')}catch(e){return null}};
- const setLock=due=>localStorage.setItem(LOCK,JSON.stringify({owner:OWNER,due}));
- const clearLock=()=>{const l=lock();if(l?.owner===OWNER)localStorage.removeItem(LOCK)};
- const dur=()=>((Math.max(0,Math.min(48,parseInt($('#alarmHours')?.value||0)||0))*60)+Math.max(0,Math.min(59,parseInt($('#alarmMinutes')?.value||0)||0)))*60000;
- const dueText=t=>{const d=new Date(t);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${String(d.getMinutes()).padStart(2,'0')}분 알람 예정`};
- function ui(a){const b=$('#alarmSet__OLD'),d=$('#alarmDue');if(a?.enabled){b.textContent='⏰ 알람 중';b.classList.add('alarm-running');d.textContent=dueText(a.due);d.classList.add('alarm-active')}else{b.textContent='알람 시작';b.classList.remove('alarm-running');d.textContent='알람이 설정되지 않았습니다.';d.classList.remove('alarm-active')}}
- async function builtin(sound){try{ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const f=sound==='gentle'?[440,523,659]:sound==='classic'?[880,660,880]:[784,988,1175];for(let i=0;i<80;i++){const o=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime+i*.4;o.frequency.value=f[i%f.length];g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.25,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+.3);o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.32)}}catch(e){}}
- async function fire(){const a=read();if(!a?.enabled)return;write({...a,enabled:false});clearLock();clearTimeout(timer);clearInterval(watch);ui(null);$('#alarmDue').textContent='⏰ 알람 시간입니다.';try{navigator.vibrate?.([800,250,800,250,1200])}catch(e){} if(window.yangStudyPlaySavedSleepAlarm){try{if(await window.yangStudyPlaySavedSleepAlarm())return}catch(e){}} if(customUrl){try{ringAudio?.pause();ringAudio=new Audio(customUrl);ringAudio.loop=true;await ringAudio.play();return}catch(e){}} builtin(a.sound);}
- function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500)}
- function replace(id,handler){const old=$(id);if(!old)return null;const n=old.cloneNode(true);old.replaceWith(n);n.addEventListener('click',handler);return n}
- document.addEventListener('DOMContentLoaded',()=>{
-   const input=$('#alarmSoundFile'),name=$('#alarmFileName');
-   input?.addEventListener('change',()=>{customFile=input.files?.[0]||null;if(customUrl)URL.revokeObjectURL(customUrl);customUrl=customFile?URL.createObjectURL(customFile):null;if(name)name.textContent=customFile?`선택: ${customFile.name}`:'';},true);
-   replace('#alarmSet__OLD',async e=>{e.preventDefault();const l=lock();if(l&&l.owner!==OWNER){alert(`다른 화면(${l.owner==='study'?'공부장':'강의기록장'})에서 알람이 진행 중입니다. 그 알람을 먼저 해제해주세요.`);return}const ms=dur();if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');try{ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(_){}const a={enabled:true,due:Date.now()+ms,sound:$('#alarmSound')?.value||'bright',customName:customFile?.name||''};write(a);setLock(a.due);arm(a)});
-   replace('#alarmCancel__OLD',e=>{e.preventDefault();clearTimeout(timer);clearInterval(watch);ringAudio?.pause();write({enabled:false});clearLock();ui(null)});
-   replace('#alarmPreview__OLD',async e=>{e.preventDefault();if(customUrl){try{ringAudio?.pause();ringAudio=new Audio(customUrl);await ringAudio.play();setTimeout(()=>ringAudio?.pause(),2500);return}catch(_){}}builtin($('#alarmSound')?.value||'bright')});
-   const a=read();if(a?.enabled){setLock(a.due);arm(a)}else ui(null);
-   window.addEventListener('storage',e=>{if(e.key===LOCK){const l=lock();const b=$('#alarmSet__OLD');if(b&&!read()?.enabled)b.disabled=!!(l&&l.owner!==OWNER)}});
- });
-})();
-</script>

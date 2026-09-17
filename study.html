@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>공부장</title>
 
-<link rel="manifest" href="./manifest.webmanifest?v=1.21">
+<link rel="manifest" href="./manifest.webmanifest?v=1.29">
 <meta name="theme-color" content="#3B6E5C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="공부장">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600;700&display=swap');
@@ -2982,10 +2982,11 @@ async function cloudSaveMonth(ym){
   // 낙관적 병합: 저장 직전 클라우드 최신본을 읽고 날짜/교시/필드 단위로 합친다.
   // 같은 달을 여러 기기에서 동시에 수정해도 서로 다른 변경을 최대한 보존한다.
   let local = ensureMonthSync(deepClone(monthCache[ym]), ym);
+  let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
       .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',ym).limit(1);
-    if(readErr){ console.error('클라우드 저장 전 읽기 실패:', readErr); return; }
+    if(readErr){ console.error('클라우드 저장 전 읽기 실패:', readErr); showToast('동기화 실패(읽기): ' + (readErr.message||readErr.code||readErr)); return; }
     const row = rows && rows[0];
     const merged = mergeMonths(local, row?.data || {}, ym);
     const nowIso = new Date(serverNowMs()).toISOString();
@@ -2996,11 +2997,12 @@ async function cloudSaveMonth(ym){
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
-      else if(wErr) console.warn('동기화 충돌 재시도:', wErr.message);
+      else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
+      else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
       const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym,data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
-      else console.warn('동기화 신규 저장 재시도:', iErr.message);
+      else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
     if(writeOk){
       monthCache[ym]=merged;
@@ -3009,8 +3011,8 @@ async function cloudSaveMonth(ym){
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
   }
-  console.error('클라우드 저장 충돌을 해결하지 못했습니다:', ym);
-  showToast('동기화 충돌이 있어 잠시 후 다시 저장해 주세요');
+  console.error('클라우드 저장 충돌을 해결하지 못했습니다:', ym, lastSaveErr);
+  showToast('동기화 실패(' + ym + '): ' + (lastSaveErr?.message || lastSaveErr?.code || '원인 불명 - 콘솔 확인'));
 }
 
 async function uploadAllToCloud(){
@@ -3028,7 +3030,7 @@ async function uploadAllToCloud(){
 async function autoSyncFromCloud(){
   if(!sbClient || !cloudUser) return;
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
-  if(error){ console.error('자동 동기화 불러오기 실패:', error); return; }
+  if(error){ console.error('자동 동기화 불러오기 실패:', error); showToast('동기화 실패(불러오기): ' + (error.message||error.code||error)); return; }
   const studyRows=(data||[]).filter(row=>!String(row.ym||'').startsWith('L:'));
   if(studyRows.length===0) return;
   const needsPush=[];
@@ -3057,7 +3059,7 @@ async function autoSyncFromCloud(){
 async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
-  if(error){ alert('클라우드 불러오기 실패: '+error.message); return; }
+  if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
   const studyRows=(data||[]).filter(row=>!String(row.ym||'').startsWith('L:'));
   if(studyRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 공부 기록을 교체할까요?')) return;
@@ -3181,7 +3183,7 @@ async function runManualCloudSync(){
     showToast('클라우드 동기화 완료');
   }catch(e){
     console.error('수동 동기화 실패:', e);
-    showToast('동기화에 실패했어요');
+    showToast('동기화 실패: ' + (e?.message || e?.code || String(e)));
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = '↻ 동기화'; }
   }
@@ -3538,7 +3540,7 @@ renderDay();
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.26', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=1.29', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });
