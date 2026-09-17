@@ -3203,7 +3203,10 @@ async function cloudSaveMonth(ym){
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
       .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym)).limit(1);
-    if(readErr){ console.error('클라우드 저장 전 읽기 실패:', readErr); showToast('동기화 실패(읽기): ' + (readErr.message||readErr.code||readErr)); return; }
+    if(readErr){
+      console.error('클라우드 저장 전 읽기 실패:', readErr);
+      throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
+    }
     const row = rows && rows[0];
     const merged = mergeMonths(local, row?.data || {}, ym);
     const nowIso = new Date(serverNowMs()).toISOString();
@@ -3229,7 +3232,7 @@ async function cloudSaveMonth(ym){
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
   }
   console.error('클라우드 저장 충돌을 해결하지 못했습니다:', ym, lastSaveErr);
-  showToast('동기화 실패(' + ym + '): ' + (lastSaveErr?.message || lastSaveErr?.code || '원인 불명 - 콘솔 확인'));
+  throw new Error('study_months 저장 실패(' + ym + '): ' + (lastSaveErr?.message || lastSaveErr?.code || '원인 불명'));
 }
 
 async function uploadAllToCloud(){
@@ -3244,10 +3247,18 @@ async function uploadAllToCloud(){
   showToast('전체 기록을 병합해서 클라우드에 저장했어요');
 }
 
-async function autoSyncFromCloud(){
+async function autoSyncFromCloud(lockOwned=false){
   if(!sbClient || !cloudUser) return;
-  const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
-  if(error){ console.error('자동 동기화 불러오기 실패:', error); showToast('동기화 실패(불러오기): ' + (error.message||error.code||error)); return; }
+  if(!lockOwned){
+    if(fullCloudSyncRunning) return;
+    fullCloudSyncRunning = true;
+  }
+  try{
+const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
+  if(error){
+    console.error('자동 동기화 불러오기 실패:', error);
+    throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
+  }
   const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
   if(lectureRows.length===0) return;
   const needsPush=[];
@@ -3271,6 +3282,10 @@ async function autoSyncFromCloud(){
   }else{
     periodRenderPending = false;
     await renderCurrentView();
+  }
+
+  }finally{
+    if(!lockOwned) fullCloudSyncRunning = false;
   }
 }
 
@@ -3384,28 +3399,29 @@ $('#cloudLogout').onclick = async () => {
   if(sbClient) await sbClient.auth.signOut();
   cloudUser=null; await refreshCloudStatus(); showToast('로그아웃했어요');
 };
+let fullCloudSyncRunning = false;
 async function runManualCloudSync(){
   const btn = $('#cloudSync');
-  if(btn?.disabled) return;
+  if(fullCloudSyncRunning || btn?.disabled){
+    showToast('이미 동기화 중이에요');
+    return;
+  }
+  fullCloudSyncRunning = true;
   if(btn){ btn.disabled = true; btn.textContent = '↻ 동기화 중…'; }
   try{
     await saveMonth(ymKey(cur));
-    // 버튼을 누르는 순간 Supabase 세션을 다시 확인한다.
-    // PWA 복원/다른 탭 로그인 직후 cloudUser가 오래된 상태여도 동기화되게 한다.
     await refreshCloudStatus();
-    if(!cloudUser){
-      showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
-      return;
-    }
+    if(!cloudUser){ showToast('현재 기록 저장 완료 · 클라우드 로그인 필요'); return; }
     await calibrateServerClock(false);
-    await autoSyncFromCloud();
+    await autoSyncFromCloud(true);
     await syncActiveTimerFromCloud(true);
-    await renderAfterCloudSync();
+    await renderCurrentView();
     showToast('클라우드 동기화 완료');
   }catch(e){
     console.error('수동 동기화 실패:', e);
     showToast('동기화 실패: ' + (e?.message || e?.code || String(e)));
   }finally{
+    fullCloudSyncRunning = false;
     if(btn){ btn.disabled = false; btn.textContent = '↻ 동기화'; }
   }
 }
