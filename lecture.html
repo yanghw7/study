@@ -2873,7 +2873,7 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          공부 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 강의 횟수 <b>${weeks[w].pages}쪽</b><br>낭비 <b class="waste-color">${fmtDuration(weeks[w].waste)}</b>
+          강의시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b><br>강의횟수 <b>${weeks[w].pages}회</b>
         </div>
       </div>
     `).join('');
@@ -2896,7 +2896,7 @@ async function renderMonthView(){
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          공부 <b class="study-color">${fmtDuration(monthStudy)}</b> · 강의 횟수 <b>${monthPages}쪽</b><br>낭비 <b class="waste-color">${fmtDuration(monthWaste)}</b>
+          강의시간 <b class="study-color">${fmtDuration(monthStudy)}</b><br>강의횟수 <b>${monthPages}회</b>
         </div>
       </div>`;
   }
@@ -2934,9 +2934,9 @@ async function renderYearView(){
     chartPoints.push({label:`${year}`, study, pages, waste});
     if(study===0 && pages===0 && waste===0) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">공부 <b class="study-color">${fmtDuration(study)}</b> · 강의 횟수 <b>${periods.length}회</b><br>낭비 <b class="waste-color">${fmtDuration(waste)}</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">강의시간 <b class="study-color">${fmtDuration(study)}</b><br>강의횟수 <b>${pages}회</b></div></div>` + rows;
   }
-  el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">년도별 정리</div>` +
+  el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
 }
