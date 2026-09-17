@@ -3215,8 +3215,9 @@ async function refreshCloudStatus(){
 }
 
 
-function lectureCloudYm(ym){ return `L:${ym}`; }
-function lectureLocalYm(v){ return String(v||'').startsWith('L:') ? String(v).slice(2) : null; }
+const CLOUD_RECORD_PREFIX='L:';
+function cloudRecordYm(ym){ return `${CLOUD_RECORD_PREFIX}${ym}`; }
+function localRecordYm(v){ const x=String(v||''); return x.startsWith(CLOUD_RECORD_PREFIX) ? x.slice(CLOUD_RECORD_PREFIX.length) : null; }
 
 async function cloudSaveMonth(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
@@ -3226,7 +3227,7 @@ async function cloudSaveMonth(ym){
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym)).limit(1);
+      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',cloudRecordYm(ym)).limit(1);
     if(readErr){
       console.error('클라우드 저장 전 읽기 실패:', readErr);
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
@@ -3237,14 +3238,14 @@ async function cloudSaveMonth(ym){
     let writeOk=false;
     if(row){
       let q = sbClient.from('study_months').update({data:merged,updated_at:nowIso})
-        .eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym));
+        .eq('user_id',cloudUser.id).eq('ym',cloudRecordYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
-      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:lectureCloudYm(ym),data:merged,updated_at:nowIso});
+      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:cloudRecordYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
       else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
@@ -3283,11 +3284,11 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith(CLOUD_RECORD_PREFIX));
   if(lectureRows.length===0) return;
   const needsPush=[];
   for(const row of lectureRows){
-    const ym=lectureLocalYm(row.ym);
+    const ym=localRecordYm(row.ym);
     if(!ym) continue;
     let local={};
     try{ local=JSON.parse(localStorage.getItem(`lectureMonth:${ym}`)||'{}'); }catch(e){}
@@ -3317,7 +3318,7 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith(CLOUD_RECORD_PREFIX));
   if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 강의 기록을 교체할까요?')) return;
   const keys=[];
@@ -3326,7 +3327,7 @@ async function downloadAllFromCloud(){
   }
   keys.forEach(k=>localStorage.removeItem(k));
   lectureRows.forEach(row=>{
-    const ym=lectureLocalYm(row.ym);
+    const ym=localRecordYm(row.ym);
     if(ym) localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(row.data || {}));
   });
   monthCache={};
