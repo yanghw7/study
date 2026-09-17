@@ -43,6 +43,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .shared-settings-row{display:grid;grid-template-columns:1fr 116px;align-items:center;gap:10px;margin:8px 0;font-size:12px;font-weight:800}
 .shared-settings-row select{height:34px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 7px;font-weight:800;color:#34423d}
 .shared-settings-note{margin-top:8px;font-size:10px;line-height:1.45;color:#6b7773}
+.shared-danger-zone{margin-top:12px;padding-top:10px;border-top:1px solid #ead9d9}.shared-delete-all{width:100%;height:36px;border:1px solid #c9362b;border-radius:8px;background:#fff;color:#b42318;font-size:11px;font-weight:900}.shared-delete-all:active{background:#fff1f0}.shared-delete-grid{display:grid;gap:6px;margin-top:8px}.shared-delete-one{width:100%;height:34px;border:1px solid #e2c7c4;border-radius:8px;background:#fff;color:#8f3028;font-size:10.5px;font-weight:850}.shared-delete-one:active{background:#fff5f4}
 
 </style>
 
@@ -61,11 +62,22 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
   <div id="sharedSettingsPanel" class="shared-settings-panel" aria-hidden="true">
     <div class="shared-settings-title">⚙ 공통 설정</div>
     <label class="shared-settings-row"><span>하루 집계 기준시점</span><select id="sharedDayStartHour"></select></label>
+    <div class="shared-settings-note">자정(00:00)부터 오전 11:00까지 선택할 수 있습니다. 선택한 시간 전의 기록은 전날 기록으로 집계됩니다.</div>
     <label class="shared-settings-row"><span>1주 시작 요일</span><select id="sharedWeekStart">
       <option value="0">일요일</option><option value="1">월요일</option><option value="2">화요일</option>
       <option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option>
     </select></label>
-    <div class="shared-settings-note">Study · Lecture · Sleep에 공통 적용됩니다.</div>
+    <div class="shared-settings-note">선택한 요일부터 한 주가 시작되며 주간 통계에 공통 적용됩니다.</div>
+    <div class="shared-settings-note">공통 설정은 공부 · 강의 · 수면 기록장에 모두 적용됩니다.</div>
+    <div class="shared-danger-zone">
+      <div class="shared-delete-grid">
+        <button id="sharedDeleteStudy" class="shared-delete-one" type="button">공부 기록장 데이터 전체 삭제</button>
+        <button id="sharedDeleteLecture" class="shared-delete-one" type="button">강의 기록장 데이터 전체 삭제</button>
+        <button id="sharedDeleteSleep" class="shared-delete-one" type="button">수면 기록장 데이터 전체 삭제</button>
+      </div>
+      <button id="sharedDeleteAll" class="shared-delete-all" type="button">🗑 데이터 전체 삭제</button>
+      <div class="shared-settings-note">공부 · 강의 · 수면 기록장의 데이터를 모두 삭제합니다.</div>
+    </div>
   </div>
   <div class="alarmbar" id="sharedAlarmBar">
     <div class="alarmline">
@@ -132,7 +144,7 @@ function readSharedSettings(){
   try{
     const x=JSON.parse(localStorage.getItem(SHARED_SETTINGS_KEY)||'null')||{};
     return {
-      dayStartHour:Number.isInteger(+x.dayStartHour)&&+x.dayStartHour>=0&&+x.dayStartHour<=23?+x.dayStartHour:SHARED_SETTINGS_DEFAULT.dayStartHour,
+      dayStartHour:Number.isInteger(+x.dayStartHour)&&+x.dayStartHour>=0&&+x.dayStartHour<=11?+x.dayStartHour:SHARED_SETTINGS_DEFAULT.dayStartHour,
       weekStart:Number.isInteger(+x.weekStart)&&+x.weekStart>=0&&+x.weekStart<=6?+x.weekStart:SHARED_SETTINGS_DEFAULT.weekStart
     };
   }catch(e){return {...SHARED_SETTINGS_DEFAULT}}
@@ -154,7 +166,7 @@ function initSharedSettingsUI(){
   const panel=document.getElementById('sharedSettingsPanel');
   const hour=document.getElementById('sharedDayStartHour');
   const week=document.getElementById('sharedWeekStart');
-  for(let h=0;h<24;h++){
+  for(let h=0;h<12;h++){
     const o=document.createElement('option');
     o.value=String(h); o.textContent=String(h).padStart(2,'0')+':00';
     hour.appendChild(o);
@@ -177,6 +189,45 @@ function initSharedSettingsUI(){
   hour.addEventListener('change',()=>writeSharedSettings({dayStartHour:+hour.value}));
   week.addEventListener('change',()=>writeSharedSettings({weekStart:+week.value}));
   window.addEventListener('storage',e=>{if(e.key===SHARED_SETTINGS_KEY)paint()});
+
+  async function ensureDeleteFrame(kind){
+    const fr=tabs[kind].frame;
+    if(!fr.getAttribute('src')){
+      fr.src=fr.dataset.src;
+      await new Promise(r=>fr.addEventListener('load',r,{once:true}));
+    }else if(!fr.contentDocument || fr.contentDocument.readyState!=='complete'){
+      await new Promise(r=>fr.addEventListener('load',r,{once:true}));
+    }
+    return fr;
+  }
+  async function deleteOneJournal(kind){
+    const fr=await ensureDeleteFrame(kind);
+    const id=kind==='sleep'?'deleteAll':'deleteAllRecords';
+    const childBtn=fr.contentDocument?.getElementById(id);
+    if(!childBtn){alert('삭제 기능을 찾지 못했습니다.');return}
+    childBtn.click();
+  }
+  document.getElementById('sharedDeleteStudy').addEventListener('click',()=>deleteOneJournal('study'));
+  document.getElementById('sharedDeleteLecture').addEventListener('click',()=>deleteOneJournal('lecture'));
+  document.getElementById('sharedDeleteSleep').addEventListener('click',()=>deleteOneJournal('sleep'));
+
+  const del=document.getElementById('sharedDeleteAll');
+  del.addEventListener('click',()=>{
+    if(!confirm('공부 · 강의 · 수면 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.'))return;
+    if(!confirm('정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.'))return;
+    const keep=new Set([SHARED_SETTINGS_KEY,'journal:lastTab','githubAlarmSounds:v1','githubAlarmSelected:v1','sharedAlarm:v126']);
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k)keys.push(k)}
+    for(const k of keys){
+      if(keep.has(k) || k.startsWith('sb-') || k.toLowerCase().includes('supabase.auth'))continue;
+      localStorage.removeItem(k);
+    }
+    for(const item of Object.values(tabs)){
+      try{item.frame.contentWindow?.postMessage({type:'journal-all-data-deleted'},location.origin)}catch(e){}
+    }
+    alert('공부 · 강의 · 수면 기록 데이터가 모두 삭제되었습니다.');
+    location.reload();
+  });
 }
 initSharedSettingsUI();
 
