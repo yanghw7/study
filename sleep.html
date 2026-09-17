@@ -1554,7 +1554,7 @@ function currentSleepPayload(){
 // study.html의 cloudSaveMonth와 같은 방식: 저장 직전 원격 최신본을 읽고 병합 후 충돌 재시도.
 async function cloudSaveSleep(){
   if(!sb||!user) return false;
-  const ym='S:ALL';
+  const ym='1900-01'; // reserved valid YYYY-MM key for sleep cloud data
   let lastSaveErr=null;
   for(let attempt=0;attempt<4;attempt++){
     const {data:rows,error:readErr}=await sb.from('study_months').select('data,updated_at').eq('user_id',user.id).eq('ym',ym).limit(1);
@@ -1587,7 +1587,7 @@ async function autoSyncFromCloud(lockOwned=false){
   if(!sb||!user) return false;
   if(!lockOwned){ if(sleepCloudSyncRunning) return false; sleepCloudSyncRunning=true; }
   try{
-    const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);
+    const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','1900-01').limit(1);
     if(error) throw new Error('수면 기록 불러오기 실패: '+(error.message||error.code||String(error)));
     const row=rows&&rows[0];
     if(!row){ await cloudSaveSleep(); return true; }
@@ -1606,7 +1606,7 @@ async function uploadAllToCloud(){
 }
 async function downloadAllFromCloud(){
   if(!user){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
-  const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);
+  const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','1900-01').limit(1);
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)); return; }
   const row=rows&&rows[0]; if(!row){ toast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 수면 기록을 교체할까요?')) return;
