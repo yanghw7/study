@@ -2358,7 +2358,7 @@ $('#periodList').addEventListener('input', async (e) => {
 
 
 
-async function requestExclusiveSessionStart(){
+async function requestExclusiveSessionStart(atMs){
   if(window.parent===window) return true;
   try{
     const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
@@ -2369,7 +2369,7 @@ async function requestExclusiveSessionStart(){
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
       }
       window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req},location.origin);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req,at:atMs},location.origin);
     });
   }catch(e){return true}
 }
@@ -2377,14 +2377,17 @@ window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
   let stopped=false;
   try{
-    const now=new Date(serverNowMs()),day=getDayData();
+    // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
+    // 이 강의의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
+    const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
+    const now=new Date(atMs),day=getDayData();
     const p=(day.periods||[]).find(x=>Number(x.timerStartedAt)>0 && !Number(x.timerEndedAt));
     if(p){
       p.endDate=ymd(now);p.endTime=hm(now);
       if(cloudUser){
         const row=await cloudStopActiveTimer();const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(serverNowMs());
-      }else p.timerEndedAt=Math.round(serverNowMs());
+        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
+      }else p.timerEndedAt=Math.round(atMs);
       p._updatedAt=syncNow();autoSortPeriodsByStart(day);await persistToday();
       renderPeriods();updateStudyTimer();updateWasteTimer();stopped=true;
     }
@@ -2409,7 +2412,7 @@ $('#periodList').addEventListener('click', async (e) => {
   }
 
   if(btn.dataset.lectureAction === 'start'){
-    if(!(await requestExclusiveSessionStart())) return;
+    if(!(await requestExclusiveSessionStart(now.getTime()))) return;
     p.startDate = ymd(now);
     p.startTime = hm(now);
     p.endDate = '';
@@ -2418,10 +2421,10 @@ $('#periodList').addEventListener('click', async (e) => {
     if(cloudUser){
       const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
       const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
-      p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+      p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
       await calibrateServerClock(true);
     }else{
-      p.timerStartedAt = Math.round(serverNowMs());
+      p.timerStartedAt = Math.round(now.getTime());
     }
   }else{
     if(!p.startDate || !p.startTime){

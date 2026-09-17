@@ -1220,7 +1220,7 @@ $('#saveEdit').onclick=()=>{let x=data.sessions.find(s=>s.id===editing),a=new Da
     return alert(`이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치지 않는 시간으로 수정해주세요.`);
   }
   x.start=a;x.end=b;x._updatedAt=syncStamp();data.sessions.sort((x,y)=>x.start-y.start);save();$('#editOverlay').classList.remove('show');render();toast('수정했어요')}
-async function requestExclusiveSessionStart(){
+async function requestExclusiveSessionStart(atMs){
   if(window.parent===window)return true;
   try{
     const req='sleep-'+Date.now()+'-'+Math.random().toString(36).slice(2);
@@ -1231,7 +1231,7 @@ async function requestExclusiveSessionStart(){
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
       }
       window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'sleep',req},location.origin);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'sleep',req,at:atMs},location.origin);
     });
   }catch(e){return true}
 }
@@ -1240,7 +1240,9 @@ window.addEventListener('message',ev=>{
   let stopped=false;
   try{
     if(data.active){
-      const end=Date.now();
+      // 다른 기록장(공부/강의)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
+      // 이 수면 세션의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
+      const end=Number.isFinite(ev.data.at)?ev.data.at:Date.now();
       const overlap=overlappingSession(data.active.start,end);
       if(!overlap){
         data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end,_updatedAt:syncStamp()});
@@ -1250,7 +1252,7 @@ window.addEventListener('message',ev=>{
   }catch(e){console.warn('자동 수면 종료 실패',e)}
   window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped},location.origin);
 });
-$('#action').onclick=async()=>{if(!data.active){if(!(await requestExclusiveSessionStart()))return;{const ts=syncStamp();data.active={start:Date.now(),timerStartedAt:Date.now(),_updatedAt:ts};data.activeUpdatedAt=ts;}save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
+$('#action').onclick=async()=>{if(!data.active){const startAt=Date.now();if(!(await requestExclusiveSessionStart(startAt)))return;{const ts=syncStamp();data.active={start:startAt,timerStartedAt:startAt,_updatedAt:ts};data.activeUpdatedAt=ts;}save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
 if(overlap){
   alert(`현재 수면시간이 이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치는 기록을 먼저 수정하거나 삭제해주세요.`);
   return;
@@ -1322,7 +1324,7 @@ $('#saveSettings').onclick=()=>{
   $('#settingsOverlay').classList.remove('show');
   render();
   toast(`${pad(requestedHour)}:00 기준 · ${effectiveAt.getMonth()+1}/${effectiveAt.getDate()} ${pad(effectiveAt.getHours())}:${pad(effectiveAt.getMinutes())}부터 적용`);
-};document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>$('#'+x.dataset.close).classList.remove('show'));$('#deleteAll').onclick=()=>{if(confirm('모든 수면 기록을 삭제할까요?')){
+};document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>$('#'+x.dataset.close).classList.remove('show'));$('#deleteAll').onclick=()=>{if(confirm('정말 모든 수면 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.')){
   const ts=syncStamp();
   const tombstones=(data.sessions||[]).map(x=>({id:x.id,_deletedAt:ts}));
   data={sessions:[],active:null,deletedSessions:[...(data.deletedSessions||[]),...tombstones],activeUpdatedAt:ts};

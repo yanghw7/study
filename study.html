@@ -1927,7 +1927,7 @@ $('#periodList').addEventListener('paste', (e) => {
 });
 
 
-async function requestExclusiveSessionStart(){
+async function requestExclusiveSessionStart(atMs){
   if(window.parent === window) return true;
   try{
     const req='study-'+Date.now()+'-'+Math.random().toString(36).slice(2);
@@ -1938,7 +1938,7 @@ async function requestExclusiveSessionStart(){
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
       }
       window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'study',req},location.origin);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'study',req,at:atMs},location.origin);
     });
   }catch(e){return true}
 }
@@ -1946,7 +1946,10 @@ window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='study') return;
   let stopped=false;
   try{
-    const now=new Date(serverNowMs());
+    // 다른 기록장(강의/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
+    // 이 공부 세션의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
+    const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
+    const now=new Date(atMs);
     const day=getDayData();
     const p=(day.periods||[]).find(x=>Number(x.timerStartedAt)>0 && !Number(x.timerEndedAt));
     if(p){
@@ -1956,8 +1959,8 @@ window.addEventListener('message',async ev=>{
       if(cloudUser){
         const row=await cloudStopActiveTimer();
         const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(serverNowMs());
-      }else p.timerEndedAt=Math.round(serverNowMs());
+        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
+      }else p.timerEndedAt=Math.round(atMs);
       p._updatedAt=syncNow();
       autoSortPeriodsByStart(day);
       await persistToday();
@@ -2113,7 +2116,7 @@ $('#periodList').addEventListener('input', async (e) => {
       // 실제 현재 공부일에서 페이지를 새로 입력할 때만 초 단위 타이머를 제어한다.
       if(isWithinSelectedStudyDay(now)){
         if(k==='startPage'){
-          if(!(await requestExclusiveSessionStart())){
+          if(!(await requestExclusiveSessionStart(now.getTime()))){
             p.startPage=''; p.startDate=''; p.startTime=''; t.value='';
             renderPeriods(); return;
           }
@@ -2121,10 +2124,10 @@ $('#periodList').addEventListener('input', async (e) => {
           if(cloudUser){
             const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
             const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
-            p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+            p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
             await calibrateServerClock(true);
           }else{
-            p.timerStartedAt = Math.round(serverNowMs());
+            p.timerStartedAt = Math.round(now.getTime());
           }
         } else if(k==='endPage' && Number(p.timerStartedAt) > 0 && !Number(p.timerEndedAt)){
           if(cloudUser){
