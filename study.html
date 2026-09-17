@@ -412,7 +412,7 @@
     <div class="top-right-actions">
       <button class="sync-top-btn" id="todayJumpBtn" aria-label="현재 날짜로 이동">현재 날짜</button>
       <button class="sync-top-btn" id="cloudSync" aria-label="동기화">↻ 동기화</button>
-      <button class="settings-top-btn" id="settingsBtn" aria-label="설정 열기">⚙ 설정</button>
+      
     </div>
   </div>
 
@@ -503,7 +503,7 @@
 
 </div>
 
-<div class="settings-overlay" id="settingsOverlay" aria-hidden="true">
+<div class="settings-overlay" id="settingsOverlay" style="display:none!important" aria-hidden="true">
   <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="settings-head">
       <div class="settings-title" id="settingsTitle">설정</div>
@@ -567,10 +567,11 @@ const dayKeys = ['일','월','화','수','목','금','토'];
 
 // 사용자 설정: 하루 집계 기준시간 / 일주일 시작 요일
 const SETTINGS_KEY = 'studySettings:v1';
+const SHARED_SETTINGS_KEY = 'journalSharedSettings:v1';
 const DEFAULT_SETTINGS = { dayStartHour: 11, weekStartDay: 6, pendingDayStart: null }; // 기본 11:00, 6 = 토요일
 function loadSettings(){
   try{
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(SHARED_SETTINGS_KEY) || localStorage.getItem('studySettings:v1') || localStorage.getItem('lectureSettings:v1') || '{}');
     const dayStartHour = Number(saved.dayStartHour);
     const weekStartDay = Number(saved.weekStartDay);
     let pendingDayStart = null;
@@ -589,7 +590,13 @@ function loadSettings(){
   }catch(e){ return {...DEFAULT_SETTINGS}; }
 }
 let appSettings = loadSettings();
-function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings)); }
+function saveSettings(){ const raw=JSON.stringify(appSettings); localStorage.setItem(SHARED_SETTINGS_KEY, raw); localStorage.setItem(SETTINGS_KEY, raw); }
+// 공통 설정이 아직 없으면 기존 Study/Lecture 설정(없으면 기본 11:00/토요일)으로 1회 생성
+if(!localStorage.getItem(SHARED_SETTINGS_KEY)) saveSettings();
+window.addEventListener('storage', async (e)=>{
+  if(e.key!==SHARED_SETTINGS_KEY || !e.newValue) return;
+  try{ appSettings=loadSettings(); maybeActivatePending(); const latest=logicalToday(); if(cur>latest) cur=latest; await renderCurrentView(); }catch(_){}
+});
 function nextBoundaryForHour(hour, from = new Date()){
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate(), hour, 0, 0, 0);
   if(d <= from) d.setDate(d.getDate()+1);
@@ -2869,7 +2876,10 @@ function closeSettings(){
   $('#settingsOverlay').classList.remove('show');
   $('#settingsOverlay').setAttribute('aria-hidden','true');
 }
-$('#settingsBtn').onclick = openSettings;
+{
+  const settingsBtn = $('#settingsBtn');
+  if (settingsBtn) settingsBtn.onclick = openSettings;
+}
 $('#settingsClose').onclick = closeSettings;
 $('#settingsCancel').onclick = closeSettings;
 $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#settingsOverlay')) closeSettings(); });
