@@ -1076,13 +1076,24 @@ async function loadMonth(ym){
 }
 
 async function saveMonth(ym){
+  // 로컬 저장과 클라우드 동기화를 분리해서 실패 원인을 정확히 표시한다.
   try{
     localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(monthCache[ym]));
+  }catch(e){
+    console.error('로컬 저장 실패:', e);
+    showToast('로컬 저장에 실패했어요. 브라우저 저장 공간이나 사이트 저장 권한을 확인해주세요.');
+    return false;
+  }
+
+  // 로그인/클라우드 연결이 없는 경우 cloudSaveMonth()는 저장할 것이 없으므로 정상 종료한다.
+  try{
     await cloudSaveMonth(ym);
   }catch(e){
-    console.error('저장 실패:', e);
-    showToast('저장에 실패했어요 (저장 공간이 가득 찼거나 브라우저 저장이 꺼져있을 수 있어요)');
+    console.error('클라우드 동기화 실패:', e);
+    showToast('클라우드 동기화에 실패했어요. 인터넷 연결 후 다시 동기화해주세요.');
+    return false;
   }
+  return true;
 }
 
 function getDayData(){
