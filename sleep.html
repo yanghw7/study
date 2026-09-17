@@ -773,7 +773,7 @@ const DATA='sleepJournal:v2',SET='journalSharedSettings:v1';
 let data=JSON.parse(localStorage.getItem(DATA)||'{"sessions":[],"active":null,"deletedSessions":[]}');
 if(!Array.isArray(data.sessions)) data.sessions=[];
 if(!Array.isArray(data.deletedSessions)) data.deletedSessions=[];
-const syncStamp=()=>Date.now();
+const syncStamp=()=>Math.round(serverNowMs());
 for(const x of data.sessions){ if(x && !Number.isFinite(Number(x._updatedAt))) x._updatedAt=Number(x.end||x.start||0)||syncStamp(); }
 if(data.active && !Number.isFinite(Number(data.active._updatedAt))) data.active._updatedAt=Number(data.active.start||0)||syncStamp();
 if(data.active && !Number.isFinite(Number(data.active.timerStartedAt))) data.active.timerStartedAt=Number(data.active.start);
@@ -783,6 +783,32 @@ settings.dayStartHour=Number(settings.dayStartHour);
 if(!Number.isInteger(Number(settings.weekStartDay))) settings.weekStartDay=6;
 settings.weekStartDay=Number(settings.weekStartDay);
 if(!settings.pendingDayStart || !Number.isInteger(Number(settings.pendingDayStart.hour)) || !settings.pendingDayStart.effectiveAt) settings.pendingDayStart=null;
+// ---------- 서버 시각 보정 (study.html과 동일한 방식) ----------
+// 기기 로컬 시계가 틀어져 있어도 기준시점 경계 판단은 항상 서버 시각 기준으로 한다.
+let serverClockOffsetMs=0,serverClockCalibrated=false,serverClockCalibrating=false,serverClockLastCalibratedAt=0;
+function serverNowMs(){ return Date.now()+(serverClockCalibrated?serverClockOffsetMs:0); }
+async function calibrateServerClock(force=false){
+  if(serverClockCalibrating||!sb||!user) return serverClockOffsetMs;
+  if(!force&&serverClockCalibrated&&Date.now()-serverClockLastCalibratedAt<60000) return serverClockOffsetMs;
+  serverClockCalibrating=true;
+  try{
+    const t0=Date.now();
+    const {data:rpcData,error}=await sb.rpc('server_now');
+    const t1=Date.now();
+    if(error) throw error;
+    const serverMs=Date.parse(rpcData);
+    if(!Number.isFinite(serverMs)) throw new Error('서버 시간을 읽지 못했습니다.');
+    serverClockOffsetMs=Math.round(serverMs-((t0+t1)/2));
+    serverClockCalibrated=true;
+    serverClockLastCalibratedAt=Date.now();
+  }catch(e){
+    console.warn('수면장 서버 시계 보정 실패:',e);
+  }finally{
+    serverClockCalibrating=false;
+  }
+  return serverClockOffsetMs;
+}
+
 let cur=logicalToday(),view='day',editing=null;
 const SUPABASE_URL='https://nvpvxtwebzefhgulswsv.supabase.co',SUPABASE_KEY='sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';let sb=null,user=null;
 function save(){localStorage.setItem(DATA,JSON.stringify(data))}
@@ -798,7 +824,7 @@ function maybeActivatePending(){
   if(!p) return false;
   const at=new Date(p.effectiveAt);
   if(!Number.isFinite(at.getTime())){settings.pendingDayStart=null;saveSet();return false}
-  if(Date.now()>=at.getTime()){
+  if(serverNowMs()>=at.getTime()){
     settings.dayStartHour=Number(p.hour);
     settings.pendingDayStart=null;
     settings._updatedAt=syncStamp();
@@ -813,7 +839,7 @@ function effectiveStatus(){
   const d=new Date(p.effectiveAt);
   return `변경 예약: ${pad(Number(p.hour))}:00 · ${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}부터 적용`;
 }
-function ymd(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}function logicalDate(ms=Date.now()){let d=new Date(ms),x=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(d.getHours()<settings.dayStartHour)x.setDate(x.getDate()-1);return x}function logicalToday(){return logicalDate()}
+function ymd(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}function logicalDate(ms=serverNowMs()){let d=new Date(ms),x=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(d.getHours()<settings.dayStartHour)x.setDate(x.getDate()-1);return x}function logicalToday(){return logicalDate()}
 function bounds(d){let s=new Date(d.getFullYear(),d.getMonth(),d.getDate(),settings.dayStartHour,0,0,0),e=new Date(s);e.setDate(e.getDate()+1);return [s.getTime(),e.getTime()]}
 // ---------- 기준시점 횡단 + 이어서 타이머 유지 ----------
 // 원칙: 수면 시작 -> data.active.start(=timerStartedAt) 기록
@@ -828,7 +854,7 @@ function checkSleepBoundaryRollover(){
   while(data.active){
     const activeDay=logicalDate(data.active.start);
     const [,boundaryMs]=bounds(activeDay);
-    if(Date.now()<boundaryMs) break;
+    if(serverNowMs()<boundaryMs) break;
     const originalStart=Number.isFinite(Number(data.active.timerStartedAt)) ? Number(data.active.timerStartedAt) : Number(data.active.start);
     const ts=syncStamp();
     data.sessions.push({id:'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),start:data.active.start,end:boundaryMs-60000,_updatedAt:ts});
@@ -871,7 +897,7 @@ if(arr.length){
   const latestWake=arr[arr.length-1].end;
   const isCurrentSleepDay=(view==='day' && ymd(cur)===ymd(logicalToday()));
   if(isCurrentSleepDay){
-    $('#gap').textContent=Date.now()>=latestWake?dur(Date.now()-latestWake):'-';
+    $('#gap').textContent=serverNowMs()>=latestWake?dur(serverNowMs()-latestWake):'-';
   }else{
     $('#gap').textContent='-';
   }
@@ -1242,7 +1268,7 @@ window.addEventListener('message',ev=>{
     if(data.active){
       // 다른 기록장(공부/강의)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
       // 이 수면 세션의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
-      const end=Number.isFinite(ev.data.at)?ev.data.at:Date.now();
+      const end=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
       const overlap=overlappingSession(data.active.start,end);
       if(!overlap){
         data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end,_updatedAt:syncStamp()});
@@ -1252,14 +1278,14 @@ window.addEventListener('message',ev=>{
   }catch(e){console.warn('자동 수면 종료 실패',e)}
   window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped},location.origin);
 });
-$('#action').onclick=async()=>{if(!data.active){const startAt=Date.now();if(!(await requestExclusiveSessionStart(startAt)))return;{const ts=syncStamp();data.active={start:startAt,timerStartedAt:startAt,_updatedAt:ts};data.activeUpdatedAt=ts;}save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
+$('#action').onclick=async()=>{if(!data.active){const startAt=serverNowMs();if(!(await requestExclusiveSessionStart(startAt)))return;{const ts=syncStamp();data.active={start:startAt,timerStartedAt:startAt,_updatedAt:ts};data.activeUpdatedAt=ts;}save();toast('수면 시작')}else{let end=serverNowMs();const overlap=overlappingSession(data.active.start,end);
 if(overlap){
   alert(`현재 수면시간이 이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치는 기록을 먼저 수정하거나 삭제해주세요.`);
   return;
 }
 {const ts=syncStamp();data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end,_updatedAt:ts});data.active=null;data.activeUpdatedAt=ts;}save();render();toast('수면 종료 · 저장 완료');if(window.parent!==window)window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin)}render()}
 function tick(){
-  let n=Date.now();
+  let n=serverNowMs();
   checkSleepBoundaryRollover();
   if(view==='day' && ymd(cur)===ymd(logicalToday())){
     const todayArr=sessionsFor(cur);
@@ -1632,7 +1658,7 @@ async function runManualCloudSync(fromSwipe=false){
 }
 
 $('#signup').onclick=async()=>{if(!sb&& !initCloud())return alert('클라우드 연결을 시작하지 못했어요.');const email=$('#email').value.trim(),password=$('#password').value;const {error}=await sb.auth.signUp({email,password});if(error){alert('회원가입 실패: '+error.message);return;}await cloudStatus();toast('회원가입 요청 완료');};
-$('#login').onclick=async()=>{if(!sb&& !initCloud())return alert('클라우드 연결을 시작하지 못했어요.');const email=$('#email').value.trim(),password=$('#password').value;const {data:authData,error}=await sb.auth.signInWithPassword({email,password});if(error){alert('로그인 실패: '+error.message);return;}user=authData.user;await cloudStatus();await autoSyncFromCloud();toast('클라우드에 로그인했어요');};
+$('#login').onclick=async()=>{if(!sb&& !initCloud())return alert('클라우드 연결을 시작하지 못했어요.');const email=$('#email').value.trim(),password=$('#password').value;const {data:authData,error}=await sb.auth.signInWithPassword({email,password});if(error){alert('로그인 실패: '+error.message);return;}user=authData.user;await cloudStatus();await calibrateServerClock(true);await autoSyncFromCloud();checkSleepBoundaryRollover();render();toast('클라우드에 로그인했어요');};
 $('#cloudGoogle').onclick=async()=>{
   if(!sb&& !initCloud()){alert('클라우드 연결을 시작하지 못했어요. 인터넷 연결을 확인해 주세요.');return;}
   if(window.AndroidAuth&&typeof window.AndroidAuth.openOAuth==='function'){
@@ -1646,7 +1672,7 @@ window.yangStudyHandleOAuthCallback=async function(callbackUrl){
   try{
     if(!sb&& !initCloud())throw new Error('Supabase 연결 실패'); const u=new URL(callbackUrl); const oauthError=u.searchParams.get('error_description')||u.searchParams.get('error'); if(oauthError)throw new Error(oauthError);
     const code=u.searchParams.get('code'); if(!code)throw new Error('Google 로그인 인증 코드가 없습니다.'); const {data:authData,error}=await sb.auth.exchangeCodeForSession(code); if(error)throw error;
-    user=authData?.session?.user||authData?.user||null; await cloudStatus(); if(user)await autoSyncFromCloud(); render(); toast('Google 로그인이 완료됐어요'); return true;
+    user=authData?.session?.user||authData?.user||null; await cloudStatus(); if(user){await calibrateServerClock(true); await autoSyncFromCloud(); checkSleepBoundaryRollover();} render(); toast('Google 로그인이 완료됐어요'); return true;
   }catch(e){console.error('Google OAuth callback 실패:',e);alert('Google 로그인 완료 처리 실패: '+(e?.message||e));return false;}
 };
 $('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();user=null;await cloudStatus();toast('로그아웃했어요');};
@@ -1658,16 +1684,73 @@ $('#backupData').onclick=()=>{const payload={version:2,type:'sleep-backup',expor
 $('#restoreData').onclick=()=>$('#restoreFile').click();
 $('#restoreFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const j=JSON.parse(await f.text());const src=j.data||j;if(!Array.isArray(src.sessions))throw new Error('올바른 수면 백업 파일이 아닙니다.');if(!confirm('백업 파일의 수면 기록을 복원할까요?'))return;data.sessions=src.sessions||[];data.deletedSessions=src.deletedSessions||[];data.active=src.active||null;data.activeUpdatedAt=Number(src.activeUpdatedAt||src.active?._updatedAt||0);if(j.settings)Object.assign(settings,j.settings);for(const x of data.sessions){if(!Number.isFinite(Number(x._updatedAt)))x._updatedAt=Number(x.end||x.start||0)||syncStamp();}save();saveSet();render();toast('백업 데이터를 복원했어요');}catch(err){alert('데이터 복원 실패: '+err.message);}finally{e.target.value='';}};
 
+// ---------- 백그라운드 최적화 + foreground 즉시 복구 (study.html과 동일한 방식) ----------
+// 화면이 꺼져 있는 동안은 시계 보정/폴링을 멈춰 배터리를 아끼고,
+// 다시 화면을 보거나(visibilitychange) bfcache에서 복귀할 때(pageshow)
+// 서버 시각을 다시 맞춘 뒤 즉시 기준시점 소급 분할을 검사한다.
+let sleepClockCalibrateId=null,sleepActivePollId=null;
+function startSleepBackgroundLoops(){
+  if(document.visibilityState==='hidden') return;
+  if(!sleepClockCalibrateId){
+    sleepClockCalibrateId=setInterval(()=>{ if(user) calibrateServerClock(false); },60000);
+  }
+  if(!sleepActivePollId){
+    // 수면 세션이 진행 중일 때만, 다른 기기와의 상태 차이를 주기적으로 맞춘다.
+    sleepActivePollId=setInterval(()=>{
+      if(user&&data.active&&!sleepCloudSyncRunning) autoSyncFromCloud(false);
+    },5000);
+  }
+}
+function stopSleepBackgroundLoops(){
+  if(sleepClockCalibrateId){clearInterval(sleepClockCalibrateId);sleepClockCalibrateId=null;}
+  if(sleepActivePollId){clearInterval(sleepActivePollId);sleepActivePollId=null;}
+}
+async function recoverSleepFromBackground(){
+  try{
+    if(user){
+      await calibrateServerClock(true);
+      await autoSyncFromCloud();
+    }
+    checkSleepBoundaryRollover();
+    render();
+  }catch(e){
+    console.warn('수면장 foreground 복구 실패:',e);
+  }
+}
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState==='hidden'){ stopSleepBackgroundLoops(); return; }
+  startSleepBackgroundLoops();
+  await recoverSleepFromBackground();
+});
+window.addEventListener('pageshow', async ()=>{
+  startSleepBackgroundLoops();
+  await recoverSleepFromBackground();
+});
+
 initCloud();
 if(sb){
   sb.auth.onAuthStateChange(async(event,session)=>{
     user=session?.user||null; $('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요'; $('#logout').style.display=user?'':'none';
     if(user&&(event==='SIGNED_IN'||event==='INITIAL_SESSION'||event==='TOKEN_REFRESHED')){
-      try{await autoSyncFromCloud();render();}catch(e){console.error('세션 자동 동기화 실패:',e);render();}
+      try{
+        await calibrateServerClock(true);
+        await autoSyncFromCloud();
+        checkSleepBoundaryRollover();
+        render();
+      }catch(e){console.error('세션 자동 동기화 실패:',e);render();}
     }
   });
 }
-(async()=>{await cloudStatus();if(user)await autoSyncFromCloud();render();tick.lastLogicalToday=ymd(logicalToday());tick();setInterval(tick,500);})();
+(async()=>{
+  await cloudStatus();
+  if(user){ await calibrateServerClock(true); await autoSyncFromCloud(); }
+  checkSleepBoundaryRollover();
+  render();
+  tick.lastLogicalToday=ymd(logicalToday());
+  tick();
+  setInterval(tick,500);
+  startSleepBackgroundLoops();
+})();
 </script>
 
 

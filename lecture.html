@@ -511,7 +511,39 @@ body{background:#f7f5fb!important}
  font-size:17px;font-weight:900;color:#fff;background:#6d5596;
 }
 .lecture-card-action.end{background:#a43c31}
+.lecture-card-action.cancel-start{
+  background:#efeaf6!important;
+  color:#5c487d!important;
+  border:1.5px solid #67538b!important;
+  box-shadow:none!important;
+}
+.lecture-card-action.cancel-end{
+  background:#f8ece9!important;
+  color:#a43c31!important;
+  border:1.5px solid #c45a4c!important;
+  box-shadow:none!important;
+}
 .lecture-card-action:disabled{opacity:.42}
+
+.lecture-confirm-overlay{
+  position:fixed;inset:0;z-index:10050;
+  background:rgba(48,43,61,.38);
+  display:flex;align-items:flex-end;justify-content:center;
+  padding:16px;
+}
+.lecture-confirm-panel{
+  width:min(520px,100%);
+  background:#fff;border:1px solid #e2ddea;border-radius:18px;
+  padding:18px;box-shadow:0 14px 45px rgba(0,0,0,.16);
+}
+.lecture-confirm-msg{margin:0 0 14px;font-size:15px;font-weight:700;line-height:1.45;color:#302b3d}
+.lecture-confirm-actions{display:flex;gap:8px}
+.lecture-confirm-actions button{
+  flex:1;border-radius:10px;padding:11px 12px;font-size:14px;font-weight:800;cursor:pointer
+}
+.lecture-confirm-no{border:1px solid #e2ddea;background:#fff;color:#302b3d}
+.lecture-confirm-yes{border:0;background:#67538b;color:#fff}
+.lecture-confirm-yes.danger{background:#a43c31}
 </style>
 
 
@@ -616,7 +648,27 @@ body{background:#f7f5fb!important}
   white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;
 }
 </style>
-<style id="final-child-ui-ownership">.cloud-card{display:none!important}.study-alarm-card,.alarm-card{display:none!important}</style></head>
+<style id="final-child-ui-ownership">.cloud-card{display:none!important}.study-alarm-card,.alarm-card{display:none!important}</style>
+<style id="lecture-edit-cancel-v2">
+.field.time{position:relative;min-height:52px!important;overflow:hidden}
+.field.time label{position:relative;z-index:1}
+.field.time input[type="datetime-local"]{
+  position:absolute!important;inset:0!important;
+  width:100%!important;height:100%!important;min-height:0!important;
+  opacity:0!important;color:transparent!important;
+  z-index:4!important;cursor:pointer!important;
+  font-size:16px!important;
+}
+.field.time .ko-time-label{
+  left:10px!important;right:10px!important;bottom:8px!important;
+  pointer-events:none!important;z-index:3!important;
+  text-align:left!important;font-size:12.5px!important;
+  letter-spacing:-.2px!important;color:#302b3d!important;
+}
+.lecture-card-action.cancel-start,.lecture-card-action.cancel-end{
+  font-size:13px!important;letter-spacing:-.3px!important;
+}
+</style></head>
 <script>
 (()=> {
   const P='lecture::';
@@ -1916,8 +1968,22 @@ function renderPeriods(){
     const maxDT = dtLocalValue(maxRecord);
 
     const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
-    const startActionDisabled = !isCurrentLectureDay || !!(p.startDate && p.startTime);
-    const endActionDisabled = !isCurrentLectureDay || !(p.startDate && p.startTime) || !!(p.endDate && p.endTime);
+    const hasStart = !!(p.startDate && p.startTime);
+    const hasEnd = !!(p.endDate && p.endTime);
+    let startAction = 'start', startLabel = '▶ 강의 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
+    if(hasStart){
+      startAction = 'cancel-start';
+      startLabel = '시작 취소';
+      startDisabled = false;
+      startClass = 'start cancel-start';
+    }
+    let endAction = 'end', endLabel = '■ 강의 종료', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
+    if(hasEnd){
+      endAction = 'cancel-end';
+      endLabel = '종료 취소';
+      endDisabled = false;
+      endClass = 'end cancel-end';
+    }
 
     const card = document.createElement('div');
     card.className = 'period-card';
@@ -1929,18 +1995,18 @@ function renderPeriods(){
       </div>
       <div class="field-grid">
         <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action start" data-lecture-action="start" data-idx="${idx}" ${startActionDisabled ? 'disabled' : ''}>▶ 강의 시작</button>
+          <button type="button" class="lecture-card-action ${startClass}" data-lecture-action="${startAction}" data-idx="${idx}" ${startDisabled ? 'disabled' : ''}>${startLabel}</button>
         </div>
         <div class="field time">
           <label>시작 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime)}</div>
+          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime) || '시간을 눌러 수정'}</div>
         </div>
         <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action end" data-lecture-action="end" data-idx="${idx}" ${endActionDisabled ? 'disabled' : ''}>■ 강의 종료</button>
+          <button type="button" class="lecture-card-action ${endClass}" data-lecture-action="${endAction}" data-idx="${idx}" ${endDisabled ? 'disabled' : ''}>${endLabel}</button>
         </div>
         <div class="field time">
           <label>종료 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime)}</div>
+          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime) || '시간을 눌러 수정'}</div>
         </div>
       </div>
       <div class="period-stats">
@@ -2320,13 +2386,32 @@ $('#periodList').addEventListener('input', async (e) => {
     }
     updateStudyTimer();
   }
-  // 직접 입력은 합계만 다시 계산하며 실시간 타이머 상태는 만들지 않는다.
+  markChangedPeriodFields(p, beforeSync);
   if(k === 'start' || k === 'end'){
+    const label = t.parentElement && t.parentElement.querySelector('.ko-time-label');
+    if(label){
+      const dateKey = k==='start' ? 'startDate' : 'endDate';
+      const timeKey = k==='start' ? 'startTime' : 'endTime';
+      label.textContent = koDateTimeLabel(p[dateKey], p[timeKey]) || '시간을 눌러 수정';
+    }
+    if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
+      alert('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.');
+      p.startDate = '';
+      p.startTime = '';
+      p.endDate = '';
+      p.endTime = '';
+      p.timerStartedAt = null;
+      p.timerEndedAt = null;
+      p._updatedAt = syncNow();
+      t.value = '';
+      if(label) label.textContent = '시간을 눌러 수정';
+    }
+    refreshStats();
     updateStudyTimer();
     updateWasteTimer();
+    void persistToday();
+    return;
   }
-  // 입력 중인 칸은 다시 그리지 않고, 계산되는 숫자만 갱신해서 포커스/커서를 유지
-  markChangedPeriodFields(p, beforeSync);
   if(k !== 'subject') refreshStats();
 
   // 과목명은 IME/플로팅 키보드 입력 흐름을 막지 않도록 저장만 예약하고 즉시 반환한다.
@@ -2395,7 +2480,40 @@ window.addEventListener('message',async ev=>{
   window.parent.postMessage({type:'exclusive-session-stopped',kind:'lecture',req:ev.data.req,ok:true,stopped},location.origin);
 });
 
-// 강의 카드의 시작/종료 버튼
+function askConfirm(message, danger=false){
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'lecture-confirm-overlay';
+    overlay.innerHTML = `<div class="lecture-confirm-panel" role="dialog" aria-modal="true">
+      <p class="lecture-confirm-msg">${escHtml(message)}</p>
+      <div class="lecture-confirm-actions">
+        <button type="button" class="lecture-confirm-no">닫기</button>
+        <button type="button" class="lecture-confirm-yes${danger ? ' danger' : ''}">확인</button>
+      </div>
+    </div>`;
+    const finish = (ok) => { overlay.remove(); resolve(ok); };
+    overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finish(false); });
+    overlay.querySelector('.lecture-confirm-no').onclick = () => finish(false);
+    overlay.querySelector('.lecture-confirm-yes').onclick = () => finish(true);
+    document.body.appendChild(overlay);
+  });
+}
+
+$('#periodList').addEventListener('click', (e) => {
+  if(e.target.closest('button')) return;
+  const field = e.target.closest('.field.time');
+  if(!field) return;
+  const input = field.querySelector('input[type="datetime-local"]');
+  if(!input) return;
+  try{
+    if(typeof input.showPicker === 'function') input.showPicker();
+    else { input.focus(); input.click(); }
+  }catch(_){
+    input.focus();
+  }
+});
+
+// 강의 카드의 시작/종료/취소 버튼
 $('#periodList').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-lecture-action]');
   if(!btn) return;
@@ -2404,14 +2522,20 @@ $('#periodList').addEventListener('click', async (e) => {
   const p = day.periods?.[idx];
   if(!p) return;
 
-  if(cloudUser && !serverClockCalibrated) await calibrateServerClock(false);
+  const action = btn.dataset.lectureAction;
+  const isCancel = action === 'cancel-start' || action === 'cancel-end';
+  if(cloudUser && !serverClockCalibrated){
+    try{ await calibrateServerClock(false); }catch(_){}
+  }
   const now = new Date(serverNowMs());
-  if(!isWithinSelectedStudyDay(now)){
+  if(!isCancel && !isWithinSelectedStudyDay(now)){
     showToast('오늘 강의에서만 시작/종료 버튼을 사용할 수 있어요');
     return;
   }
 
-  if(btn.dataset.lectureAction === 'start'){
+  const beforeSync = deepClone(p);
+
+  if(action === 'start'){
     if(!(await requestExclusiveSessionStart(now.getTime()))) return;
     p.startDate = ymd(now);
     p.startTime = hm(now);
@@ -2419,32 +2543,75 @@ $('#periodList').addEventListener('click', async (e) => {
     p.endTime = '';
     p.timerEndedAt = null;
     if(cloudUser){
-      const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
-      const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
-      p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
-      await calibrateServerClock(true);
+      try{
+        const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
+        p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
+        await calibrateServerClock(true);
+      }catch(_){
+        p.timerStartedAt = Math.round(now.getTime());
+      }
     }else{
       p.timerStartedAt = Math.round(now.getTime());
     }
-  }else{
+  }else if(action === 'end'){
     if(!p.startDate || !p.startTime){
-      alert('먼저 강의 시작을 눌러주세요.');
+      showToast('먼저 강의 시작을 눌러주세요');
       return;
     }
     p.endDate = ymd(now);
     p.endTime = hm(now);
     if(cloudUser){
-      const row = await cloudStopActiveTimer();
-      const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
-      p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-      await calibrateServerClock(true);
+      try{
+        const row = await cloudStopActiveTimer();
+        const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
+        p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+        await calibrateServerClock(true);
+      }catch(_){
+        p.timerEndedAt = Math.round(serverNowMs());
+      }
     }else{
       p.timerEndedAt = Math.round(serverNowMs());
     }
     if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+  }else if(action === 'cancel-start'){
+    const msg = (p.endDate || p.endTime)
+      ? `${idx+1}강의의 시작·종료 기록을 모두 지울까요?`
+      : `${idx+1}강의 시작을 취소할까요?`;
+    if(!(await askConfirm(msg, true))) return;
+    p.startDate = '';
+    p.startTime = '';
+    p.endDate = '';
+    p.endTime = '';
+    p.timerStartedAt = null;
+    p.timerEndedAt = null;
+    if(cloudUser){
+      try{ await cloudClearActiveTimer(); }catch(_){}
+    }
+    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+    showToast('시작 기록을 취소했어요');
+  }else if(action === 'cancel-end'){
+    if(!(await askConfirm(`${idx+1}강의 종료를 취소할까요?`, true))) return;
+    p.endDate = '';
+    p.endTime = '';
+    p.timerEndedAt = null;
+    if(Number(p.timerStartedAt) > 0 && cloudUser){
+      try{
+        await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        await calibrateServerClock(true);
+      }catch(_){}
+    }
+    if(window.parent!==window){
+      try{ await requestExclusiveSessionStart(serverNowMs()); }catch(_){}
+    }
+    showToast('종료 기록을 취소했어요');
+  }else{
+    return;
   }
+
+  markChangedPeriodFields(p, beforeSync);
   p._updatedAt = syncNow();
-  if(btn.dataset.lectureAction === 'end') autoSortPeriodsByStart(day);
+  if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
   await persistToday();
   renderPeriods();
   updateStudyTimer();
