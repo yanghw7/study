@@ -2884,7 +2884,14 @@ async function deleteAllStudyRecords(){
       alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
       return;
     }
-    const {error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id);
+    const {data:studyRows,error:readErr} = await sbClient.from('study_months').select('ym').eq('user_id', cloudUser.id);
+    if(readErr){
+      alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message);
+      return;
+    }
+    const studyYms=(studyRows||[]).map(r=>String(r.ym||'')).filter(ym=>/^\d{4}-\d{2}$/.test(ym));
+    let error=null;
+    if(studyYms.length){ ({error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id).in('ym',studyYms)); }
     if(error){
       alert('클라우드 기록 삭제에 실패해 삭제를 중단했어요: ' + error.message);
       return;
@@ -3062,7 +3069,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
-  const studyRows=(data||[]).filter(row=>!String(row.ym||'').startsWith('L:'));
+  const studyRows=(data||[]).filter(row=>/^\d{4}-\d{2}$/.test(String(row.ym||'')));
   if(studyRows.length===0) return;
   const needsPush=[];
   for(const row of studyRows){
@@ -3095,7 +3102,7 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const studyRows=(data||[]).filter(row=>!String(row.ym||'').startsWith('L:'));
+  const studyRows=(data||[]).filter(row=>/^\d{4}-\d{2}$/.test(String(row.ym||'')));
   if(studyRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 공부 기록을 교체할까요?')) return;
   const keys=[];

@@ -359,14 +359,14 @@ body .wrap > .summary{
   <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
   <div class="top-right-actions">
     <button class="sync-top-btn" type="button" id="todayJumpBtn">현재 날짜</button>
-    <button class="sync-top-btn" id="syncBtn">↻ 동기화</button>
+    <button class="sync-top-btn" id="cloudSync">↻ 동기화</button>
     <button class="settings-top-btn" id="settingsBtn">⚙ 설정</button>
   </div>
 </div>
 <div class="datebar"><button id="prevDay" aria-label="이전 날짜">‹</button><div class="date-center" id="dateCenter" role="button" tabindex="0" aria-label="날짜 선택" title="눌러서 날짜 선택"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay" aria-label="다음 날짜">›</button></div><input type="date" id="datePicker" aria-hidden="true" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
 <div class="tabs"><button class="active" data-view="day">오늘</button><button data-view="week">주별</button><button data-view="month">월별</button><button data-view="year">년도별</button></div>
 <div class="data-tools"><button class="data-btn" id="backupData">데이터 백업</button><button class="data-btn" id="restoreData">데이터 복원</button><input type="file" id="restoreFile" accept="application/json,.json"></div>
-<section class="cloud-card" id="cloudCard"><div class="cloud-head"><div class="cloud-title">☁ 클라우드 저장</div><div class="cloud-status" id="cloudStatus">로그인 필요</div></div><div class="cloud-actions"><button class="data-btn" id="toggleCloudSetup">로그인 / 회원가입</button><button class="data-btn" id="upload">전체 클라우드 저장</button><button class="data-btn" id="download">클라우드에서 불러오기</button><button class="data-btn" id="logout" style="display:none">로그아웃</button></div><div class="cloud-setup" id="cloudSetup"><div class="cloud-grid"><input id="email" type="email" placeholder="이메일"><input id="password" type="password" placeholder="비밀번호 (6자 이상)"></div><div class="cloud-actions"><button class="data-btn" id="signup">회원가입</button><button class="data-btn" id="login">로그인</button><button class="data-btn" id="cloudGoogle">Google로 로그인</button></div><div class="cloud-note">로그인 후 수면 기록을 브라우저와 클라우드에 저장할 수 있습니다.</div></div></section>
+<section class="cloud-card" id="cloudCard"><div class="cloud-head"><div class="cloud-title">☁ 클라우드 저장</div><div class="cloud-status" id="cloudStatus">로그인 필요</div></div><div class="cloud-actions"><button class="data-btn" id="toggleCloudSetup">로그인 / 회원가입</button><button class="data-btn" id="cloudUpload">전체 클라우드 저장</button><button class="data-btn" id="cloudDownload">클라우드에서 불러오기</button><button class="data-btn" id="logout" style="display:none">로그아웃</button></div><div class="cloud-setup" id="cloudSetup"><div class="cloud-grid"><input id="email" type="email" placeholder="이메일"><input id="password" type="password" placeholder="비밀번호 (6자 이상)"></div><div class="cloud-actions"><button class="data-btn" id="signup">회원가입</button><button class="data-btn" id="login">로그인</button><button class="data-btn" id="cloudGoogle">Google로 로그인</button></div><div class="cloud-note">로그인 후 수면 기록을 브라우저와 클라우드에 저장할 수 있습니다.</div></div></section>
 <div class="fixed-core" id="fixedCore">
   <div class="section-title">알람</div>
 <div class="alarm-card">
@@ -1241,81 +1241,138 @@ function currentSleepPayload(){
   return {sessions:data.sessions,deletedSessions:data.deletedSessions||[],active:data.active||null,activeUpdatedAt:data.activeUpdatedAt||0,settings:{...settings}};
 }
 
-// study.html의 cloudSaveMonth와 같은 방식: 저장 직전 원격 최신본을 읽고 병합 후 충돌 재시도.
-async function cloudSaveSleep(){
-  if(!sb||!user) return false;
-  const ym='S:ALL';
+// ---------- Supabase 클라우드 저장: study.html과 동일한 동기화 흐름 ----------
+// 수면은 하나의 통합 payload를 쓰므로 클라우드 키만 S:ALL로 분리한다.
+// study.html은 YYYY-MM만 읽도록 분리되어 있어 서로의 데이터를 건드리지 않는다.
+const SLEEP_CLOUD_YM='S:ALL';
+
+async function cloudSaveMonth(){
+  if(!sb || !user) return;
+  let local=currentSleepPayload();
   let lastSaveErr=null;
   for(let attempt=0;attempt<4;attempt++){
-    const {data:rows,error:readErr}=await sb.from('study_months').select('data,updated_at').eq('user_id',user.id).eq('ym',ym).limit(1);
-    if(readErr) throw new Error('수면 기록 저장 전 읽기 실패: '+(readErr.message||readErr.code||String(readErr)));
+    const {data:rows,error:readErr}=await sb.from('study_months')
+      .select('data,updated_at').eq('user_id',user.id).eq('ym',SLEEP_CLOUD_YM).limit(1);
+    if(readErr){
+      console.error('클라우드 저장 전 읽기 실패:',readErr);
+      throw new Error('study_months 저장 전 읽기 실패: '+(readErr.message||readErr.code||String(readErr)));
+    }
     const row=rows&&rows[0];
     const merged=mergeSleepPayload(row?.data||{});
-    data.sessions=merged.sessions; data.deletedSessions=merged.deletedSessions; data.active=merged.active; data.activeUpdatedAt=merged.activeUpdatedAt;
-    Object.assign(settings,merged.settings); save(); saveSet();
-    const payload=currentSleepPayload(),nowIso=new Date().toISOString();
+    data.sessions=merged.sessions;
+    data.deletedSessions=merged.deletedSessions;
+    data.active=merged.active;
+    data.activeUpdatedAt=merged.activeUpdatedAt;
+    Object.assign(settings,merged.settings);
+    save(); saveSet();
+    local=currentSleepPayload();
+    const nowIso=new Date().toISOString();
     let writeOk=false;
     if(row){
-      let q=sb.from('study_months').update({data:payload,updated_at:nowIso}).eq('user_id',user.id).eq('ym',ym);
+      let q=sb.from('study_months').update({data:local,updated_at:nowIso})
+        .eq('user_id',user.id).eq('ym',SLEEP_CLOUD_YM);
       if(row.updated_at) q=q.eq('updated_at',row.updated_at);
       const {data:w,error:wErr}=await q.select('updated_at');
       if(!wErr&&w&&w.length) writeOk=true;
-      else lastSaveErr=wErr||new Error('업데이트된 행이 0개입니다');
+      else if(wErr){lastSaveErr=wErr;console.warn('동기화 충돌 재시도:',wErr.message);}
+      else lastSaveErr=new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)');
     }else{
-      const {error:iErr}=await sb.from('study_months').insert({user_id:user.id,ym,data:payload,updated_at:nowIso});
-      if(!iErr) writeOk=true; else lastSaveErr=iErr;
+      const {error:iErr}=await sb.from('study_months').insert({user_id:user.id,ym:SLEEP_CLOUD_YM,data:local,updated_at:nowIso});
+      if(!iErr) writeOk=true;
+      else {lastSaveErr=iErr;console.warn('동기화 신규 저장 재시도:',iErr.message);}
     }
-    if(writeOk){ render(); return true; }
+    if(writeOk){render();return;}
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
   }
-  throw new Error('수면 기록 저장 실패: '+(lastSaveErr?.message||lastSaveErr?.code||'원인 불명'));
-}
-
-// study.html의 autoSyncFromCloud와 같은 pull -> merge -> 필요시 push 흐름.
-let sleepCloudSyncRunning=false;
-async function autoSyncFromCloud(lockOwned=false){
-  if(!sb||!user) return false;
-  if(!lockOwned){ if(sleepCloudSyncRunning) return false; sleepCloudSyncRunning=true; }
-  try{
-    const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);
-    if(error) throw new Error('수면 기록 불러오기 실패: '+(error.message||error.code||String(error)));
-    const row=rows&&rows[0];
-    if(!row){ await cloudSaveSleep(); return true; }
-    const remoteBefore=JSON.stringify(row.data||{});
-    const merged=mergeSleepPayload(row.data||{});
-    data.sessions=merged.sessions; data.deletedSessions=merged.deletedSessions; data.active=merged.active; data.activeUpdatedAt=merged.activeUpdatedAt;
-    Object.assign(settings,merged.settings); save(); saveSet(); render();
-    if(JSON.stringify(currentSleepPayload())!==remoteBefore) await cloudSaveSleep();
-    return true;
-  }finally{ if(!lockOwned) sleepCloudSyncRunning=false; }
+  console.error('클라우드 저장 충돌을 해결하지 못했습니다:',SLEEP_CLOUD_YM,lastSaveErr);
+  throw new Error('study_months 저장 실패('+SLEEP_CLOUD_YM+'): '+(lastSaveErr?.message||lastSaveErr?.code||'원인 불명'));
 }
 
 async function uploadAllToCloud(){
-  if(!user){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
-  await cloudSaveSleep(); toast('전체 기록을 병합해서 클라우드에 저장했어요');
+  if(!user){alert('먼저 클라우드에 로그인해 주세요.');return;}
+  if(!data.sessions.length&&!data.active){toast('저장할 기록이 없어요');return;}
+  await cloudSaveMonth();
+  toast('전체 기록을 병합해서 클라우드에 저장했어요');
 }
+
+let fullCloudSyncRunning=false;
+async function autoSyncFromCloud(lockOwned=false){
+  if(!sb||!user)return;
+  if(!lockOwned){
+    if(fullCloudSyncRunning)return;
+    fullCloudSyncRunning=true;
+  }
+  try{
+    const {data:rows,error}=await sb.from('study_months')
+      .select('ym,data').eq('user_id',user.id).eq('ym',SLEEP_CLOUD_YM).limit(1);
+    if(error){
+      console.error('자동 동기화 불러오기 실패:',error);
+      throw new Error('study_months 불러오기 실패: '+(error.message||error.code||String(error)));
+    }
+    const row=rows&&rows[0];
+    if(!row){
+      if(data.sessions.length||data.active) await cloudSaveMonth();
+      return;
+    }
+    const remoteBefore=JSON.stringify(row.data||{});
+    const merged=mergeSleepPayload(row.data||{});
+    data.sessions=merged.sessions;
+    data.deletedSessions=merged.deletedSessions;
+    data.active=merged.active;
+    data.activeUpdatedAt=merged.activeUpdatedAt;
+    Object.assign(settings,merged.settings);
+    save(); saveSet(); render();
+    if(JSON.stringify(currentSleepPayload())!==remoteBefore) await cloudSaveMonth();
+  }finally{
+    if(!lockOwned)fullCloudSyncRunning=false;
+  }
+}
+
 async function downloadAllFromCloud(){
-  if(!user){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
-  const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);
-  if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)); return; }
-  const row=rows&&rows[0]; if(!row){ toast('클라우드에 저장된 기록이 없어요'); return; }
-  if(!confirm('클라우드 기록으로 이 브라우저의 수면 기록을 교체할까요?')) return;
-  const src=row.data||{}; data.sessions=Array.isArray(src.sessions)?src.sessions:[]; data.deletedSessions=Array.isArray(src.deletedSessions)?src.deletedSessions:[];
-  data.active=src.active||null; data.activeUpdatedAt=Number(src.activeUpdatedAt||src.active?._updatedAt||0); if(src.settings)Object.assign(settings,src.settings);
-  save(); saveSet(); render(); toast('클라우드 기록을 불러왔어요');
+  if(!user){alert('먼저 클라우드에 로그인해 주세요.');return;}
+  const {data:rows,error}=await sb.from('study_months')
+    .select('ym,data').eq('user_id',user.id).eq('ym',SLEEP_CLOUD_YM).limit(1);
+  if(error){alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)');return;}
+  const row=rows&&rows[0];
+  if(!row){toast('클라우드에 저장된 기록이 없어요');return;}
+  if(!confirm('클라우드 기록으로 이 브라우저의 수면 기록을 교체할까요?'))return;
+  const src=row.data||{};
+  data.sessions=Array.isArray(src.sessions)?src.sessions:[];
+  data.deletedSessions=Array.isArray(src.deletedSessions)?src.deletedSessions:[];
+  data.active=src.active||null;
+  data.activeUpdatedAt=Number(src.activeUpdatedAt||src.active?._updatedAt||0);
+  if(src.settings)Object.assign(settings,src.settings);
+  save();saveSet();render();toast('클라우드 기록을 불러왔어요');
 }
 
 async function runManualCloudSync(fromSwipe=false){
-  const btn=$('#syncBtn');
-  if(sleepCloudSyncRunning||btn?.disabled){ if(!fromSwipe)toast('이미 동기화 중이에요'); return false; }
-  sleepCloudSyncRunning=true; if(btn){btn.disabled=true;btn.textContent='↻ 동기화 중…';}
+  const btn=$('#cloudSync');
+  if(fullCloudSyncRunning||btn?.disabled){
+    if(!fromSwipe)toast('이미 동기화 중이에요');
+    return false;
+  }
+  fullCloudSyncRunning=true;
+  if(btn){btn.disabled=true;btn.textContent='↻ 동기화 중…';}
   try{
-    save(); saveSet(); await cloudStatus();
-    if(!user){ if(!fromSwipe)toast('현재 기록 저장 완료 · 클라우드 로그인 필요'); return false; }
-    await autoSyncFromCloud(true); render();
-    if(!fromSwipe)toast('클라우드 동기화 완료'); return true;
-  }catch(e){ console.error('수동 동기화 실패:',e); if(!fromSwipe)toast('동기화 실패: '+(e?.message||e?.code||String(e))); else console.error('스와이프 동기화 실패:',e); return false; }
-  finally{ sleepCloudSyncRunning=false; if(btn){btn.disabled=false;btn.textContent='↻ 동기화';} }
+    save();saveSet();
+    await cloudStatus();
+    if(!user){
+      if(!fromSwipe)toast('현재 기록 저장 완료 · 클라우드 로그인 필요');
+      return false;
+    }
+    await autoSyncFromCloud(true);
+    render();
+    if(!fromSwipe)toast('클라우드 동기화 완료');
+    return true;
+  }catch(e){
+    console.error('수동 동기화 실패:',e);
+    if(!fromSwipe)toast('동기화 실패: '+(e?.message||e?.code||String(e)));
+    else console.error('스와이프 동기화 실패:',e);
+    return false;
+  }finally{
+    fullCloudSyncRunning=false;
+    if(btn){btn.disabled=false;btn.textContent='↻ 동기화';}
+  }
 }
 
 $('#signup').onclick=async()=>{if(!sb&& !initCloud())return alert('클라우드 연결을 시작하지 못했어요.');const email=$('#email').value.trim(),password=$('#password').value;const {error}=await sb.auth.signUp({email,password});if(error){alert('회원가입 실패: '+error.message);return;}await cloudStatus();toast('회원가입 요청 완료');};
@@ -1337,9 +1394,9 @@ window.yangStudyHandleOAuthCallback=async function(callbackUrl){
   }catch(e){console.error('Google OAuth callback 실패:',e);alert('Google 로그인 완료 처리 실패: '+(e?.message||e));return false;}
 };
 $('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();user=null;await cloudStatus();toast('로그아웃했어요');};
-$('#syncBtn').onclick=()=>runManualCloudSync(false);
-$('#upload').onclick=uploadAllToCloud;
-$('#download').onclick=downloadAllFromCloud;
+$('#cloudSync').onclick=()=>runManualCloudSync(false);
+$('#cloudUpload').onclick=uploadAllToCloud;
+$('#cloudDownload').onclick=downloadAllFromCloud;
 $('#toggleCloudSetup').onclick=()=>$('#cloudSetup').classList.toggle('show');
 $('#backupData').onclick=()=>{const payload={version:2,type:'sleep-backup',exportedAt:new Date().toISOString(),data,settings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sleep-backup-${ymd(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('백업 파일을 저장했어요');};
 $('#restoreData').onclick=()=>$('#restoreFile').click();
