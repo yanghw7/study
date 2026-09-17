@@ -2814,7 +2814,17 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,10px)';
-      setTimeout(() => location.reload(), 80);
+      Promise.resolve()
+        .then(() => runManualCloudSync(true))
+        .then(ok => {
+          if(ok) showToast('↕ 스와이프 동기화 성공');
+          else showToast('↕ 스와이프 동기화 실패');
+        })
+        .catch(e => {
+          console.error('스와이프 동기화 실패:', e);
+          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
+        })
+        .finally(() => { refreshing = false; reset(); });
     }else{
       reset();
     }
@@ -2882,7 +2892,17 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,0px)';
-      setTimeout(() => location.reload(), 80);
+      Promise.resolve()
+        .then(() => runManualCloudSync(true))
+        .then(ok => {
+          if(ok) showToast('↕ 스와이프 동기화 성공');
+          else showToast('↕ 스와이프 동기화 실패');
+        })
+        .catch(e => {
+          console.error('스와이프 동기화 실패:', e);
+          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
+        })
+        .finally(() => { refreshing = false; reset(); });
     } else reset();
   }, {passive:true});
   document.addEventListener('touchcancel', reset, {passive:true});
@@ -3400,26 +3420,32 @@ $('#cloudLogout').onclick = async () => {
   cloudUser=null; await refreshCloudStatus(); showToast('로그아웃했어요');
 };
 let fullCloudSyncRunning = false;
-async function runManualCloudSync(){
+async function runManualCloudSync(fromSwipe=false){
   const btn = $('#cloudSync');
   if(fullCloudSyncRunning || btn?.disabled){
-    showToast('이미 동기화 중이에요');
-    return;
+    if(!fromSwipe) showToast('이미 동기화 중이에요');
+    return false;
   }
   fullCloudSyncRunning = true;
   if(btn){ btn.disabled = true; btn.textContent = '↻ 동기화 중…'; }
   try{
     await saveMonth(ymKey(cur));
     await refreshCloudStatus();
-    if(!cloudUser){ showToast('현재 기록 저장 완료 · 클라우드 로그인 필요'); return; }
+    if(!cloudUser){
+      if(!fromSwipe) showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
+      return false;
+    }
     await calibrateServerClock(false);
     await autoSyncFromCloud(true);
     await syncActiveTimerFromCloud(true);
     await renderCurrentView();
-    showToast('클라우드 동기화 완료');
+    if(!fromSwipe) showToast('클라우드 동기화 완료');
+    return true;
   }catch(e){
     console.error('수동 동기화 실패:', e);
-    showToast('동기화 실패: ' + (e?.message || e?.code || String(e)));
+    if(!fromSwipe) showToast('동기화 실패: ' + (e?.message || e?.code || String(e)));
+    else console.error('스와이프 동기화 실패:', e);
+    return false;
   }finally{
     fullCloudSyncRunning = false;
     if(btn){ btn.disabled = false; btn.textContent = '↻ 동기화'; }
