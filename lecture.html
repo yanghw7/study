@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>공부장</title>
+<title>강의 기록장</title>
 
-<link rel="manifest" href="./manifest.webmanifest?v=1.21">
+<link rel="manifest" href="./manifest.webmanifest?v=1.29">
 <meta name="theme-color" content="#3B6E5C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="공부장">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="강의 기록장">
+<link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600;700&display=swap');
@@ -475,6 +475,12 @@
 #dayView > .summary-card{position:static!important;top:auto!important;z-index:auto!important}
 
 .field.time{position:relative;min-height:45px}.field.time input[type="datetime-local"]{color:transparent;caret-color:transparent;min-height:20px}.field.time input[type="datetime-local"]::-webkit-calendar-picker-indicator{opacity:1;cursor:pointer}.ko-time-label{position:absolute;left:10px;right:34px;bottom:7px;z-index:2;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:700;color:var(--ink);background:var(--bg);line-height:20px}
+
+/* shared alarm lives in index */
+.study-alarm-card,.alarm-card{display:none!important}
+
+/* Cloud account/storage UI is owned by index */
+.cloud-card{display:none!important}
 </style>
 
 <style>
@@ -583,7 +589,7 @@ body{background:#f7f5fb!important}
 .cloud-actions .data-btn[style*="display:none"]{display:none!important}
 @media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
 </style>
-<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style>
+
 <style id="v136-datetime-value-center">
 .field-grid .ko-time-label{left:34px!important;right:34px!important;text-align:center!important;display:block!important;}
 </style>
@@ -610,7 +616,7 @@ body{background:#f7f5fb!important}
   white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;
 }
 </style>
-</head>
+<style id="final-child-ui-ownership">.cloud-card{display:none!important}.study-alarm-card,.alarm-card{display:none!important}</style></head>
 <script>
 (()=> {
   const P='lecture::';
@@ -651,7 +657,7 @@ body{background:#f7f5fb!important}
     <div class="top-right-actions">
       <button class="sync-top-btn" id="todayJumpBtn" aria-label="현재 날짜로 이동">현재 날짜</button>
       <button class="sync-top-btn" id="cloudSync" aria-label="동기화">↻ 동기화</button>
-      <button class="settings-top-btn" id="settingsBtn" aria-label="설정 열기">⚙ 설정</button>
+      
     </div>
   </div>
 
@@ -742,7 +748,7 @@ body{background:#f7f5fb!important}
 
 </div>
 
-<div class="settings-overlay" id="settingsOverlay" aria-hidden="true">
+<div class="settings-overlay" id="settingsOverlay" style="display:none!important" aria-hidden="true">
   <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="settings-head">
       <div class="settings-title" id="settingsTitle">설정</div>
@@ -806,10 +812,11 @@ const dayKeys = ['일','월','화','수','목','금','토'];
 
 // 사용자 설정: 하루 집계 기준시간 / 일주일 시작 요일
 const SETTINGS_KEY = 'lectureSettings:v1';
+const SHARED_SETTINGS_KEY = 'journalSharedSettings:v1';
 const DEFAULT_SETTINGS = { dayStartHour: 11, weekStartDay: 6, pendingDayStart: null }; // 기본 11:00, 6 = 토요일
 function loadSettings(){
   try{
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(SHARED_SETTINGS_KEY) || localStorage.getItem('studySettings:v1') || localStorage.getItem('lectureSettings:v1') || '{}');
     const dayStartHour = Number(saved.dayStartHour);
     const weekStartDay = Number(saved.weekStartDay);
     let pendingDayStart = null;
@@ -828,7 +835,13 @@ function loadSettings(){
   }catch(e){ return {...DEFAULT_SETTINGS}; }
 }
 let appSettings = loadSettings();
-function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings)); }
+function saveSettings(){ const raw=JSON.stringify(appSettings); localStorage.setItem(SHARED_SETTINGS_KEY, raw); localStorage.setItem(SETTINGS_KEY, raw); }
+// 공통 설정이 아직 없으면 기존 Study/Lecture 설정(없으면 기본 11:00/토요일)으로 1회 생성
+if(!localStorage.getItem(SHARED_SETTINGS_KEY)) saveSettings();
+window.addEventListener('storage', async (e)=>{
+  if(e.key!==SHARED_SETTINGS_KEY || !e.newValue) return;
+  try{ appSettings=loadSettings(); maybeActivatePending(); const latest=logicalToday(); if(cur>latest) cur=latest; await renderCurrentView(); }catch(_){}
+});
 function nextBoundaryForHour(hour, from = new Date()){
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate(), hour, 0, 0, 0);
   if(d <= from) d.setDate(d.getDate()+1);
@@ -1063,13 +1076,24 @@ async function loadMonth(ym){
 }
 
 async function saveMonth(ym){
+  // 로컬 저장과 클라우드 동기화를 분리해서 실패 원인을 정확히 표시한다.
   try{
     localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(monthCache[ym]));
+  }catch(e){
+    console.error('로컬 저장 실패:', e);
+    showToast('로컬 저장에 실패했어요. 브라우저 저장 공간이나 사이트 저장 권한을 확인해주세요.');
+    return false;
+  }
+
+  // 로그인/클라우드 연결이 없는 경우 cloudSaveMonth()는 저장할 것이 없으므로 정상 종료한다.
+  try{
     await cloudSaveMonth(ym);
   }catch(e){
-    console.error('저장 실패:', e);
-    showToast('저장에 실패했어요 (저장 공간이 가득 찼거나 브라우저 저장이 꺼져있을 수 있어요)');
+    console.error('클라우드 동기화 실패:', e);
+    showToast('클라우드 동기화에 실패했어요. 인터넷 연결 후 다시 동기화해주세요.');
+    return false;
   }
+  return true;
 }
 
 function getDayData(){
@@ -1891,6 +1915,10 @@ function renderPeriods(){
     const minDT = dtLocalValue(dayStart);
     const maxDT = dtLocalValue(maxRecord);
 
+    const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
+    const startActionDisabled = !isCurrentLectureDay || !!(p.startDate && p.startTime);
+    const endActionDisabled = !isCurrentLectureDay || !(p.startDate && p.startTime) || !!(p.endDate && p.endTime);
+
     const card = document.createElement('div');
     card.className = 'period-card';
     card.innerHTML = `
@@ -1901,14 +1929,14 @@ function renderPeriods(){
       </div>
       <div class="field-grid">
         <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action start" data-lecture-action="start" data-idx="${idx}" ${p.startDate && p.startTime ? 'disabled' : ''}>▶ 강의 시작</button>
+          <button type="button" class="lecture-card-action start" data-lecture-action="start" data-idx="${idx}" ${startActionDisabled ? 'disabled' : ''}>▶ 강의 시작</button>
         </div>
         <div class="field time">
           <label>시작 시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime)}</div>
         </div>
         <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action end" data-lecture-action="end" data-idx="${idx}" ${p.startDate && p.startTime && !(p.endDate && p.endTime) ? '' : 'disabled'}>■ 강의 종료</button>
+          <button type="button" class="lecture-card-action end" data-lecture-action="end" data-idx="${idx}" ${endActionDisabled ? 'disabled' : ''}>■ 강의 종료</button>
         </div>
         <div class="field time">
           <label>종료 시간</label>
@@ -2330,7 +2358,7 @@ $('#periodList').addEventListener('input', async (e) => {
 
 
 
-async function requestExclusiveSessionStart(){
+async function requestExclusiveSessionStart(atMs){
   if(window.parent===window) return true;
   try{
     const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
@@ -2341,7 +2369,7 @@ async function requestExclusiveSessionStart(){
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
       }
       window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req},location.origin);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req,at:atMs},location.origin);
     });
   }catch(e){return true}
 }
@@ -2349,14 +2377,17 @@ window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
   let stopped=false;
   try{
-    const now=new Date(serverNowMs()),day=getDayData();
+    // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
+    // 이 강의의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
+    const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
+    const now=new Date(atMs),day=getDayData();
     const p=(day.periods||[]).find(x=>Number(x.timerStartedAt)>0 && !Number(x.timerEndedAt));
     if(p){
       p.endDate=ymd(now);p.endTime=hm(now);
       if(cloudUser){
         const row=await cloudStopActiveTimer();const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(serverNowMs());
-      }else p.timerEndedAt=Math.round(serverNowMs());
+        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
+      }else p.timerEndedAt=Math.round(atMs);
       p._updatedAt=syncNow();autoSortPeriodsByStart(day);await persistToday();
       renderPeriods();updateStudyTimer();updateWasteTimer();stopped=true;
     }
@@ -2381,7 +2412,7 @@ $('#periodList').addEventListener('click', async (e) => {
   }
 
   if(btn.dataset.lectureAction === 'start'){
-    if(!(await requestExclusiveSessionStart())) return;
+    if(!(await requestExclusiveSessionStart(now.getTime()))) return;
     p.startDate = ymd(now);
     p.startTime = hm(now);
     p.endDate = '';
@@ -2390,10 +2421,10 @@ $('#periodList').addEventListener('click', async (e) => {
     if(cloudUser){
       const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
       const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
-      p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+      p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
       await calibrateServerClock(true);
     }else{
-      p.timerStartedAt = Math.round(serverNowMs());
+      p.timerStartedAt = Math.round(now.getTime());
     }
   }else{
     if(!p.startDate || !p.startTime){
@@ -2814,7 +2845,17 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,10px)';
-      setTimeout(() => location.reload(), 80);
+      Promise.resolve()
+        .then(() => runManualCloudSync(true))
+        .then(ok => {
+          if(ok) showToast('↕ 스와이프 동기화 성공');
+          else showToast('↕ 스와이프 동기화 실패');
+        })
+        .catch(e => {
+          console.error('스와이프 동기화 실패:', e);
+          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
+        })
+        .finally(() => { refreshing = false; reset(); });
     }else{
       reset();
     }
@@ -2882,7 +2923,17 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,0px)';
-      setTimeout(() => location.reload(), 80);
+      Promise.resolve()
+        .then(() => runManualCloudSync(true))
+        .then(ok => {
+          if(ok) showToast('↕ 스와이프 동기화 성공');
+          else showToast('↕ 스와이프 동기화 실패');
+        })
+        .catch(e => {
+          console.error('스와이프 동기화 실패:', e);
+          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
+        })
+        .finally(() => { refreshing = false; reset(); });
     } else reset();
   }, {passive:true});
   document.addEventListener('touchcancel', reset, {passive:true});
@@ -3062,7 +3113,7 @@ function closeSettings(){
   $('#settingsOverlay').classList.remove('show');
   $('#settingsOverlay').setAttribute('aria-hidden','true');
 }
-$('#settingsBtn').onclick = openSettings;
+
 $('#settingsClose').onclick = closeSettings;
 $('#settingsCancel').onclick = closeSettings;
 $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#settingsOverlay')) closeSettings(); });
@@ -3199,10 +3250,14 @@ async function cloudSaveMonth(ym){
   // 낙관적 병합: 저장 직전 클라우드 최신본을 읽고 날짜/교시/필드 단위로 합친다.
   // 같은 달을 여러 기기에서 동시에 수정해도 서로 다른 변경을 최대한 보존한다.
   let local = ensureMonthSync(deepClone(monthCache[ym]), ym);
+  let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
       .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym)).limit(1);
-    if(readErr){ console.error('클라우드 저장 전 읽기 실패:', readErr); return; }
+    if(readErr){
+      console.error('클라우드 저장 전 읽기 실패:', readErr);
+      throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
+    }
     const row = rows && rows[0];
     const merged = mergeMonths(local, row?.data || {}, ym);
     const nowIso = new Date(serverNowMs()).toISOString();
@@ -3213,11 +3268,12 @@ async function cloudSaveMonth(ym){
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
-      else if(wErr) console.warn('동기화 충돌 재시도:', wErr.message);
+      else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
+      else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
       const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:lectureCloudYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
-      else console.warn('동기화 신규 저장 재시도:', iErr.message);
+      else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
     if(writeOk){
       monthCache[ym]=merged;
@@ -3226,8 +3282,8 @@ async function cloudSaveMonth(ym){
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
   }
-  console.error('클라우드 저장 충돌을 해결하지 못했습니다:', ym);
-  showToast('동기화 충돌이 있어 잠시 후 다시 저장해 주세요');
+  console.error('클라우드 저장 충돌을 해결하지 못했습니다:', ym, lastSaveErr);
+  throw new Error('study_months 저장 실패(' + ym + '): ' + (lastSaveErr?.message || lastSaveErr?.code || '원인 불명'));
 }
 
 async function uploadAllToCloud(){
@@ -3242,10 +3298,18 @@ async function uploadAllToCloud(){
   showToast('전체 기록을 병합해서 클라우드에 저장했어요');
 }
 
-async function autoSyncFromCloud(){
+async function autoSyncFromCloud(lockOwned=false){
   if(!sbClient || !cloudUser) return;
-  const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
-  if(error){ console.error('자동 동기화 불러오기 실패:', error); return; }
+  if(!lockOwned){
+    if(fullCloudSyncRunning) return;
+    fullCloudSyncRunning = true;
+  }
+  try{
+const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
+  if(error){
+    console.error('자동 동기화 불러오기 실패:', error);
+    throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
+  }
   const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
   if(lectureRows.length===0) return;
   const needsPush=[];
@@ -3270,12 +3334,16 @@ async function autoSyncFromCloud(){
     periodRenderPending = false;
     await renderCurrentView();
   }
+
+  }finally{
+    if(!lockOwned) fullCloudSyncRunning = false;
+  }
 }
 
 async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
-  if(error){ alert('클라우드 불러오기 실패: '+error.message); return; }
+  if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
   const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
   if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 강의 기록을 교체할까요?')) return;
@@ -3382,28 +3450,35 @@ $('#cloudLogout').onclick = async () => {
   if(sbClient) await sbClient.auth.signOut();
   cloudUser=null; await refreshCloudStatus(); showToast('로그아웃했어요');
 };
-async function runManualCloudSync(){
+let fullCloudSyncRunning = false;
+async function runManualCloudSync(fromSwipe=false){
   const btn = $('#cloudSync');
-  if(btn?.disabled) return;
+  if(fullCloudSyncRunning || btn?.disabled){
+    if(!fromSwipe) showToast('이미 동기화 중이에요');
+    return false;
+  }
+  fullCloudSyncRunning = true;
   if(btn){ btn.disabled = true; btn.textContent = '↻ 동기화 중…'; }
   try{
     await saveMonth(ymKey(cur));
-    // 버튼을 누르는 순간 Supabase 세션을 다시 확인한다.
-    // PWA 복원/다른 탭 로그인 직후 cloudUser가 오래된 상태여도 동기화되게 한다.
     await refreshCloudStatus();
     if(!cloudUser){
-      showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
-      return;
+      if(!fromSwipe) showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
+      return false;
     }
     await calibrateServerClock(false);
-    await autoSyncFromCloud();
+    await autoSyncFromCloud(true);
     await syncActiveTimerFromCloud(true);
-    await renderAfterCloudSync();
-    showToast('클라우드 동기화 완료');
+    await renderCurrentView();
+    if(!fromSwipe) showToast('클라우드 동기화 완료');
+    return true;
   }catch(e){
     console.error('수동 동기화 실패:', e);
-    showToast('동기화에 실패했어요');
+    if(!fromSwipe) showToast('동기화 실패: ' + (e?.message || e?.code || String(e)));
+    else console.error('스와이프 동기화 실패:', e);
+    return false;
   }finally{
+    fullCloudSyncRunning = false;
     if(btn){ btn.disabled = false; btn.textContent = '↻ 동기화'; }
   }
 }
@@ -3759,7 +3834,7 @@ renderDay();
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.26', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=1.29', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });
