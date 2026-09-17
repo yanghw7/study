@@ -4222,6 +4222,35 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 
 <!-- vibration-repeat-verified-v1 -->
+
+<style id="pc-datetime-edit-final">
+/* PC: 날짜/시간을 마우스 선택뿐 아니라 키보드로 직접 수정 가능하게 표시 */
+@media (hover:hover) and (pointer:fine){
+  .field.time input[type="datetime-local"]{
+    color:var(--ink)!important;
+    caret-color:auto!important;
+    min-height:26px!important;
+    position:relative!important;
+    z-index:3!important;
+    cursor:text!important;
+  }
+  .field.time .ko-time-label{display:none!important;}
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-text,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
+  .field.time input[type="datetime-local"]::-webkit-datetime-edit-ampm-field{
+    color:var(--ink)!important;
+  }
+  .field.time input[type="datetime-local"]::-webkit-calendar-picker-indicator{
+    opacity:1!important;cursor:pointer!important;
+  }
+}
+</style>
 </body>
 </html>
 
@@ -4261,5 +4290,13 @@ document.addEventListener('DOMContentLoaded',()=>{
 /* 주별·월별·연도별 가장 긴 수면시간 값은 합계와 같은 붉은 계열 */
 .agg-nums b.waste-color{
   color:#B5533C!important;
+}
+</style>
+
+<style id="sleep-summary-value-size-14-final">
+/* 오늘 수면 합계 5개 값 글자 크기 */
+.summary-grid.sleep-summary-grid .summary-item b,
+#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumWaste{
+  font-size:14px!important;
 }
 </style>
