@@ -25,7 +25,7 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 .chart-bar-sleep:hover,.chart-bar-sleep:focus{opacity:.72}
 .overlay{position:fixed;inset:0;background:#1f2a2466;z-index:50;display:none;align-items:flex-end;justify-content:center;padding:16px}.overlay.show{display:flex}.panel{width:min(520px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:18px}.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.panel-head b{font-size:17px}.close{border:0;background:none;font-size:22px}.setting-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}.setting-row:first-of-type{border-top:0}.setting-label{font-size:13px;font-weight:800}.setting-desc{font-size:11px;color:var(--soft);margin-top:3px;line-height:1.4}.setting-row select{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:8px}.panel-actions{display:flex;gap:8px;margin-top:12px}.panel-actions button{flex:1;border-radius:10px;padding:10px;font-weight:800}.save-btn{border:0;background:var(--accent);color:#fff}.cancel-btn{border:1px solid var(--line);background:#fff}.danger{width:100%;margin-top:15px;border:1px solid #dc2626;color:#dc2626;background:#fff;border-radius:10px;padding:10px;font-weight:800}
 .edit-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}.field{background:var(--bg);padding:10px;border-radius:10px;min-width:0}.field label{display:block;font-size:11px;color:var(--soft);font-weight:800;margin-bottom:4px}.field input{width:100%;min-width:0;border:0;background:none;font-weight:700}.cloud-card{display:none;background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px}.cloud-card.show{display:block}.cloud-status{font-size:11px;color:var(--soft);margin-bottom:8px}.cloud-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.cloud-grid input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px}.cloud-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.cloud-actions button{flex:1;min-width:100px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px;font-size:12px;font-weight:750}
-.toast{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:100;background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}.toast.show{opacity:1}@media(max-width:430px){.edit-grid,.cloud-grid{grid-template-columns:1fr}.top-actions button{padding:7px 8px;font-size:12px}}
+.toast{position:fixed;top:max(8px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:10020;background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s}.toast.show{opacity:1}@media(max-width:430px){.edit-grid,.cloud-grid{grid-template-columns:1fr}.top-actions button{padding:7px 8px;font-size:12px}}
 
 .swipe-stage{will-change:transform,opacity}
 .swipe-stage.swipe-animating{transition:transform .20s ease,opacity .20s ease}
@@ -64,7 +64,7 @@ button,input,select{font:inherit}.top-actions{display:flex;gap:8px;align-items:c
 .dial-help{text-align:center;color:var(--soft);font-size:13px;font-weight:750;margin:9px 0 2px}
 
 #todayJumpBtn{touch-action:manipulation}
-#todayJumpBtn:disabled{opacity:.38}
+
 
 /* device-only relative alarm */
 .alarm-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:18px;margin:0 0 24px;box-shadow:0 2px 8px rgba(0,0,0,.03)}
@@ -327,7 +327,7 @@ body .wrap > .summary .metric span{
     <button class="settings-top-btn" id="settingsBtn">⚙ 설정</button>
   </div>
 </div>
-<div class="datebar"><button id="prevDay">‹</button><div class="date-center"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay">›</button></div>
+<div class="datebar"><button id="prevDay" aria-label="이전 날짜">‹</button><div class="date-center" id="dateCenter" role="button" tabindex="0" aria-label="날짜 선택" title="눌러서 날짜 선택"><div class="week-mini" id="weekMini"></div><div class="date-big" id="dateBig"></div><div class="date-sub" id="dateSub"></div><div class="day-rule" id="dayRule"></div></div><button id="nextDay" aria-label="다음 날짜">›</button></div><input type="date" id="datePicker" aria-hidden="true" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
 <div class="tabs"><button class="active" data-view="day">오늘</button><button data-view="week">주별</button><button data-view="month">월별</button><button data-view="year">년도별</button></div>
 <div class="data-tools"><button class="data-btn" id="backupData">데이터 백업</button><button class="data-btn" id="restoreData">데이터 복원</button><input type="file" id="restoreFile" accept="application/json,.json"></div>
 <section class="cloud-card" id="cloudCard"><div class="cloud-head"><div class="cloud-title">☁ 클라우드 저장</div><div class="cloud-status" id="cloudStatus">로그인 필요</div></div><div class="cloud-actions"><button class="data-btn" id="toggleCloudSetup">로그인 / 회원가입</button><button class="data-btn" id="upload">전체 클라우드 저장</button><button class="data-btn" id="download">클라우드에서 불러오기</button><button class="data-btn" id="logout" style="display:none">로그아웃</button></div><div class="cloud-setup" id="cloudSetup"><div class="cloud-grid"><input id="email" type="email" placeholder="이메일"><input id="password" type="password" placeholder="비밀번호 (6자 이상)"></div><div class="cloud-actions"><button class="data-btn" id="signup">회원가입</button><button class="data-btn" id="login">로그인</button><button class="data-btn" id="cloudGoogle">Google로 로그인</button></div><div class="cloud-note">로그인 후 수면 기록을 브라우저와 클라우드에 저장할 수 있습니다.</div></div></section>
@@ -429,7 +429,12 @@ body .wrap > .summary .metric span{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
 const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),DK=['일','월','화','수','목','금','토'];
 const DATA='sleepJournal:v2',SET='sleepSettings:v1';
-let data=JSON.parse(localStorage.getItem(DATA)||'{"sessions":[],"active":null}');
+let data=JSON.parse(localStorage.getItem(DATA)||'{"sessions":[],"active":null,"deletedSessions":[]}');
+if(!Array.isArray(data.sessions)) data.sessions=[];
+if(!Array.isArray(data.deletedSessions)) data.deletedSessions=[];
+const syncStamp=()=>Date.now();
+for(const x of data.sessions){ if(x && !Number.isFinite(Number(x._updatedAt))) x._updatedAt=Number(x.end||x.start||0)||syncStamp(); }
+if(data.active && !Number.isFinite(Number(data.active._updatedAt))) data.active._updatedAt=Number(data.active.start||0)||syncStamp();
 if(data.active && !Number.isFinite(Number(data.active.timerStartedAt))) data.active.timerStartedAt=Number(data.active.start);
 let settings=JSON.parse(localStorage.getItem(SET)||'{"dayStartHour":11,"weekStartDay":6,"pendingDayStart":null}');
 if(!Number.isInteger(Number(settings.dayStartHour))) settings.dayStartHour=11;
@@ -455,6 +460,7 @@ function maybeActivatePending(){
   if(Date.now()>=at.getTime()){
     settings.dayStartHour=Number(p.hour);
     settings.pendingDayStart=null;
+    settings._updatedAt=syncStamp();
     saveSet();
     return true;
   }
@@ -483,8 +489,10 @@ function checkSleepBoundaryRollover(){
     const [,boundaryMs]=bounds(activeDay);
     if(Date.now()<boundaryMs) break;
     const originalStart=Number.isFinite(Number(data.active.timerStartedAt)) ? Number(data.active.timerStartedAt) : Number(data.active.start);
-    data.sessions.push({id:'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),start:data.active.start,end:boundaryMs-60000});
-    data.active={start:boundaryMs,timerStartedAt:originalStart};
+    const ts=syncStamp();
+    data.sessions.push({id:'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),start:data.active.start,end:boundaryMs-60000,_updatedAt:ts});
+    data.active={start:boundaryMs,timerStartedAt:originalStart,_updatedAt:ts};
+    data.activeUpdatedAt=ts;
     rolled=true;
   }
   if(rolled){data.sessions.sort((a,b)=>a.start-b.start);save()}
@@ -507,10 +515,6 @@ function weekOfMonth(y,m,d){const first=new Date(y,m-1,1), offset=(first.getDay(
 function header(){
   maybeActivatePending();
   $('#dateBig').textContent=`${cur.getMonth()+1}월 ${cur.getDate()}일`;
-  requestAnimationFrame(()=>{
-    const b=$('#todayJumpBtn');
-    if(b) b.disabled=(view==='day' && ymd(cur)===ymd(logicalToday()));
-  });
   $('#dateSub').textContent=`${cur.getFullYear()}년 · ${DK[cur.getDay()]}요일`;
   $('#weekMini').textContent=view==='day'?`${cur.getMonth()+1}월 ${weekOfMonth(cur.getFullYear(),cur.getMonth()+1,cur.getDate())}주차`:view==='week'?'주별 통계':view==='month'?'월별 통계':'년도별 통계';
   $('#dayRule').textContent=`하루 집계 기준 ${pad(settings.dayStartHour)}:00${settings.pendingDayStart?' · 변경 예약됨':''}`;
@@ -529,7 +533,7 @@ if(arr.length){
   }
 }else{
   $('#gap').textContent='-';
-}$('#liveCard').style.display=view==='day'&&ymd(cur)===ymd(logicalToday())?'':'none';let h=$('#history');h.innerHTML='';let shown=view==='day'?arr:arr.slice().reverse().slice(0,30);if(!shown.length)h.innerHTML='<div class="empty">이 기간의 수면 기록이 없습니다.</div>';shown.slice().reverse().forEach(x=>{let r=document.createElement('div');r.className='row';r.innerHTML=`<div><div class="row-main">${fmtHM(x.start)} → ${fmtHM(x.end)}</div><div class="row-sub">${ymd(logicalDate(x.start))} 수면일</div><button class="mini-btn edit-btn">수정</button> <button class="mini-btn delete-btn">삭제</button></div><div class="duration">${dur(x.end-x.start)}</div>`;r.querySelector('.edit-btn').onclick=()=>openEdit(x.id);r.querySelector('.delete-btn').onclick=()=>{if(confirm('이 기록을 삭제할까요?')){data.sessions=data.sessions.filter(s=>s.id!==x.id);save();render()}};h.appendChild(r)});renderChart(days)}
+}$('#liveCard').style.display=view==='day'&&ymd(cur)===ymd(logicalToday())?'':'none';let h=$('#history');h.innerHTML='';let shown=view==='day'?arr:arr.slice().reverse().slice(0,30);if(!shown.length)h.innerHTML='<div class="empty">이 기간의 수면 기록이 없습니다.</div>';shown.slice().reverse().forEach(x=>{let r=document.createElement('div');r.className='row';r.innerHTML=`<div><div class="row-main">${fmtHM(x.start)} → ${fmtHM(x.end)}</div><div class="row-sub">${ymd(logicalDate(x.start))} 수면일</div><button class="mini-btn edit-btn">수정</button> <button class="mini-btn delete-btn">삭제</button></div><div class="duration">${dur(x.end-x.start)}</div>`;r.querySelector('.edit-btn').onclick=()=>openEdit(x.id);r.querySelector('.delete-btn').onclick=()=>{if(confirm('이 기록을 삭제할까요?')){data.deletedSessions.push({id:x.id,_deletedAt:syncStamp()});data.sessions=data.sessions.filter(s=>s.id!==x.id);save();render()}};h.appendChild(r)});renderChart(days)}
 function sleepTooltip(minutes){
   const mins=Math.max(0,Math.round(Number(minutes)||0));
   const h=Math.floor(mins/60), m=mins%60;
@@ -860,7 +864,7 @@ $('#saveManual').onclick=()=>{
   if(ymd(cur)===ymd(logicalToday())&&end>Date.now())return alert('미래 시간은 기록할 수 없습니다.');
   const overlap=overlappingSession(start,end);
   if(overlap)return alert(`이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치지 않는 시간으로 입력해주세요.`);
-  data.sessions.push({id:'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),start,end});
+  data.sessions.push({id:'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),start,end,_updatedAt:syncStamp()});
   data.sessions.sort((a,b)=>a.start-b.start);save();
   $('#manualOverlay').classList.remove('show');render();toast('수면 기록을 추가했어요');
 };
@@ -871,7 +875,7 @@ $('#saveEdit').onclick=()=>{let x=data.sessions.find(s=>s.id===editing),a=new Da
   if(overlap){
     return alert(`이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치지 않는 시간으로 수정해주세요.`);
   }
-  x.start=a;x.end=b;data.sessions.sort((x,y)=>x.start-y.start);save();$('#editOverlay').classList.remove('show');render();toast('수정했어요')}
+  x.start=a;x.end=b;x._updatedAt=syncStamp();data.sessions.sort((x,y)=>x.start-y.start);save();$('#editOverlay').classList.remove('show');render();toast('수정했어요')}
 async function requestExclusiveSessionStart(){
   if(window.parent===window)return true;
   try{
@@ -895,19 +899,19 @@ window.addEventListener('message',ev=>{
       const end=Date.now();
       const overlap=overlappingSession(data.active.start,end);
       if(!overlap){
-        data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});
-        data.active=null;save();render();stopped=true;
+        data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end,_updatedAt:syncStamp()});
+        data.active=null;data.activeUpdatedAt=syncStamp();save();render();stopped=true;
       }
     }
   }catch(e){console.warn('자동 수면 종료 실패',e)}
   window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped},location.origin);
 });
-$('#action').onclick=async()=>{if(!data.active){if(!(await requestExclusiveSessionStart()))return;data.active={start:Date.now(),timerStartedAt:Date.now()};save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
+$('#action').onclick=async()=>{if(!data.active){if(!(await requestExclusiveSessionStart()))return;{const ts=syncStamp();data.active={start:Date.now(),timerStartedAt:Date.now(),_updatedAt:ts};data.activeUpdatedAt=ts;}save();toast('수면 시작')}else{let end=Date.now();const overlap=overlappingSession(data.active.start,end);
 if(overlap){
   alert(`현재 수면시간이 이미 기록된 수면시간과 겹칩니다.\n\n기존 기록: ${fmtHM(overlap.start)} ~ ${fmtHM(overlap.end)}\n겹치는 기록을 먼저 수정하거나 삭제해주세요.`);
   return;
 }
-data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end});data.active=null;save();render();toast('수면 종료 · 저장 완료');if(window.parent!==window)window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin)}render()}
+{const ts=syncStamp();data.sessions.push({id:'s-'+Date.now().toString(36),start:data.active.start,end,_updatedAt:ts});data.active=null;data.activeUpdatedAt=ts;}save();render();toast('수면 종료 · 저장 완료');if(window.parent!==window)window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin)}render()}
 function tick(){
   let n=Date.now();
   checkSleepBoundaryRollover();
@@ -960,6 +964,7 @@ $('#saveSettings').onclick=()=>{
   settings.weekStartDay=Number($('#weekStart').value);
   if(requestedHour===settings.dayStartHour){
     settings.pendingDayStart=null;
+    settings._updatedAt=syncStamp();
     saveSet();
     cur=logicalToday();
     $('#settingsOverlay').classList.remove('show');
@@ -970,12 +975,15 @@ $('#saveSettings').onclick=()=>{
   const newBoundary=nextBoundaryForHour(requestedHour,now);
   const effectiveAt=new Date(Math.max(oldBoundary.getTime(),newBoundary.getTime()));
   settings.pendingDayStart={hour:requestedHour,effectiveAt:effectiveAt.toISOString()};
+  settings._updatedAt=syncStamp();
   saveSet();
   $('#settingsOverlay').classList.remove('show');
   render();
   toast(`${pad(requestedHour)}:00 기준 · ${effectiveAt.getMonth()+1}/${effectiveAt.getDate()} ${pad(effectiveAt.getHours())}:${pad(effectiveAt.getMinutes())}부터 적용`);
 };document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>$('#'+x.dataset.close).classList.remove('show'));$('#deleteAll').onclick=()=>{if(confirm('모든 수면 기록을 삭제할까요?')){
-  data={sessions:[],active:null};
+  const ts=syncStamp();
+  const tombstones=(data.sessions||[]).map(x=>({id:x.id,_deletedAt:ts}));
+  data={sessions:[],active:null,deletedSessions:[...(data.deletedSessions||[]),...tombstones],activeUpdatedAt:ts};
   save();
   $('#settingsOverlay').classList.remove('show');
   render();
@@ -988,8 +996,12 @@ function movePeriod(dir){
   else if(view==='month') n.setMonth(n.getMonth()+dir);
   else n.setFullYear(n.getFullYear()+dir);
   const today=logicalToday();
-  if(dir>0 && n>today) n=today;
+  if(dir>0 && n>today){
+    alert('아직 시작되지 않은 수면일입니다.');
+    return false;
+  }
   cur=n; render();
+  return true;
 }
 $('#prevDay').onclick=()=>movePeriod(-1);
 $('#todayJumpBtn').onclick=()=>{
@@ -997,7 +1009,31 @@ $('#todayJumpBtn').onclick=()=>{
   cur=new Date(logicalToday());
   render();
 };
-$('#nextDay').onclick=()=>movePeriod(1);document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');view=b.dataset.view;render()});$('#chartToggle').onclick=()=>{$('#chartCard').classList.toggle('show');$('#chartToggle').textContent=$('#chartCard').classList.contains('show')?'📉 그래프 닫기':'📈 그래프 보기'}
+$('#nextDay').onclick=()=>movePeriod(1);
+// 공부 기록장/강의 기록장과 동일한 날짜 직접 선택 동작
+function openDatePicker(){
+  const picker=$('#datePicker');
+  picker.value=ymd(cur);
+  picker.max=ymd(logicalToday());
+  try{
+    if(typeof picker.showPicker==='function') picker.showPicker();
+    else { picker.focus(); picker.click(); }
+  }catch(e){ picker.focus(); picker.click(); }
+}
+$('#dateCenter').onclick=openDatePicker;
+$('#dateCenter').onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();openDatePicker();} };
+$('#datePicker').onchange=(e)=>{
+  if(!e.target.value)return;
+  const [y,m,d]=e.target.value.split('-').map(Number);
+  const picked=new Date(y,m-1,d);
+  if(picked>logicalToday()){
+    alert('아직 시작되지 않은 수면일입니다.');
+    e.target.value=ymd(cur);
+    return;
+  }
+  cur=picked; render();
+};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');view=b.dataset.view;render()});$('#chartToggle').onclick=()=>{$('#chartCard').classList.toggle('show');$('#chartToggle').textContent=$('#chartCard').classList.contains('show')?'📉 그래프 닫기':'📈 그래프 보기'}
 
 let touchStartX=0,touchStartY=0,touchLastY=0,touchMode='',pullReady=false;
 const SWIPE_X=55,PULL_Y=72;
@@ -1007,18 +1043,26 @@ function showPull(text,ready=false){
   $('#pullIndicator').textContent=text;
   $('#pullIndicator').classList.add('show');
   $('#pullIndicator').classList.toggle('ready',ready);
-  $('#syncBlur').classList.add('show');
+  // 동기화 시 전체 화면 블러는 사용하지 않음.
 }
 function hidePull(){
   $('#pullIndicator').classList.remove('show','ready');
-  $('#syncBlur').classList.remove('show');
 }
 async function gestureSync(){
   showPull('↻ 동기화 중…',true);
-  // Cloud is optional for now: local UI/data refresh always works.
-  if(sb){await cloudStatus(); if(user) await syncCloud();}
-  render();
-  setTimeout(()=>{hidePull();toast(user?'동기화 완료':'로컬 기록 새로고침 완료')},180);
+  let ok=false;
+  try{
+    ok=await runManualCloudSync(true);
+    render();
+    toast(ok?'↕ 스와이프 동기화 성공':'↕ 스와이프 동기화 실패');
+    return ok;
+  }catch(e){
+    console.error('스와이프 수면 동기화 실패:',e);
+    toast('↕ 스와이프 동기화 실패: '+(e?.message||e?.code||String(e)));
+    return false;
+  }finally{
+    setTimeout(hidePull,180);
+  }
 }
 function canMovePeriod(dir){
   if(dir<0) return true;
@@ -1035,6 +1079,7 @@ function animateMove(dir){
   // 미래 기간으로 갈 수 없으면 화면 전환 자체를 시작하지 않는다.
   // 살짝 저항감만 보여주고 현재 화면으로 복귀한다.
   if(!canMovePeriod(dir)){
+    toast('아직 시작되지 않은 수면일입니다.');
     st.classList.add('swipe-animating');
     st.style.transform=dir>0?'translateX(-5%)':'translateX(5%)';
     st.style.opacity='.88';
@@ -1109,41 +1154,176 @@ document.addEventListener('touchend',e=>{
   touchMode='';pullReady=false;
 },{passive:true});
 
-function initCloud(){try{if(window.supabase)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){}}async function cloudStatus(){if(!sb)return;let {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';$('#logout').style.display=user?'':'none'}$('#syncBtn').onclick=async()=>{const btn=$('#syncBtn');if(btn?.disabled)return;if(btn){btn.disabled=true;btn.textContent='↻ 동기화 중…'}try{if(!sb)initCloud();await cloudStatus();if(!user){$('#cloudCard').classList.add('show');toast('클라우드 로그인 필요');return}const ok=await syncCloud();if(ok!==false)toast('클라우드 동기화 완료')}catch(e){console.error('수면 동기화 실패:',e);toast('동기화 실패: '+(e?.message||e?.code||String(e)))}finally{if(btn){btn.disabled=false;btn.textContent='↻ 동기화'}}}
-async function syncCloud(){
-  if(!user)return false;
-  const ym='S:ALL';
-  const {data:rows,error}=await sb.from('study_months').select('data,updated_at').eq('user_id',user.id).eq('ym',ym).limit(1);
-  if(error) throw error;
-  const row=rows&&rows[0];
-  const remote=row?.data||{sessions:[],settings:{}};
-  const mergedMap=new Map();
-  for(const x of [...(remote.sessions||[]),...(data.sessions||[])]){
-    const key=x?.id||`${x?.start||0}:${x?.end||0}`;
-    mergedMap.set(key,x);
-  }
-  data.sessions=[...mergedMap.values()].sort((a,b)=>(a.start||0)-(b.start||0));
-  const mergedSettings={...(remote.settings||{}),...settings};
-  Object.assign(settings,mergedSettings); save(); saveSet();
-  const payload={sessions:data.sessions,settings:mergedSettings};
-  const nowIso=new Date().toISOString();
-  let w;
-  if(row){
-    w=await sb.from('study_months').update({data:payload,updated_at:nowIso}).eq('user_id',user.id).eq('ym',ym);
-  }else{
-    w=await sb.from('study_months').insert({user_id:user.id,ym,data:payload,updated_at:nowIso});
-  }
-  if(w.error) throw w.error;
-  render(); return true;
+function initCloud(){
+  if(!SUPABASE_URL || !SUPABASE_KEY || !window.supabase){ sb=null; return false; }
+  try{
+    sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    return true;
+  }catch(e){ sb=null; return false; }
 }
-$('#signup').onclick=async()=>{if(!sb)initCloud();let e=$('#email').value.trim(),p=$('#password').value;if(!e||p.length<6)return toast('이메일/비밀번호를 확인해주세요');let {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert(error.message);await cloudStatus();toast('회원가입 요청 완료')};$('#login').onclick=async()=>{if(!sb)initCloud();let {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);await cloudStatus();toast('로그인 완료')};$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();await cloudStatus();toast('로그아웃')};$('#upload').onclick=async()=>{await cloudStatus();if(!user)return toast('로그인 필요');await syncCloud()};$('#download').onclick=async()=>{try{await cloudStatus();if(!user)return toast('로그인 필요');const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);if(error)throw error;const r=rows&&rows[0];if(!r)return toast('클라우드 기록 없음');if(confirm('클라우드 기록으로 불러올까요?')){data.sessions=r.data?.sessions||[];if(r.data?.settings)Object.assign(settings,r.data.settings);save();saveSet();render();toast('불러오기 완료')}}catch(e){console.error(e);toast('클라우드 불러오기 실패: '+(e?.message||e?.code||String(e)))}}
+
+async function cloudStatus(){
+  if(!sb && !initCloud()){
+    user=null; $('#cloudStatus').textContent='설정 안 됨'; $('#logout').style.display='none'; return false;
+  }
+  const {data:{session}}=await sb.auth.getSession();
+  user=session?.user||null;
+  $('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';
+  $('#logout').style.display=user?'':'none';
+  return !!user;
+}
+
+function mergeSleepPayload(remotePayload={}){
+  const remoteSessions=Array.isArray(remotePayload.sessions)?remotePayload.sessions:[];
+  const localSessions=Array.isArray(data.sessions)?data.sessions:[];
+  const remoteDeleted=Array.isArray(remotePayload.deletedSessions)?remotePayload.deletedSessions:[];
+  const localDeleted=Array.isArray(data.deletedSessions)?data.deletedSessions:[];
+  const deleted=new Map();
+  for(const d of [...remoteDeleted,...localDeleted]){
+    if(!d?.id) continue;
+    const prev=deleted.get(d.id);
+    if(!prev || Number(d._deletedAt||0)>Number(prev._deletedAt||0)) deleted.set(d.id,d);
+  }
+  const live=new Map();
+  for(const x of [...remoteSessions,...localSessions]){
+    if(!x?.id) continue;
+    const prev=live.get(x.id);
+    if(!prev || Number(x._updatedAt||x.end||x.start||0)>=Number(prev._updatedAt||prev.end||prev.start||0)) live.set(x.id,x);
+  }
+  const sessions=[];
+  for(const [id,x] of live){
+    if(Number(deleted.get(id)?._deletedAt||0)<Number(x._updatedAt||x.end||x.start||0)) sessions.push(x);
+  }
+  sessions.sort((a,b)=>(a.start||0)-(b.start||0));
+  const localActive=data.active||null,remoteActive=remotePayload.active||null;
+  const la=Number(localActive?._updatedAt||data.activeUpdatedAt||localActive?.start||0);
+  const ra=Number(remoteActive?._updatedAt||remotePayload.activeUpdatedAt||remoteActive?.start||0);
+  const active=ra>la?remoteActive:localActive;
+  const activeUpdatedAt=Math.max(la,ra);
+  const remoteSettings=remotePayload.settings||{};
+  const rs=Number(remoteSettings._updatedAt||0),ls=Number(settings._updatedAt||0);
+  const mergedSettings=rs>ls?{...settings,...remoteSettings}:{...remoteSettings,...settings};
+  return {sessions,deletedSessions:[...deleted.values()],active,activeUpdatedAt,settings:mergedSettings};
+}
+
+function currentSleepPayload(){
+  return {sessions:data.sessions,deletedSessions:data.deletedSessions||[],active:data.active||null,activeUpdatedAt:data.activeUpdatedAt||0,settings:{...settings}};
+}
+
+// study.html의 cloudSaveMonth와 같은 방식: 저장 직전 원격 최신본을 읽고 병합 후 충돌 재시도.
+async function cloudSaveSleep(){
+  if(!sb||!user) return false;
+  const ym='S:ALL';
+  let lastSaveErr=null;
+  for(let attempt=0;attempt<4;attempt++){
+    const {data:rows,error:readErr}=await sb.from('study_months').select('data,updated_at').eq('user_id',user.id).eq('ym',ym).limit(1);
+    if(readErr) throw new Error('수면 기록 저장 전 읽기 실패: '+(readErr.message||readErr.code||String(readErr)));
+    const row=rows&&rows[0];
+    const merged=mergeSleepPayload(row?.data||{});
+    data.sessions=merged.sessions; data.deletedSessions=merged.deletedSessions; data.active=merged.active; data.activeUpdatedAt=merged.activeUpdatedAt;
+    Object.assign(settings,merged.settings); save(); saveSet();
+    const payload=currentSleepPayload(),nowIso=new Date().toISOString();
+    let writeOk=false;
+    if(row){
+      let q=sb.from('study_months').update({data:payload,updated_at:nowIso}).eq('user_id',user.id).eq('ym',ym);
+      if(row.updated_at) q=q.eq('updated_at',row.updated_at);
+      const {data:w,error:wErr}=await q.select('updated_at');
+      if(!wErr&&w&&w.length) writeOk=true;
+      else lastSaveErr=wErr||new Error('업데이트된 행이 0개입니다');
+    }else{
+      const {error:iErr}=await sb.from('study_months').insert({user_id:user.id,ym,data:payload,updated_at:nowIso});
+      if(!iErr) writeOk=true; else lastSaveErr=iErr;
+    }
+    if(writeOk){ render(); return true; }
+    await new Promise(r=>setTimeout(r,120*(attempt+1)));
+  }
+  throw new Error('수면 기록 저장 실패: '+(lastSaveErr?.message||lastSaveErr?.code||'원인 불명'));
+}
+
+// study.html의 autoSyncFromCloud와 같은 pull -> merge -> 필요시 push 흐름.
+let sleepCloudSyncRunning=false;
+async function autoSyncFromCloud(lockOwned=false){
+  if(!sb||!user) return false;
+  if(!lockOwned){ if(sleepCloudSyncRunning) return false; sleepCloudSyncRunning=true; }
+  try{
+    const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);
+    if(error) throw new Error('수면 기록 불러오기 실패: '+(error.message||error.code||String(error)));
+    const row=rows&&rows[0];
+    if(!row){ await cloudSaveSleep(); return true; }
+    const remoteBefore=JSON.stringify(row.data||{});
+    const merged=mergeSleepPayload(row.data||{});
+    data.sessions=merged.sessions; data.deletedSessions=merged.deletedSessions; data.active=merged.active; data.activeUpdatedAt=merged.activeUpdatedAt;
+    Object.assign(settings,merged.settings); save(); saveSet(); render();
+    if(JSON.stringify(currentSleepPayload())!==remoteBefore) await cloudSaveSleep();
+    return true;
+  }finally{ if(!lockOwned) sleepCloudSyncRunning=false; }
+}
+
+async function uploadAllToCloud(){
+  if(!user){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
+  await cloudSaveSleep(); toast('전체 기록을 병합해서 클라우드에 저장했어요');
+}
+async function downloadAllFromCloud(){
+  if(!user){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
+  const {data:rows,error}=await sb.from('study_months').select('data').eq('user_id',user.id).eq('ym','S:ALL').limit(1);
+  if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)); return; }
+  const row=rows&&rows[0]; if(!row){ toast('클라우드에 저장된 기록이 없어요'); return; }
+  if(!confirm('클라우드 기록으로 이 브라우저의 수면 기록을 교체할까요?')) return;
+  const src=row.data||{}; data.sessions=Array.isArray(src.sessions)?src.sessions:[]; data.deletedSessions=Array.isArray(src.deletedSessions)?src.deletedSessions:[];
+  data.active=src.active||null; data.activeUpdatedAt=Number(src.activeUpdatedAt||src.active?._updatedAt||0); if(src.settings)Object.assign(settings,src.settings);
+  save(); saveSet(); render(); toast('클라우드 기록을 불러왔어요');
+}
+
+async function runManualCloudSync(fromSwipe=false){
+  const btn=$('#syncBtn');
+  if(sleepCloudSyncRunning||btn?.disabled){ if(!fromSwipe)toast('이미 동기화 중이에요'); return false; }
+  sleepCloudSyncRunning=true; if(btn){btn.disabled=true;btn.textContent='↻ 동기화 중…';}
+  try{
+    save(); saveSet(); await cloudStatus();
+    if(!user){ if(!fromSwipe)toast('현재 기록 저장 완료 · 클라우드 로그인 필요'); return false; }
+    await autoSyncFromCloud(true); render();
+    if(!fromSwipe)toast('클라우드 동기화 완료'); return true;
+  }catch(e){ console.error('수동 동기화 실패:',e); if(!fromSwipe)toast('동기화 실패: '+(e?.message||e?.code||String(e))); else console.error('스와이프 동기화 실패:',e); return false; }
+  finally{ sleepCloudSyncRunning=false; if(btn){btn.disabled=false;btn.textContent='↻ 동기화';} }
+}
+
+$('#signup').onclick=async()=>{if(!sb&& !initCloud())return alert('클라우드 연결을 시작하지 못했어요.');const email=$('#email').value.trim(),password=$('#password').value;const {error}=await sb.auth.signUp({email,password});if(error){alert('회원가입 실패: '+error.message);return;}await cloudStatus();toast('회원가입 요청 완료');};
+$('#login').onclick=async()=>{if(!sb&& !initCloud())return alert('클라우드 연결을 시작하지 못했어요.');const email=$('#email').value.trim(),password=$('#password').value;const {data:authData,error}=await sb.auth.signInWithPassword({email,password});if(error){alert('로그인 실패: '+error.message);return;}user=authData.user;await cloudStatus();await autoSyncFromCloud();toast('클라우드에 로그인했어요');};
+$('#cloudGoogle').onclick=async()=>{
+  if(!sb&& !initCloud()){alert('클라우드 연결을 시작하지 못했어요. 인터넷 연결을 확인해 주세요.');return;}
+  if(window.AndroidAuth&&typeof window.AndroidAuth.openOAuth==='function'){
+    const {data:d,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'yangstudy://auth/callback',skipBrowserRedirect:true}});
+    if(error){alert('Google 로그인 실패: '+error.message);return;} if(!d?.url){alert('Google 로그인 주소를 만들지 못했어요.');return;} window.AndroidAuth.openOAuth(d.url);return;
+  }
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo}}); if(error)alert('Google 로그인 실패: '+error.message);
+};
+window.yangStudyHandleOAuthCallback=async function(callbackUrl){
+  try{
+    if(!sb&& !initCloud())throw new Error('Supabase 연결 실패'); const u=new URL(callbackUrl); const oauthError=u.searchParams.get('error_description')||u.searchParams.get('error'); if(oauthError)throw new Error(oauthError);
+    const code=u.searchParams.get('code'); if(!code)throw new Error('Google 로그인 인증 코드가 없습니다.'); const {data:authData,error}=await sb.auth.exchangeCodeForSession(code); if(error)throw error;
+    user=authData?.session?.user||authData?.user||null; await cloudStatus(); if(user)await autoSyncFromCloud(); render(); toast('Google 로그인이 완료됐어요'); return true;
+  }catch(e){console.error('Google OAuth callback 실패:',e);alert('Google 로그인 완료 처리 실패: '+(e?.message||e));return false;}
+};
+$('#logout').onclick=async()=>{if(sb)await sb.auth.signOut();user=null;await cloudStatus();toast('로그아웃했어요');};
+$('#syncBtn').onclick=()=>runManualCloudSync(false);
+$('#upload').onclick=uploadAllToCloud;
+$('#download').onclick=downloadAllFromCloud;
 $('#toggleCloudSetup').onclick=()=>$('#cloudSetup').classList.toggle('show');
-$('#backupData').onclick=()=>{const payload={version:1,type:'sleep-backup',exportedAt:new Date().toISOString(),data,settings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sleep-backup-${ymd(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('데이터 백업 완료')};
+$('#backupData').onclick=()=>{const payload={version:2,type:'sleep-backup',exportedAt:new Date().toISOString(),data,settings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sleep-backup-${ymd(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('백업 파일을 저장했어요');};
 $('#restoreData').onclick=()=>$('#restoreFile').click();
-$('#restoreFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const j=JSON.parse(await f.text());const src=j.data||j;if(!Array.isArray(src.sessions))throw new Error('올바른 수면 백업 파일이 아닙니다.');if(!confirm('백업 파일의 수면 기록을 복원할까요?'))return;data.sessions=src.sessions||[];data.active=src.active||null;if(j.settings)Object.assign(settings,j.settings);save();saveSet();render();toast('데이터 복원 완료')}catch(err){alert('데이터 복원 실패: '+err.message)}finally{e.target.value=''}};
-$('#cloudGoogle').onclick=async()=>{if(!sb)initCloud();if(!sb)return alert('클라우드 연결을 시작하지 못했어요.');if(window.AndroidAuth&&typeof window.AndroidAuth.openOAuth==='function'){const {data:d,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'yangstudy://auth/callback',skipBrowserRedirect:true}});if(error)return alert('Google 로그인 실패: '+error.message);if(!d?.url)return alert('Google 로그인 주소를 만들지 못했어요.');window.AndroidAuth.openOAuth(d.url);return}const redirectTo=window.location.origin+window.location.pathname;const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo}});if(error)alert('Google 로그인 실패: '+error.message)};
-window.yangStudyHandleOAuthCallback=async function(callbackUrl){try{if(!sb)initCloud();if(!sb)throw new Error('Supabase 연결 실패');const u=new URL(callbackUrl);const oauthError=u.searchParams.get('error_description')||u.searchParams.get('error');if(oauthError)throw new Error(oauthError);const code=u.searchParams.get('code');if(!code)throw new Error('Google 로그인 인증 코드가 없습니다.');const {data:authData,error}=await sb.auth.exchangeCodeForSession(code);if(error)throw error;user=authData?.session?.user||authData?.user||null;await cloudStatus();if(user){await syncCloud();toast('Google 로그인이 완료됐어요');return true}throw new Error('로그인 세션을 확인하지 못했습니다.')}catch(e){console.error('Google OAuth callback 실패:',e);alert('Google 로그인 완료 처리 실패: '+(e?.message||e));return false}};
-initCloud();cloudStatus();render();tick.lastLogicalToday=ymd(logicalToday());tick();setInterval(tick,500);
+$('#restoreFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const j=JSON.parse(await f.text());const src=j.data||j;if(!Array.isArray(src.sessions))throw new Error('올바른 수면 백업 파일이 아닙니다.');if(!confirm('백업 파일의 수면 기록을 복원할까요?'))return;data.sessions=src.sessions||[];data.deletedSessions=src.deletedSessions||[];data.active=src.active||null;data.activeUpdatedAt=Number(src.activeUpdatedAt||src.active?._updatedAt||0);if(j.settings)Object.assign(settings,j.settings);for(const x of data.sessions){if(!Number.isFinite(Number(x._updatedAt)))x._updatedAt=Number(x.end||x.start||0)||syncStamp();}save();saveSet();render();toast('백업 데이터를 복원했어요');}catch(err){alert('데이터 복원 실패: '+err.message);}finally{e.target.value='';}};
+
+initCloud();
+if(sb){
+  sb.auth.onAuthStateChange(async(event,session)=>{
+    user=session?.user||null; $('#cloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요'; $('#logout').style.display=user?'':'none';
+    if(user&&(event==='SIGNED_IN'||event==='INITIAL_SESSION'||event==='TOKEN_REFRESHED')){
+      try{await autoSyncFromCloud();render();}catch(e){console.error('세션 자동 동기화 실패:',e);render();}
+    }
+  });
+}
+(async()=>{await cloudStatus();if(user)await autoSyncFromCloud();render();tick.lastLogicalToday=ymd(logicalToday());tick();setInterval(tick,500);})();
 </script>
 
 
