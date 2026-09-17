@@ -317,8 +317,44 @@ body .wrap > .summary .metric span{
   color:#66736D!important;opacity:1!important;white-space:nowrap!important;
 }
 </style>
+
+<style id="v-final-sleep-timer-in-summary">
+/* Match lecture summary dimensions exactly; only sleep labels/colors differ. */
+body .wrap > .summary{padding:13px 16px 14px!important;margin-bottom:12px!important;min-height:0!important;}
+body .wrap > .summary .summary-head{
+  display:grid!important;grid-template-columns:minmax(56px,1fr) minmax(118px,150px) minmax(118px,150px)!important;
+  align-items:center!important;gap:8px!important;margin-bottom:11px!important;position:relative!important;
+}
+body .wrap > .summary .summary-title{font-size:15px!important;width:auto!important;text-align:left!important;justify-self:start!important;margin:0!important;}
+.sleep-summary-timer,.wake-gap-summary-timer{
+  min-width:0!important;width:100%!important;min-height:42px!important;border:1.5px solid #BFCFC6!important;background:#F7FAF8!important;
+  border-radius:11px!important;padding:5px 7px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+  box-shadow:0 2px 7px rgba(31,42,36,.08)!important;font-variant-numeric:tabular-nums!important;line-height:1.05!important;
+}
+.sleep-summary-timer{grid-column:2;justify-self:center!important;}
+.wake-gap-summary-timer{grid-column:3;justify-self:end!important;border-color:#B5533C!important;background:#F7E7E2!important;box-shadow:0 2px 9px rgba(181,83,60,.14)!important;}
+.sleep-summary-timer-label,.wake-gap-summary-timer-label{font-size:9.5px!important;font-weight:700!important;margin-bottom:3px!important;white-space:nowrap!important;}
+.sleep-summary-timer-label{color:#66736D!important}.wake-gap-summary-timer-label{color:#B5533C!important}
+.sleep-summary-timer-time,.wake-gap-summary-timer-time{font-size:19px!important;font-weight:800!important;letter-spacing:.06em!important;white-space:nowrap!important;}
+.sleep-summary-timer-time{color:var(--ink)!important}.wake-gap-summary-timer-time{color:#B5533C!important}
+.sleep-summary-timer.running{border-color:var(--accent)!important;background:#EEF4FA!important;box-shadow:0 2px 9px rgba(73,118,164,.14)!important;}
+.sleep-summary-timer.running .sleep-summary-timer-label,.sleep-summary-timer.running .sleep-summary-timer-time{color:var(--accent)!important;}
+body .wrap > .summary .summary-grid{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:10px!important;margin:0!important;}
+body .wrap > .summary .metric:nth-child(1){text-align:left!important}
+body .wrap > .summary .metric:nth-child(2){text-align:center!important;transform:translateX(10px)!important}
+body .wrap > .summary .metric:nth-child(3){text-align:right!important}
+#liveCard{padding-top:12px!important;}#liveCard .live-head{margin-bottom:8px!important;}#liveCard .live-note{margin:4px 0 12px!important;}
+</style>
+<style id="v-final-summary-sticky">
+/* Keep the sleep total card pinned while scrolling. */
+body .wrap > .summary{
+  position:sticky!important;
+  top:8px!important;
+  z-index:22!important;
+}
+</style>
 </head><body><div class="toast" id="toast"></div><div class="sync-blur" id="syncBlur"></div><div class="pull-indicator" id="pullIndicator">↓ 당겨서 동기화</div><main class="wrap swipe-stage" id="swipeStage">
-<section class="summary"><div class="summary-head"><div class="summary-title" id="summaryTitle">오늘 수면 합계</div><div class="count" id="count"></div></div><div class="summary-grid"><div class="metric"><span>총 수면</span><b id="total">0분</b></div><div class="metric"><span>가장 긴 수면</span><b id="longest">0분</b></div><div class="metric"><span>최근 기상</span><b id="lastWake">-</b></div><div class="metric"><span>기상 후 경과시간</span><b id="gap">-</b></div></div></section>
+<section class="summary"><div class="summary-head"><div class="summary-title" id="summaryTitle">오늘 수면 합계</div><div class="sleep-summary-timer" id="sleepSummaryTimer" aria-live="polite"><span class="sleep-summary-timer-label">수면시간</span><b class="sleep-summary-timer-time" id="liveTime">00:00:00</b></div><div class="wake-gap-summary-timer" id="wakeGapSummaryTimer" aria-live="polite"><span class="wake-gap-summary-timer-label">기상 후 경과시간</span><b class="wake-gap-summary-timer-time" id="wakeGapTimerTime">00:00:00</b></div></div><div class="summary-grid"><div class="metric"><b id="total">0분</b><span>수면시간</span></div><div class="metric"><b id="count">0회</b><span>수면 횟수</span></div><div class="metric"><b id="gap">0분</b><span>기상 후 경과시간</span></div></div></section>
 <div class="top-actions">
   <button class="chart-toggle-btn top-chart-btn" id="chartToggle">📈 그래프 보기</button>
   <div class="top-right-actions">
@@ -365,7 +401,7 @@ body .wrap > .summary .metric span{
 </div>
   
   <div class="section-title fixed-label">자동 입력</div>
-  <section class="live" id="liveCard"><div class="live-head"><b id="state">깨어 있어요</b><span id="now"></span></div><div class="live-time" id="liveTime">00:00:00</div><div class="live-note" id="liveNote">잠들 때 수면 시작을 누르세요</div><button class="action" id="action">☾ 수면 시작</button></section>
+  <section class="live" id="liveCard"><div class="live-head"><b id="state">깨어 있어요</b><span id="now"></span></div><div class="live-note" id="liveNote">잠들 때 수면 시작을 누르세요</div><button class="action" id="action">☾ 수면 시작</button></section>
   <div class="section-title fixed-label">직접 기록</div>
   <button class="action" id="manualAdd" style="margin:0 0 10px;background:var(--surface);color:var(--accent);border:1px solid var(--accent)">＋ 수면 기록</button>
 </div>
@@ -519,10 +555,7 @@ function header(){
   $('#weekMini').textContent=view==='day'?`${cur.getMonth()+1}월 ${weekOfMonth(cur.getFullYear(),cur.getMonth()+1,cur.getDate())}주차`:view==='week'?'주별 통계':view==='month'?'월별 통계':'년도별 통계';
   $('#dayRule').textContent=`하루 집계 기준 ${pad(settings.dayStartHour)}:00${settings.pendingDayStart?' · 변경 예약됨':''}`;
 }
-function render(){header();let days=periodDays(),arr=aggregate(days),ms=arr.map(x=>x.end-x.start),total=ms.reduce((a,b)=>a+b,0);$('#summaryTitle').textContent=view==='day'?'오늘 수면 합계':view==='week'?'이번 주 수면':view==='month'?'이번 달 수면':'올해 수면';$('#count').textContent=`${arr.length}회`;$('#total').textContent=dur(total);$('#longest').textContent=arr.length?dur(Math.max(...ms)):'0분';$('#lastWake').textContent=arr.length?(()=>{
-  const d=new Date(arr[arr.length-1].end);
-  return `${d.getHours()}시 ${pad(d.getMinutes())}분`;
-})():'-';
+function render(){header();let days=periodDays(),arr=aggregate(days),ms=arr.map(x=>x.end-x.start),total=ms.reduce((a,b)=>a+b,0);$('#summaryTitle').textContent=view==='day'?'오늘 수면 합계':view==='week'?'이번 주 수면':view==='month'?'이번 달 수면':'올해 수면';$('#count').textContent=`${arr.length}회`;$('#total').textContent=dur(total);
 if(arr.length){
   const latestWake=arr[arr.length-1].end;
   const isCurrentSleepDay=(view==='day' && ymd(cur)===ymd(logicalToday()));
@@ -920,15 +953,13 @@ function tick(){
     if(todayArr.length){
       const latestWake=todayArr[todayArr.length-1].end;
       $('#gap').textContent=n>=latestWake?dur(n-latestWake):'-';
-      {
-        const d=new Date(latestWake);
-        $('#lastWake').textContent=`${d.getHours()}시 ${pad(d.getMinutes())}분`;
-      }
     }
   }
   const changed=maybeActivatePending();
   $('#now').textContent=`현재 ${fmtHM(n)}`;
   $('#liveTime').textContent=data.active?live(n-Number(data.active.timerStartedAt ?? data.active.start)):'00:00:00';
+  { const todayArr=sessionsFor(logicalToday()); const latestWake=todayArr.length?todayArr[todayArr.length-1].end:null; const wakeGap=(!data.active && latestWake && n>=latestWake)?(n-latestWake):0; $('#wakeGapTimerTime').textContent=live(wakeGap); }
+  $('#sleepSummaryTimer')?.classList.toggle('running',!!data.active);
   $('#state').textContent=data.active?'수면 중':'깨어 있어요';
   $('#action').textContent=data.active?'☀ 수면 종료':'☾ 수면 시작';
   $('#action').classList.toggle('stop',!!data.active);

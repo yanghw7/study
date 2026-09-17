@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>공부장</title>
+<title>강의 기록장</title>
 
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
 <meta name="theme-color" content="#3B6E5C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="공부장">
+<meta name="apple-mobile-web-app-title" content="강의 기록장">
 <link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>
@@ -583,7 +583,7 @@ body{background:#f7f5fb!important}
 .cloud-actions .data-btn[style*="display:none"]{display:none!important}
 @media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
 </style>
-<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style>
+
 <style id="v136-datetime-value-center">
 .field-grid .ko-time-label{left:34px!important;right:34px!important;text-align:center!important;display:block!important;}
 </style>
@@ -1891,6 +1891,10 @@ function renderPeriods(){
     const minDT = dtLocalValue(dayStart);
     const maxDT = dtLocalValue(maxRecord);
 
+    const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
+    const startActionDisabled = !isCurrentLectureDay || !!(p.startDate && p.startTime);
+    const endActionDisabled = !isCurrentLectureDay || !(p.startDate && p.startTime) || !!(p.endDate && p.endTime);
+
     const card = document.createElement('div');
     card.className = 'period-card';
     card.innerHTML = `
@@ -1901,14 +1905,14 @@ function renderPeriods(){
       </div>
       <div class="field-grid">
         <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action start" data-lecture-action="start" data-idx="${idx}" ${p.startDate && p.startTime ? 'disabled' : ''}>▶ 강의 시작</button>
+          <button type="button" class="lecture-card-action start" data-lecture-action="start" data-idx="${idx}" ${startActionDisabled ? 'disabled' : ''}>▶ 강의 시작</button>
         </div>
         <div class="field time">
           <label>시작 시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime)}</div>
         </div>
         <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action end" data-lecture-action="end" data-idx="${idx}" ${p.startDate && p.startTime && !(p.endDate && p.endTime) ? '' : 'disabled'}>■ 강의 종료</button>
+          <button type="button" class="lecture-card-action end" data-lecture-action="end" data-idx="${idx}" ${endActionDisabled ? 'disabled' : ''}>■ 강의 종료</button>
         </div>
         <div class="field time">
           <label>종료 시간</label>
