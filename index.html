@@ -236,7 +236,7 @@ const baseTabLabels={study:'📚 공부 기록장',lecture:'🎓 강의 기록�
 function setExclusiveTabStatus(kind){
   Object.entries(tabs).forEach(([key,item])=>{
     if(key==='study') item.button.textContent = kind==='study' ? '📚 공부 기록장 기록중' : baseTabLabels.study;
-    else if(key==='lecture') item.button.textContent = kind==='lecture' ? '🎓 강의장 기록중' : baseTabLabels.lecture;
+    else if(key==='lecture') item.button.textContent = kind==='lecture' ? '🎓 강의 기록장 기록중' : baseTabLabels.lecture;
     else item.button.textContent = kind==='sleep' ? '🌙 수면 기록장 기록중' : baseTabLabels.sleep;
   });
 }

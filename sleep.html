@@ -2537,7 +2537,7 @@ $('#periodList').addEventListener('input', async (e) => {
 async function requestExclusiveSessionStart(atMs){
   if(window.parent===window) return true;
   try{
-    const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    const req='sleep-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     return await new Promise(resolve=>{
       const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
       function onMsg(ev){
@@ -2545,12 +2545,12 @@ async function requestExclusiveSessionStart(atMs){
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
       }
       window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req,at:atMs},location.origin);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'sleep',req,at:atMs},location.origin);
     });
   }catch(e){return true}
 }
 window.addEventListener('message',async ev=>{
-  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
+  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='sleep')return;
   let stopped=false;
   try{
     // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
@@ -2568,7 +2568,7 @@ window.addEventListener('message',async ev=>{
       renderPeriods();updateStudyTimer();updateWasteTimer();stopped=true;
     }
   }catch(e){console.warn('자동 기상 실패',e)}
-  window.parent.postMessage({type:'exclusive-session-stopped',kind:'lecture',req:ev.data.req,ok:true,stopped},location.origin);
+  window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped},location.origin);
 });
 
 function askConfirm(message, danger=false){
@@ -2664,7 +2664,7 @@ $('#periodList').addEventListener('click', async (e) => {
     }else{
       p.timerEndedAt = Math.round(serverNowMs());
     }
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
   }else if(action === 'cancel-start'){
     const msg = (p.endDate || p.endTime)
       ? `${idx+1}회 수면의 시작·종료 기록을 모두 지울까요?`
@@ -2679,7 +2679,7 @@ $('#periodList').addEventListener('click', async (e) => {
     if(cloudUser){
       try{ await cloudClearActiveTimer(); }catch(_){}
     }
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
     showToast('시작 기록을 취소했어요');
   }else if(action === 'cancel-end'){
     if(!(await askConfirm(`${idx+1}회 수면 종료를 취소할까요?`, true))) return;
