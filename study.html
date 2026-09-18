@@ -581,37 +581,42 @@ function fmtDuration(min){
 const dayKeys = ['일','월','화','수','목','금','토'];
 
 // 사용자 설정: 하루 집계 기준시간 / 일주일 시작 요일
-const SETTINGS_KEY = 'studySettings:v1';
-const SHARED_SETTINGS_KEY = 'journalSharedSettings:v1';
-const DEFAULT_SETTINGS = { dayStartHour: 11, weekStartDay: 6, pendingDayStart: null }; // 기본 11:00, 6 = 토요일
-function loadSettings(){
-  try{
-    const saved = JSON.parse(localStorage.getItem(SHARED_SETTINGS_KEY) || localStorage.getItem('studySettings:v1') || localStorage.getItem('lectureSettings:v1') || '{}');
-    const dayStartHour = Number(saved.dayStartHour);
-    const weekStartDay = Number(saved.weekStartDay);
-    let pendingDayStart = null;
-    if(saved.pendingDayStart && typeof saved.pendingDayStart === 'object'){
-      const ph = Number(saved.pendingDayStart.hour);
-      const pe = String(saved.pendingDayStart.effectiveAt || '');
-      if(Number.isInteger(ph) && ph >= 0 && ph <= 11 && pe && !isNaN(new Date(pe).getTime())){
-        pendingDayStart = {hour:ph, effectiveAt:pe};
-      }
+// v2: 설정은 index(부모)가 Supabase journal_settings 에서 로드해 postMessage 로 전달.
+const DEFAULT_SETTINGS = { dayStartHour: 11, weekStartDay: 6, pendingDayStart: null };
+let appSettings = { ...DEFAULT_SETTINGS };
+function saveSettings(){ /* v2: 설정 저장은 index(부모)가 담당. */ }
+function normalizeSharedSettings(x){
+  const s = (x && typeof x==='object') ? x : {};
+  const h = Number(s.dayStartHour);
+  const w = Number(s.weekStartDay);
+  let p = null;
+  if(s.pendingDayStart && typeof s.pendingDayStart==='object'){
+    const ph = Number(s.pendingDayStart.hour);
+    const pe = String(s.pendingDayStart.effectiveAt||'');
+    if(Number.isInteger(ph) && ph>=0 && ph<=11 && pe && !isNaN(new Date(pe).getTime())){
+      p = {hour:ph, effectiveAt:pe};
     }
-    return {
-      dayStartHour: Number.isInteger(dayStartHour) && dayStartHour >= 0 && dayStartHour <= 11 ? dayStartHour : DEFAULT_SETTINGS.dayStartHour,
-      weekStartDay: Number.isInteger(weekStartDay) && weekStartDay >= 0 && weekStartDay <= 6 ? weekStartDay : DEFAULT_SETTINGS.weekStartDay,
-      pendingDayStart
-    };
-  }catch(e){ return {...DEFAULT_SETTINGS}; }
+  }
+  return {
+    dayStartHour: Number.isInteger(h) && h>=0 && h<=11 ? h : DEFAULT_SETTINGS.dayStartHour,
+    weekStartDay: Number.isInteger(w) && w>=0 && w<=6 ? w : DEFAULT_SETTINGS.weekStartDay,
+    pendingDayStart: p
+  };
 }
-let appSettings = loadSettings();
-function saveSettings(){ const raw=JSON.stringify(appSettings); localStorage.setItem(SHARED_SETTINGS_KEY, raw); localStorage.setItem(SETTINGS_KEY, raw); }
-// 공통 설정이 아직 없으면 기존 Study/Lecture 설정(없으면 기본 11:00/토요일)으로 1회 생성
-if(!localStorage.getItem(SHARED_SETTINGS_KEY)) saveSettings();
-window.addEventListener('storage', async (e)=>{
-  if(e.key!==SHARED_SETTINGS_KEY || !e.newValue) return;
-  try{ appSettings=loadSettings(); maybeActivatePending(); const latest=logicalToday(); if(cur>latest) cur=latest; await renderCurrentView(); }catch(_){}
+window.addEventListener('message', (ev)=>{
+  if(ev.origin!==location.origin) return;
+  if(ev.data?.type!=='journal-shared-settings-changed') return;
+  try{
+    appSettings = normalizeSharedSettings(ev.data.settings);
+    maybeActivatePending();
+    const latest = logicalToday();
+    if(cur > latest) cur = latest;
+    renderCurrentView();
+  }catch(e){ console.warn('설정 반영 실패', e); }
 });
+if(window.parent!==window){
+  try{ window.parent.postMessage({type:'journal-request-shared-settings'}, location.origin); }catch(e){}
+}
 function nextBoundaryForHour(hour, from = new Date()){
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate(), hour, 0, 0, 0);
   if(d <= from) d.setDate(d.getDate()+1);
@@ -624,7 +629,10 @@ function maybeActivatePending(){
   if(new Date() < when) return false;
   appSettings.dayStartHour = p.hour;
   appSettings.pendingDayStart = null;
-  saveSettings();
+  // v2: 활성화된 값을 부모(index)에게 알려 Supabase 에 반영
+  if(window.parent!==window){
+    try{ window.parent.postMessage({type:'journal-activate-pending-day-start',hour:p.hour}, location.origin); }catch(e){}
+  }
   return true;
 }
 maybeActivatePending();
@@ -830,28 +838,40 @@ function mergeMonths(localMonth, remoteMonth, ym=''){
 }
 
 async function loadMonth(ym){
+  if(monthCache[ym]) return monthCache[ym];
+  if(!sbClient || !cloudUser){
+    monthCache[ym] = {};
+    return monthCache[ym];
+  }
   try{
-    if(monthCache[ym]) return monthCache[ym];
-    const raw = localStorage.getItem(`month:${ym}`);
-    const m = raw ? JSON.parse(raw) : {};
+    const {data, error} = await sbClient.from('study_months')
+      .select('data').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
+    if(error) throw error;
+    const m = data?.data || {};
     const [year, mo] = ym.split('-').map(Number);
     Object.keys(m).forEach(dk => {
       (m[dk].periods||[]).forEach(p => migratePeriod(p, year, mo, Number(dk)));
     });
     monthCache[ym] = ensureMonthSync(m, ym);
   }catch(e){
+    console.warn('월 데이터 로드 실패:', ym, e);
     monthCache[ym] = {};
   }
   return monthCache[ym];
 }
 
 async function saveMonth(ym){
+  if(!sbClient || !cloudUser){
+    showToast('로그인 후에만 저장할 수 있어요');
+    return false;
+  }
   try{
-    localStorage.setItem(`month:${ym}`, JSON.stringify(monthCache[ym]));
     await cloudSaveMonth(ym);
+    return true;
   }catch(e){
-    console.error('저장 실패:', e);
-    showToast('저장에 실패했어요 (저장 공간이 가득 찼거나 브라우저 저장이 꺼져있을 수 있어요)');
+    console.error('클라우드 저장 실패:', e);
+    showToast('클라우드 저장에 실패했어요. 인터넷 연결을 확인해주세요.');
+    return false;
   }
 }
 
@@ -2611,11 +2631,6 @@ async function renderYearView(){
   const el = $('#yearView');
   const currentYear = logicalToday().getFullYear();
   const years = new Set([cur.getFullYear()]);
-  for(let i=0; i<localStorage.length; i++){
-    const k = localStorage.key(i);
-    const m = k && k.match(/^month:(\d{4})-\d{2}$/);
-    if(m) years.add(Number(m[1]));
-  }
   Object.keys(monthCache).forEach(k=>{ const m=k.match(/^(\d{4})-\d{2}$/); if(m) years.add(Number(m[1])); });
   const sorted = [...years].filter(y=>y<=currentYear).sort((a,b)=>a-b);
   let rows = '';
@@ -3049,12 +3064,6 @@ async function deleteAllStudyRecords(){
   // 예약된 자동 저장이 삭제 직후 빈/옛 기록을 다시 저장하지 않도록 모두 취소한다.
   Object.keys(saveTimers).forEach(k=>{ clearTimeout(saveTimers[k]); delete saveTimers[k]; });
 
-  const keys=[];
-  for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);
-    if(k && k.startsWith('month:')) keys.push(k);
-  }
-  keys.forEach(k=>localStorage.removeItem(k));
   monthCache = {};
   cur = logicalToday();
   enforceStudyDayLimit();
@@ -3067,13 +3076,7 @@ $('#deleteAllRecords').onclick = deleteAllStudyRecords;
 
 // 기존 공부일에 현재 기준시간을 찍어 두어, 이후 설정 변경으로 과거 기록 범위가 바뀌지 않게 한다.
 async function stampExistingStudyDays(){
-  const monthKeys = new Set();
-  for(let i=0; i<localStorage.length; i++){
-    const k = localStorage.key(i);
-    const m = k && k.match(/^month:(\d{4}-\d{2})$/);
-    if(m) monthKeys.add(m[1]);
-  }
-  Object.keys(monthCache).forEach(k=>{ if(/^\d{4}-\d{2}$/.test(k)) monthKeys.add(k); });
+  const monthKeys = new Set(Object.keys(monthCache).filter(k=>/^\d{4}-\d{2}$/.test(k)));
   for(const ym of monthKeys){
     await loadMonth(ym);
     const m = monthCache[ym] || {};
@@ -3086,32 +3089,8 @@ async function stampExistingStudyDays(){
 }
 
 $('#settingsSave').onclick = async () => {
-  maybeActivatePending();
-  const requestedHour = Number($('#dayStartSelect').value);
-  const requestedWeek = Number($('#weekStartSelect').value);
-  await stampExistingStudyDays();
-
-  appSettings.weekStartDay = requestedWeek;
-  if(requestedHour === appSettings.dayStartHour){
-    appSettings.pendingDayStart = null;
-    saveSettings();
-    closeSettings();
-    await renderCurrentView();
-    showToast('설정을 저장했어요');
-    return;
-  }
-
-  // 현재 기준과 새 기준의 다음 경계 중 더 늦은 시점에 전환한다.
-  // 이렇게 하면 날짜가 뒤로 튀거나 시간 구간이 겹치는 현상을 막을 수 있다.
-  const now = new Date();
-  const oldBoundary = nextBoundaryForHour(appSettings.dayStartHour, now);
-  const newBoundary = nextBoundaryForHour(requestedHour, now);
-  const effectiveAt = new Date(Math.max(oldBoundary.getTime(), newBoundary.getTime()));
-  appSettings.pendingDayStart = { hour: requestedHour, effectiveAt: effectiveAt.toISOString() };
-  saveSettings();
-  closeSettings();
-  await renderCurrentView();
-  showToast(`${pad(requestedHour)}:00 기준 · ${formatEffectiveAt(effectiveAt)}부터 적용`);
+  // v2: 설정 UI 는 index(부모)의 공통 설정 패널로 일원화.
+  alert('설정은 상단 ⚙ 공통 설정에서 변경해주세요.');
 };
 
 // 예약 적용 시점을 지나 앱을 켜 둔 경우에도 자동 반영한다.
@@ -3184,7 +3163,6 @@ async function cloudSaveMonth(ym){
     }
     if(writeOk){
       monthCache[ym]=merged;
-      localStorage.setItem(`month:${ym}`,JSON.stringify(merged));
       return;
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
@@ -3219,19 +3197,12 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
   }
   const studyRows=(data||[]).filter(row=>/^\d{4}-\d{2}$/.test(String(row.ym||'')));
   if(studyRows.length===0) return;
-  const needsPush=[];
   for(const row of studyRows){
     const ym=row.ym;
-    let local={};
-    try{ local=JSON.parse(localStorage.getItem(`month:${ym}`)||'{}'); }catch(e){}
     const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
-    const merged=mergeMonths(local,remoteNorm,ym);
-    localStorage.setItem(`month:${ym}`,JSON.stringify(merged));
-    monthCache[ym]=merged;
-    if(!jsonSame(merged,remoteNorm)) needsPush.push(ym);
+    const existing=monthCache[ym];
+    monthCache[ym]= existing ? mergeMonths(existing, remoteNorm, ym) : remoteNorm;
   }
-  // 이 기기에만 있던 변경도 다시 클라우드에 병합해 다른 기기에서 받을 수 있게 한다.
-  for(const ym of needsPush) await cloudSaveMonth(ym);
   enforceStudyDayLimit();
   if(isPeriodInputEditing()){
     // 입력 중 input 요소를 교체하면 Android/Samsung 플로팅 키보드가 닫힐 수 있다.
@@ -3253,13 +3224,8 @@ async function downloadAllFromCloud(){
   const studyRows=(data||[]).filter(row=>/^\d{4}-\d{2}$/.test(String(row.ym||'')));
   if(studyRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 공부 기록을 교체할까요?')) return;
-  const keys=[];
-  for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i); if(k && k.startsWith('month:')) keys.push(k);
-  }
-  keys.forEach(k=>localStorage.removeItem(k));
-  studyRows.forEach(row=>localStorage.setItem(`month:${row.ym}`, JSON.stringify(row.data || {})));
   monthCache={};
+  studyRows.forEach(row=>{ monthCache[row.ym]=ensureMonthSync(deepClone(row.data||{}),row.ym); });
   enforceStudyDayLimit();
   await renderCurrentView();
   showToast('클라우드 기록을 불러왔어요');
@@ -3562,7 +3528,7 @@ async function applyActiveTimerRow(row){
   found.p.timerEndedAt =
     row.status === 'stopped' && Number.isFinite(stopped) ? stopped : null;
 
-  localStorage.setItem(`month:${found.ym}`, JSON.stringify(monthCache[found.ym]));
+  // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
     await renderCurrentView();
@@ -3653,13 +3619,9 @@ window.yangStudyAppResume = async function(){
 // ---------- 전체 데이터 백업 / 복원 ----------
 function collectBackupData(){
   const months = {};
-  for(let i=0; i<localStorage.length; i++){
-    const key = localStorage.key(i);
-    if(key && key.startsWith('month:')){
-      try{ months[key.slice(6)] = JSON.parse(localStorage.getItem(key)); }
-      catch(e){ months[key.slice(6)] = {}; }
-    }
-  }
+  Object.keys(monthCache).forEach(ym=>{
+    if(/^\d{4}-\d{2}$/.test(ym)) months[ym]=monthCache[ym];
+  });
   return {
     app: 'study-log',
     version: 1,
@@ -3686,50 +3648,9 @@ showToast('백업 파일을 저장했어요');
 $('#restoreData').onclick = () => $('#restoreFile').click();
 
 $('#restoreFile').addEventListener('change', async (e) => {
-  const file = e.target.files && e.target.files[0];
-  if(!file) return;
-  try{
-    const parsed = JSON.parse(await file.text());
-    if(!parsed || parsed.app !== 'study-log' || !parsed.months || typeof parsed.months !== 'object'){
-      throw new Error('invalid backup');
-    }
-    if(!confirm('백업 데이터를 복원하면 현재 공부 기록이 백업 내용으로 교체됩니다. 계속할까요?')){
-      e.target.value = '';
-      return;
-    }
-    const keysToRemove = [];
-    for(let i=0; i<localStorage.length; i++){
-      const key = localStorage.key(i);
-      if(key && key.startsWith('month:')) keysToRemove.push(key);
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    Object.entries(parsed.months).forEach(([ym, data]) => {
-      if(/^\d{4}-\d{2}$/.test(ym)){
-        localStorage.setItem(`month:${ym}`, JSON.stringify(data || {}));
-      }
-    });
-    if(parsed.settings && typeof parsed.settings === 'object'){
-      const h = Number(parsed.settings.dayStartHour);
-      const w = Number(parsed.settings.weekStartDay);
-      if(Number.isInteger(h) && h >= 0 && h <= 11 && Number.isInteger(w) && w >= 0 && w <= 6){
-        let pendingDayStart = null;
-        const p = parsed.settings.pendingDayStart;
-        if(p && Number.isInteger(Number(p.hour)) && Number(p.hour) >= 0 && Number(p.hour) <= 11 && p.effectiveAt && !isNaN(new Date(p.effectiveAt).getTime())){
-          pendingDayStart = {hour:Number(p.hour), effectiveAt:String(p.effectiveAt)};
-        }
-        appSettings = {dayStartHour:h, weekStartDay:w, pendingDayStart};
-        saveSettings();
-        maybeActivatePending();
-      }
-    }
-    monthCache = {};
-    await renderDay();
-    showToast('백업 데이터를 복원했어요');
-  }catch(err){
-    alert('올바른 공부장 백업 파일이 아니에요.');
-  }finally{
-    e.target.value = '';
-  }
+  // v2: 백업/복원 UI 는 index(부모)에서 처리.
+  alert('복원은 홈 화면의 데이터 복원 버튼을 사용해주세요.');
+  e.target.value = '';
 });
 renderDay();
 </script>
