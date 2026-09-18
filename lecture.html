@@ -3637,7 +3637,13 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
   const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
-  if(lectureRows.length===0) return;
+  // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 (L: 접두사)
+  const serverYms = new Set(lectureRows.map(r=>String(r.ym||'')));
+  Object.keys(monthCache).forEach(localYm => {
+    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has('L:'+localYm)){
+      delete monthCache[localYm];
+    }
+  });
   for(const row of lectureRows){
     const ym=lectureLocalYm(row.ym);
     if(!ym) continue;

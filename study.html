@@ -3250,7 +3250,13 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
   const studyRows=(data||[]).filter(row=>/^\d{4}-\d{2}$/.test(String(row.ym||'')));
-  if(studyRows.length===0) return;
+  // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 → 다른 기기 삭제 반영
+  const serverYms = new Set(studyRows.map(r=>String(r.ym||'')));
+  Object.keys(monthCache).forEach(localYm => {
+    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has(localYm)){
+      delete monthCache[localYm];
+    }
+  });
   for(const row of studyRows){
     const ym=row.ym;
     const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
