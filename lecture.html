@@ -1748,7 +1748,6 @@ window.addEventListener('pageshow', ()=>{
 let activeTimerPollId = null;
 let clockCalibrateId = null;
 let rolloverCheckId = null;
-let studySyncPollId = null;
 
 function startBackgroundSensitiveLoops(){
   // hidden 상태에서는 시작하지 않는다.
@@ -1757,7 +1756,7 @@ function startBackgroundSensitiveLoops(){
   if(!activeTimerPollId){
     activeTimerPollId = setInterval(()=>{
       if(cloudUser) syncActiveTimerFromCloud(false);
-    }, 2000);
+    }, 30000);   // [RT] 폴백. realtime이 기본
   }
 
   if(!clockCalibrateId){
@@ -1770,13 +1769,6 @@ function startBackgroundSensitiveLoops(){
     rolloverCheckId = setInterval(()=>{
       checkStudyDayBoundaryRollover();
     }, 1000);
-  }
-
-  // [FIX8] 다른 기기의 study_months 입력을 주기적으로 따라잡는다.
-  if(!studySyncPollId){
-    studySyncPollId = setInterval(()=>{
-      if(cloudUser) autoSyncFromCloud();
-    }, 5000);
   }
 }
 
@@ -1794,11 +1786,6 @@ function stopBackgroundSensitiveLoops(){
   if(rolloverCheckId){
     clearInterval(rolloverCheckId);
     rolloverCheckId = null;
-  }
-
-  if(studySyncPollId){
-    clearInterval(studySyncPollId);
-    studySyncPollId = null;
   }
 }
 
@@ -4064,6 +4051,12 @@ function startActiveTimerRealtime(){
         'postgres_changes',
         {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${cloudUser.id}`},
         ()=>syncActiveTimerFromCloud(true)
+      )
+      // [RT] study_months 변경도 서버가 즉시 밀어준다
+      .on(
+        'postgres_changes',
+        {event:'*',schema:'public',table:'study_months',filter:`user_id=eq.${cloudUser.id}`},
+        ()=>{ autoSyncFromCloud(); }
       )
       .subscribe();
   }catch(e){
