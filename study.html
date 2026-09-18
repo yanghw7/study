@@ -1476,7 +1476,10 @@ function startBackgroundSensitiveLoops(){
 
   if(!activeTimerPollId){
     activeTimerPollId = setInterval(()=>{
-      if(cloudUser) syncActiveTimerFromCloud(false);
+      if(cloudUser){
+        syncActiveTimerFromCloud(false);
+        autoSyncFromCloud();   // [DEL-SYNC] 삭제 반영 폴링
+      }
     }, 60000);   // [RT] 폴백. realtime이 기본
   }
 
