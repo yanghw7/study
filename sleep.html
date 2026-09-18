@@ -4114,6 +4114,14 @@ function collectBackupData(){
   };
 }
 
+/* [fix] 백업/복원 UI는 index가 소유. iframe 내 sleep.html에는 요소가 없어
+   TypeError로 이후 초기화(로그인/동기화)가 죽는 문제 방지. */
+(() => {
+  const _b = document.getElementById('backupData');
+  const _r = document.getElementById('restoreData');
+  const _f = document.getElementById('restoreFile');
+  if (!_b || !_r || !_f) { console.info('[sleep] 백업/복원 UI 없음 — skip'); return; }
+
 $('#backupData').onclick = () => {
   const data = collectBackupData();
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -4176,6 +4184,8 @@ $('#restoreFile').addEventListener('change', async (e) => {
     e.target.value = '';
   }
 });
+})();
+
 renderDay();
 </script>
 
