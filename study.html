@@ -408,6 +408,11 @@
 }
 .add-btn:active{transform:translateY(1px)}
 </style>
+<style id="time-field-lock">
+/* 시간 입력 잠금 상태 */
+.field.time.disabled{opacity:.55;cursor:not-allowed;}
+.field.time.disabled .ko-time-label{color:var(--ink-soft);font-weight:600;}
+</style>
 </head>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
@@ -1713,6 +1718,21 @@ function renderPeriods(){
     const minDT = dtLocalValue(dayStart);
     const maxDT = dtLocalValue(maxRecord);
 
+    // 페이지 입력 상태에 따라 시간 필드 잠금 여부 결정
+    const startPageBlank = String(p.startPage ?? '').trim() === '';
+    const endPageBlank   = String(p.endPage   ?? '').trim() === '';
+    const startTimeDisabled = startPageBlank;
+    const endTimeDisabled   = startPageBlank || endPageBlank;
+
+    const startTimePlaceholder = startPageBlank
+      ? '시작 페이지를 입력하면 자동 기록'
+      : (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정');
+    const endTimePlaceholder = startPageBlank
+      ? '시작 페이지를 입력하면 자동 기록'
+      : (endPageBlank
+          ? '종료 페이지를 입력하면 자동 기록'
+          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
+
     const card = document.createElement('div');
     card.className = 'period-card';
     card.innerHTML = `
@@ -1726,17 +1746,17 @@ function renderPeriods(){
           <label>시작 페이지</label>
           <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="startPage" value="${p.startPage ?? ''}">
         </div>
-        <div class="field time">
+        <div class="field time${startTimeDisabled ? ' disabled' : ''}">
           <label>시작 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime) || '시간을 눌러 수정'}</div>
+          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" ${startTimeDisabled ? 'disabled' : ''} value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${startTimePlaceholder}</div>
         </div>
         <div class="field">
           <label>종료 페이지</label>
           <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="endPage" min="${String(p.startPage||'').trim() || 1}" value="${p.endPage ?? ''}">
         </div>
-        <div class="field time">
+        <div class="field time${endTimeDisabled ? ' disabled' : ''}">
           <label>종료 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime) || '시간을 눌러 수정'}</div>
+          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" ${endTimeDisabled ? 'disabled' : ''} value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${endTimePlaceholder}</div>
         </div>
       </div>
       <div class="period-stats">
@@ -1799,6 +1819,44 @@ function refreshStats(){
   $('#sumPages').classList.toggle('stat-error', sumPagesErr);
   $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
   renderDayCharts();
+}
+
+// 페이지 입력 상태에 따라 시작/종료 시간 입력칸의 잠금 여부를 즉시 갱신한다.
+// (포커스를 유지하기 위해 renderPeriods() 를 다시 부르지 않고 DOM 만 수정)
+function refreshTimeFieldDisabled(idx){
+  const day = getDayData();
+  const p = day.periods[idx];
+  if(!p) return;
+
+  const startPageBlank = String(p.startPage ?? '').trim() === '';
+  const endPageBlank   = String(p.endPage   ?? '').trim() === '';
+  const startDisabled  = startPageBlank;
+  const endDisabled    = startPageBlank || endPageBlank;
+
+  const startInput = document.querySelector(`#periodList input[data-k="start"][data-idx="${idx}"]`);
+  const endInput   = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
+  const startField = startInput?.closest('.field.time');
+  const endField   = endInput?.closest('.field.time');
+
+  if(startInput) startInput.disabled = startDisabled;
+  if(endInput)   endInput.disabled   = endDisabled;
+  if(startField) startField.classList.toggle('disabled', startDisabled);
+  if(endField)   endField.classList.toggle('disabled', endDisabled);
+
+  const startLabel = startField?.querySelector('.ko-time-label');
+  if(startLabel){
+    startLabel.textContent = startDisabled
+      ? '시작 페이지를 입력하면 자동 기록'
+      : (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정');
+  }
+  const endLabel = endField?.querySelector('.ko-time-label');
+  if(endLabel){
+    endLabel.textContent = startPageBlank
+      ? '시작 페이지를 입력하면 자동 기록'
+      : (endPageBlank
+          ? '종료 페이지를 입력하면 자동 기록'
+          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
+  }
 }
 
 async function renderDay(){
@@ -1954,6 +2012,8 @@ $('#periodList').addEventListener('click', (e) => {
   if(e.target.closest('button')) return;
   const field = e.target.closest('.field.time');
   if(!field) return;
+  // 잠긴 시간 필드는 시간 선택기를 열지 않는다.
+  if(field.classList.contains('disabled')) return;
   const input = field.querySelector('input[type="datetime-local"]');
   if(!input) return;
   try{
@@ -2293,14 +2353,8 @@ $('#periodList').addEventListener('input', async (e) => {
         }
       }
     }
-    // 페이지 자동기록 직후 시작/종료일시 표시도 즉시 갱신한다.
-    const dtInputEl = $('#periodList').querySelector(`input[data-k="${k==='startPage'?'start':'end'}"][data-idx="${idx}"]`);
-    if(dtInputEl){
-      const labelEl = dtInputEl.nextElementSibling;
-      if(labelEl && labelEl.classList.contains('ko-time-label')){
-        labelEl.textContent = koDateTimeLabel(p[k==='startPage'?'startDate':'endDate'], p[k==='startPage'?'startTime':'endTime']);
-      }
-    }
+    // 페이지 입력 변화에 따라 시작/종료 시간 필드의 잠금 상태와 라벨을 갱신한다.
+    refreshTimeFieldDisabled(idx);
     updateStudyTimer();
   }
   // 직접 입력은 합계만 다시 계산하며 실시간 타이머 상태는 만들지 않는다.
