@@ -3488,8 +3488,16 @@ async function applyActiveTimerRow(row){
   if(!Number.isFinite(started)) return false;
 
   found.p.timerStartedAt = started;
-  found.p.timerEndedAt =
-    row.status === 'stopped' && Number.isFinite(stopped) ? stopped : null;
+  if(row.status === 'stopped' && Number.isFinite(stopped)){
+    found.p.timerEndedAt = stopped;
+  }else if(row.status === 'running'){
+    // 서버가 아직 running인데 로컬에 이미 종료시각이 있으면
+    // (stop handler와 2초 폴링 간 race) 로컬 값을 유지한다.
+    const localEnd = Number(found.p.timerEndedAt);
+    if(!(Number.isFinite(localEnd) && localEnd > started)){
+      found.p.timerEndedAt = null;
+    }
+  }
 
   // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
