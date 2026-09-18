@@ -2066,10 +2066,10 @@ function renderPeriods(){
       startDisabled = false;
       startClass = 'start cancel-start';
     }
-    let endAction = 'end', endLabel = '☀ 기상', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
+    let endAction = 'end', endLabel = '☀ 깨어남 입력', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
     if(hasEnd){
       endAction = 'cancel-end';
-      endLabel = '기상 취소';
+      endLabel = '깨어남 취소';
       endDisabled = false;
       endClass = 'end cancel-end';
     }
