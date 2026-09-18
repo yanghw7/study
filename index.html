@@ -479,7 +479,17 @@ let exclusiveQueue=Promise.resolve();
         .on('postgres_changes',
             {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${user.id}`},
             (payload)=>apply(payload.new))
-        .subscribe();
+        .subscribe((status)=>{
+          // ▼ 채널 상태 감시 + 자동 재연결
+          if(status === 'SUBSCRIBED'){
+            console.info('[RT-TAB] subscribed');
+          }else if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+            console.warn('[RT-TAB] realtime', status, '- 3초 후 재시도');
+            try{ sb.removeChannel(ch); }catch(_){}
+            ch = null;
+            setTimeout(ensure, 3000);
+          }
+        });
       sb.from('active_timer').select('*').eq('user_id',user.id).maybeSingle()
         .then(({data:row})=>apply(row));
     });
@@ -490,6 +500,14 @@ let exclusiveQueue=Promise.resolve();
     if(ch){ try{ sb.removeChannel(ch); }catch(e){} ch=null; }
     setTimeout(ensure,300);
   });
+
+  // ▼ 부팅 시 세션이 아직 복원 안 됐을 수 있으므로, 채널이 붙을 때까지 재시도한다.
+  //   (최대 약 5초, 800ms 간격 6회)
+  let ensureTries = 0;
+  const ensureTimer = setInterval(()=>{
+    if(ch || ensureTries++ >= 6){ clearInterval(ensureTimer); return; }
+    ensure();
+  }, 800);
 })();
 
 // 시작 전환 하나의 기록: 새로 시작된 kind와, 그로 인해 자동 종료된 이전 kind.
