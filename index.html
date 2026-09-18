@@ -17,8 +17,6 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .tabs button.active.study{background:#285f50;color:#fff}
 .tabs button.active.lecture{background:#67538b;color:#fff}
 .tabs button.active.sleep{background:#456d96;color:#fff}
-.tabs button.recording{color:#c9342b!important}
-.tabs button.recording.active{color:#fff!important}
 .frame{display:none;flex:1 1 auto;width:100%;min-height:0;border:0;background:#fff}
 .frame.active{display:block}
 
@@ -150,109 +148,36 @@ function openTab(which){
       item.frame.src=item.frame.dataset.src;
     }
   });
-  saveLastTabToCloud(which);
+  try{localStorage.setItem('journal:lastTab',which)}catch(e){}
 }
 Object.entries(tabs).forEach(([key,item])=>item.button.onclick=()=>openTab(key));
 let first='study';
+try{const saved=localStorage.getItem('journal:lastTab');if(saved&&tabs[saved])first=saved}catch(e){}
 openTab(first);
-restoreLastTabFromCloud().then(tab=>{ if(tab && tab!==first && tabs[tab]) openTab(tab); });
 
 
 const SHARED_SETTINGS_KEY='journalSharedSettings:v1';
 const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
-let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
-let sharedSettingsLoaded=false;
-let sbSettingsClient=null;
-
-function initSettingsClient(){
-  if(sbSettingsClient) return sbSettingsClient;
+function readSharedSettings(){
   try{
-    sbSettingsClient=window.supabase.createClient(
-      'https://nvpvxtwebzefhgulswsv.supabase.co',
-      'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo',
-      {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}
-    );
-    return sbSettingsClient;
-  }catch(e){ return null; }
-}
-
-async function loadSharedSettingsFromCloud(){
-  const sb=initSettingsClient();
-  if(!sb) return {...SHARED_SETTINGS_DEFAULT};
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session?.user){
-    sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
-    sharedSettingsLoaded=false;
-    return {...SHARED_SETTINGS_DEFAULT};
-  }
-  const {data,error}=await sb.from('journal_settings')
-    .select('day_start_hour,pending_day_start,week_start_day')
-    .eq('user_id',session.user.id).maybeSingle();
-  if(error){
-    console.warn('설정 로드 실패, 기본값 사용:',error);
-    return {...SHARED_SETTINGS_DEFAULT};
-  }
-  const norm={
-    dayStartHour:Number.isInteger(data?.day_start_hour)&&data.day_start_hour>=0&&data.day_start_hour<=11?data.day_start_hour:SHARED_SETTINGS_DEFAULT.dayStartHour,
-    weekStartDay:Number.isInteger(data?.week_start_day)&&data.week_start_day>=0&&data.week_start_day<=6?data.week_start_day:SHARED_SETTINGS_DEFAULT.weekStartDay,
-    pendingDayStart:data?.pending_day_start||null
-  };
-  sharedSettingsCache=norm;
-  sharedSettingsLoaded=true;
-  return norm;
-}
-
-async function readSharedSettings(){
-  if(!sharedSettingsLoaded) await loadSharedSettingsFromCloud();
-  return {...sharedSettingsCache};
-}
-
-async function writeSharedSettingsToCloud(patch){
-  const sb=initSettingsClient();
-  if(!sb) throw new Error('클라우드 연결 실패');
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session?.user) throw new Error('로그인이 필요합니다. 설정은 클라우드에만 저장됩니다.');
-  const current=await readSharedSettings();
-  const next={...current,...patch};
-  const payload={
-    user_id:session.user.id,
-    day_start_hour:next.dayStartHour,
-    pending_day_start:next.pendingDayStart??null,
-    week_start_day:next.weekStartDay,
-    updated_at:new Date().toISOString()
-  };
-  const {error}=await sb.from('journal_settings').upsert(payload,{onConflict:'user_id'});
-  if(error) throw error;
-  sharedSettingsCache=next;
-  notifySharedSettings(next);
-  return next;
-}
-
-async function saveLastTabToCloud(tab){
-  const sb=initSettingsClient();
-  if(!sb) return;
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session?.user) return;
-  await sb.from('journal_settings').upsert({
-    user_id:session.user.id,
-    last_tab:tab,
-    updated_at:new Date().toISOString()
-  },{onConflict:'user_id'});
-}
-
-async function restoreLastTabFromCloud(){
-  const sb=initSettingsClient();
-  if(!sb) return null;
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session?.user) return null;
-  const {data}=await sb.from('journal_settings')
-    .select('last_tab').eq('user_id',session.user.id).maybeSingle();
-  return data?.last_tab||null;
+    const x=JSON.parse(localStorage.getItem(SHARED_SETTINGS_KEY)||'null')||{};
+    return {
+      dayStartHour:Number.isInteger(+x.dayStartHour)&&+x.dayStartHour>=0&&+x.dayStartHour<=11?+x.dayStartHour:SHARED_SETTINGS_DEFAULT.dayStartHour,
+      weekStartDay:Number.isInteger(+(x.weekStartDay ?? x.weekStart))&&+(x.weekStartDay ?? x.weekStart)>=0&&+(x.weekStartDay ?? x.weekStart)<=6?+(x.weekStartDay ?? x.weekStart):SHARED_SETTINGS_DEFAULT.weekStartDay
+    };
+  }catch(e){return {...SHARED_SETTINGS_DEFAULT}}
 }
 function notifySharedSettings(v){
   for(const item of Object.values(tabs)){
     try{item.frame.contentWindow?.postMessage({type:'journal-shared-settings-changed',settings:v},location.origin)}catch(e){}
   }
+}
+function writeSharedSettings(patch){
+  const next={...readSharedSettings(),...patch};
+  localStorage.setItem(SHARED_SETTINGS_KEY,JSON.stringify(next));
+  window.dispatchEvent(new StorageEvent('storage',{key:SHARED_SETTINGS_KEY,newValue:JSON.stringify(next)}));
+  notifySharedSettings(next);
+  return next;
 }
 function initSharedSettingsUI(){
   const btn=document.getElementById('sharedSettingsBtn');
@@ -264,8 +189,8 @@ function initSharedSettingsUI(){
     o.value=String(h); o.textContent=String(h).padStart(2,'0')+':00';
     hour.appendChild(o);
   }
-  async function paint(){
-    const v=await readSharedSettings();
+  function paint(){
+    const v=readSharedSettings();
     hour.value=String(v.dayStartHour);
     week.value=String(v.weekStartDay);
   }
@@ -279,26 +204,9 @@ function initSharedSettingsUI(){
   });
   panel.addEventListener('click',e=>e.stopPropagation());
   document.addEventListener('click',()=>{panel.classList.remove('show');panel.setAttribute('aria-hidden','true')});
-  hour.addEventListener('change',async()=>{
-    try{ await writeSharedSettingsToCloud({dayStartHour:+hour.value}); }
-    catch(e){ alert('설정 저장 실패: '+(e?.message||e)); await paint(); }
-  });
-  week.addEventListener('change',async()=>{
-    try{ await writeSharedSettingsToCloud({weekStartDay:+week.value}); }
-    catch(e){ alert('설정 저장 실패: '+(e?.message||e)); await paint(); }
-  });
-
-  const sb=initSettingsClient();
-  if(sb){
-    sb.auth.onAuthStateChange(async()=>{
-      sharedSettingsLoaded=false;
-      await loadSharedSettingsFromCloud();
-      paint();
-      notifySharedSettings(sharedSettingsCache);
-      const t=await restoreLastTabFromCloud();
-      if(t && tabs[t]) openTab(t);
-    });
-  }
+  hour.addEventListener('change',()=>writeSharedSettings({dayStartHour:+hour.value}));
+  week.addEventListener('change',()=>writeSharedSettings({weekStartDay:+week.value}));
+  window.addEventListener('storage',e=>{if(e.key===SHARED_SETTINGS_KEY)paint()});
 
   async function ensureDeleteFrame(kind){
     const fr=tabs[kind].frame;
@@ -325,28 +233,18 @@ function initSharedSettingsUI(){
   del.addEventListener('click',()=>{
     if(!confirm('공부 · 강의 · 수면 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.'))return;
     if(!confirm('정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.'))return;
-    (async()=>{
-      for(const kind of ['study','lecture','sleep']){
-        try{ await deleteOneJournal(kind); }catch(e){ console.warn(kind,e); }
-      }
-      alert('공부 · 강의 · 수면 기록 데이터가 모두 삭제되었습니다.');
-      location.reload();
-    })();
-  });
-
-  window.addEventListener('message',async(ev)=>{
-    if(ev.origin!==location.origin) return;
-    if(ev.data?.type==='journal-request-shared-settings'){
-      try{ ev.source?.postMessage({type:'journal-shared-settings-changed',settings:{...sharedSettingsCache}},location.origin); }catch(e){}
-      return;
+    const keep=new Set([SHARED_SETTINGS_KEY,'journal:lastTab','githubAlarmSounds:v1','githubAlarmSelected:v1','sharedAlarm:v126']);
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k)keys.push(k)}
+    for(const k of keys){
+      if(keep.has(k) || k.startsWith('sb-') || k.toLowerCase().includes('supabase.auth'))continue;
+      localStorage.removeItem(k);
     }
-    if(ev.data?.type==='journal-activate-pending-day-start'){
-      const h=Number(ev.data.hour);
-      if(!Number.isInteger(h)||h<0||h>11) return;
-      try{ await writeSharedSettingsToCloud({dayStartHour:h, pendingDayStart:null}); }
-      catch(e){ console.warn('pending 활성화 저장 실패', e); }
-      return;
+    for(const item of Object.values(tabs)){
+      try{item.frame.contentWindow?.postMessage({type:'journal-all-data-deleted'},location.origin)}catch(e){}
     }
+    alert('공부 · 강의 · 수면 기록 데이터가 모두 삭제되었습니다.');
+    location.reload();
   });
 }
 initSharedSettingsUI();
@@ -355,11 +253,9 @@ initSharedSettingsUI();
 const baseTabLabels={study:'📚 공부 기록장',lecture:'🎓 강의 기록장',sleep:'🌙 수면 기록장'};
 function setExclusiveTabStatus(kind){
   Object.entries(tabs).forEach(([key,item])=>{
-    const isRecording = key===kind;
-    item.button.classList.toggle('recording', isRecording);
-    if(key==='study') item.button.textContent = isRecording ? '📚 공부 기록장 기록중' : baseTabLabels.study;
-    else if(key==='lecture') item.button.textContent = isRecording ? '🎓 강의 기록장 기록중' : baseTabLabels.lecture;
-    else item.button.textContent = isRecording ? '🌙 수면 기록장 기록중' : baseTabLabels.sleep;
+    if(key==='study') item.button.textContent = kind==='study' ? '📚 공부 기록장 기록중' : baseTabLabels.study;
+    else if(key==='lecture') item.button.textContent = kind==='lecture' ? '🎓 강의 기록장 기록중' : baseTabLabels.lecture;
+    else item.button.textContent = kind==='sleep' ? '🌙 수면 기록장 기록중' : baseTabLabels.sleep;
   });
 }
 
