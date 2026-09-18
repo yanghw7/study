@@ -432,7 +432,7 @@ const exclusiveFrames={study:tabs.study.frame,lecture:tabs.lecture.frame,sleep:t
 let exclusiveActive=null;
 let exclusiveQueue=Promise.resolve();
 
-// [RT-TAB] 다른 기기에서 시작/종료한 타이머도 탭 라벨에 반영한다.
+// [RT-TAB] realtime only — 폴링 없음
 (function(){
   function kindFromYm(ym){
     const s = String(ym||'');
@@ -441,9 +441,10 @@ let exclusiveQueue=Promise.resolve();
     if(/^\d{4}-\d{2}$/.test(s)) return 'study';
     return null;
   }
-  let ch=null;
-  function apply(row){
-    // 케이스 1: 진행 중 → 해당 탭을 "기록중" 상태로 표시
+
+  let ch = null;
+
+  function applyFromRow(row){
     if(row && row.status === 'running'){
       const kind = kindFromYm(row.ym);
       if(kind && tabs[kind]){
@@ -452,62 +453,60 @@ let exclusiveQueue=Promise.resolve();
       }
       return;
     }
-
-    // 케이스 2: 정지됨(status='stopped') → 이 탭이 활성이었으면 원복
-    if(row && row.status === 'stopped'){
-      const kind = kindFromYm(row.ym);
-      if(!exclusiveActive || exclusiveActive === kind){
-        exclusiveActive = null;
-        setExclusiveTabStatus(null);
-      }
-      return;
-    }
-
-    // 케이스 3: 행 자체가 삭제됨(payload.new === null) → 무조건 원복
-    if(!row){
-      exclusiveActive = null;
-      setExclusiveTabStatus(null);
-    }
+    // stopped 이거나 null(삭제) → 원복
+    exclusiveActive = null;
+    setExclusiveTabStatus(null);
   }
-  function ensure(){
-    const sb=initSettingsClient();
+
+  async function fetchOnce(){
+    const sb = initSettingsClient();
+    if(!sb) return;
+    try{
+      const {data:{session}} = await sb.auth.getSession();
+      const user = session?.user;
+      if(!user) return;
+      const {data:row} = await sb.from('active_timer')
+        .select('*').eq('user_id', user.id).maybeSingle();
+      applyFromRow(row);
+    }catch(e){}
+  }
+
+  function startRealtime(){
+    const sb = initSettingsClient();
     if(!sb || ch) return;
     sb.auth.getSession().then(({data:{session}})=>{
-      const user=session?.user;
+      const user = session?.user;
       if(!user || ch) return;
-      ch=sb.channel(`gongbujang-tab-${user.id}`)
+      ch = sb.channel(`gongbujang-tab-${user.id}`)
         .on('postgres_changes',
-            {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${user.id}`},
-            (payload)=>apply(payload.new))
+            {event:'*', schema:'public', table:'active_timer', filter:`user_id=eq.${user.id}`},
+            (payload)=>applyFromRow(payload.new))
         .subscribe((status)=>{
-          // ▼ 채널 상태 감시 + 자동 재연결
-          if(status === 'SUBSCRIBED'){
-            console.info('[RT-TAB] subscribed');
-          }else if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
-            console.warn('[RT-TAB] realtime', status, '- 3초 후 재시도');
+          if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
             try{ sb.removeChannel(ch); }catch(_){}
             ch = null;
-            setTimeout(ensure, 3000);
+            setTimeout(startRealtime, 5000);
           }
         });
-      sb.from('active_timer').select('*').eq('user_id',user.id).maybeSingle()
-        .then(({data:row})=>apply(row));
     });
   }
-  ensure();
-  const sb=initSettingsClient();
+
+  // realtime 연결 + 앱 시작할 때 딱 1회만 확인
+  startRealtime();
+  fetchOnce();
+
+  const sb = initSettingsClient();
   if(sb) sb.auth.onAuthStateChange(()=>{
-    if(ch){ try{ sb.removeChannel(ch); }catch(e){} ch=null; }
-    setTimeout(ensure,300);
+    if(ch){ try{ sb.removeChannel(ch); }catch(e){} ch = null; }
+    setTimeout(startRealtime, 300);
+    setTimeout(fetchOnce, 400);
   });
 
-  // ▼ 부팅 시 세션이 아직 복원 안 됐을 수 있으므로, 채널이 붙을 때까지 재시도한다.
-  //   (최대 약 5초, 800ms 간격 6회)
-  let ensureTries = 0;
-  const ensureTimer = setInterval(()=>{
-    if(ch || ensureTries++ >= 6){ clearInterval(ensureTimer); return; }
-    ensure();
-  }, 800);
+  // 백그라운드에서 돌아올 때만 1회 (하루 몇 번 수준, 무시 가능)
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible') fetchOnce();
+  });
+  window.addEventListener('pageshow', ()=>{ fetchOnce(); });
 })();
 
 // 시작 전환 하나의 기록: 새로 시작된 kind와, 그로 인해 자동 종료된 이전 kind.
