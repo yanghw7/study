@@ -2283,6 +2283,12 @@ $('#periodList').addEventListener('input', async (e) => {
   }
   // 직접 입력은 합계만 다시 계산하며 실시간 타이머 상태는 만들지 않는다.
   if(k === 'start' || k === 'end'){
+    const labelEl = t.parentElement && t.parentElement.querySelector('.ko-time-label');
+    if(labelEl){
+      const dateKey = k==='start' ? 'startDate' : 'endDate';
+      const timeKey = k==='start' ? 'startTime' : 'endTime';
+      labelEl.textContent = koDateTimeLabel(p[dateKey], p[timeKey]) || '시간을 눌러 수정';
+    }
     updateStudyTimer();
     updateWasteTimer();
   }
