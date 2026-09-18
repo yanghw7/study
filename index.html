@@ -343,6 +343,7 @@ let exclusiveQueue=Promise.resolve();
 // 시작 전환 하나의 기록: 새로 시작된 kind와, 그로 인해 자동 종료된 이전 kind.
 // 새 타이머가 곧바로 취소되면 이 정보를 이용해 이전 기록을 되돌린다.
 let lastTransition=null; // {startedKind, previousKind, atMs}
+let pendingStart=null;   // 진행 중인 시작 요청 추적 (cancel로 무효화 가능)
 
 // 아직 한 번도 열지 않은 탭(iframe에 src가 없는 탭)은 백그라운드에서 타이머가 돌고 있어도
 // 정지 메시지를 받을 스크립트 자체가 로드돼 있지 않다. 메시지를 보내기 전에 반드시 불러온다.
@@ -381,17 +382,30 @@ window.addEventListener('message',ev=>{
   if(ev.data?.type==='exclusive-session-ended'){
     if(exclusiveActive===ev.data.kind){ exclusiveActive=null; setExclusiveTabStatus(null); }
     if(lastTransition?.startedKind===ev.data.kind) lastTransition=null;
+    if(pendingStart?.kind===ev.data.kind) pendingStart=null;
     return;
   }
   if(ev.data?.type==='exclusive-session-cancel-start'){
-    // 방금 시작한 타이머를 스스로 취소한 경우: 그로 인해 자동 종료됐던 이전 기록장을 되돌린다.
     const kind=ev.data.kind;
+
+    // 아직 큐에서 처리 안 된 시작 요청이면 → 무효화만 하고 끝
+    // (2단계에서 aborted 감지해서 알아서 되돌림)
+    if(pendingStart && pendingStart.kind===kind && pendingStart.aborted===false){
+      pendingStart.aborted = true;
+      if(exclusiveActive!==kind && !lastTransition){
+        exclusiveActive=null;
+        setExclusiveTabStatus(null);
+      }
+      return;
+    }
+
+    // 이미 활성화된 상태에서 취소된 경우
     exclusiveQueue=exclusiveQueue.then(async()=>{
-      const canUndo = lastTransition && lastTransition.startedKind===kind && exclusiveActive===kind && lastTransition.previousKind;
+      const canUndo = lastTransition && lastTransition.startedKind===kind && lastTransition.previousKind;
       if(canUndo){
         const {previousKind:target, atMs}=lastTransition;
-        const targetFrame=exclusiveFrames[target];
-        targetFrame?.contentWindow?.postMessage({type:'exclusive-session-undo-stop',atMs},location.origin);
+        exclusiveFrames[target]?.contentWindow?.postMessage(
+          {type:'exclusive-session-undo-stop', atMs}, location.origin);
         exclusiveActive=target;
         setExclusiveTabStatus(target);
       }else if(exclusiveActive===kind){
@@ -404,14 +418,42 @@ window.addEventListener('message',ev=>{
   }
   if(ev.data?.type!=='exclusive-session-start')return;
   const kind=ev.data.kind, req=ev.data.req;
-  // 요청 프레임이 보낸 시각을 그대로 다른 프레임들에게 '종료 시각'으로 넘겨서
-  // 새 세션의 시작 시각과 이전 세션의 종료 시각이 정확히 같아지도록 한다.
   const atMs=Number.isFinite(ev.data.at)?ev.data.at:Date.now();
   if(!exclusiveFrames[kind])return;
+
+  // 이전에 대기 중이던 시작 요청은 무효화
+  if(pendingStart) pendingStart.aborted = true;
+  pendingStart = {kind, req, atMs, aborted:false};
+
   exclusiveQueue=exclusiveQueue.then(async()=>{
+    // 큐에 들어와서 실행할 시점에 이미 취소됐는지 확인
+    if(pendingStart?.req !== req || pendingStart.aborted){
+      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
+      return;
+    }
+
     const previousActive = exclusiveActive!==kind ? exclusiveActive : null;
-    // Stop the other recorders in parallel so Start reacts without multi-second lag.
-    await Promise.all(Object.keys(exclusiveFrames).filter(other=>other!==kind).map(k=>stopExclusive(k, atMs)));
+
+    // 다른 기록장들 먼저 정지
+    await Promise.all(
+      Object.keys(exclusiveFrames)
+        .filter(other=>other!==kind)
+        .map(k=>stopExclusive(k, atMs))
+    );
+
+    // 정지시키는 동안 취소가 왔으면 → 방금 정지시킨 것을 되돌림
+    if(pendingStart?.req !== req || pendingStart.aborted){
+      if(previousActive){
+        exclusiveFrames[previousActive]?.contentWindow?.postMessage(
+          {type:'exclusive-session-undo-stop', atMs}, location.origin);
+        exclusiveActive = previousActive;
+        setExclusiveTabStatus(previousActive);
+      }
+      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
+      return;
+    }
+
+    // 정상 시작 확정
     exclusiveActive=kind;
     setExclusiveTabStatus(kind);
     lastTransition = previousActive ? {startedKind:kind, previousKind:previousActive, atMs} : null;

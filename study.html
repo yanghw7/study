@@ -2204,9 +2204,7 @@ $('#periodList').addEventListener('input', async (e) => {
         p.timerStartedAt = null;
         p.timerEndedAt = null;
         if(cloudUser) await cloudClearActiveTimer();
-        // 방금 시작했던 타이머를 취소하는 것이므로, 그로 인해 자동 종료됐던
-        // 다른 기록장(강의/수면)의 기록을 되돌려 달라고 알린다.
-        if(wasRunning && window.parent!==window){
+        if(window.parent!==window){
           window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'study'},location.origin);
         }
       } else if(k==='endPage' && Number(p.timerStartedAt) > 0){
