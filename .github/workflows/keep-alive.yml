@@ -1,0 +1,19 @@
+name: Keep Workflows Alive
+
+on:
+  schedule:
+    # 매주 월요일 UTC 00:00 (= KST 월요일 오전 9시)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  immortality:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Re-enable all workflows
+        uses: PhrozenByte/gh-workflow-immortality@v1
+        with:
+          repos: ${{ github.repository }}
+          secret: ${{ secrets.IMMORTALITY_TOKEN }}
