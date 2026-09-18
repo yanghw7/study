@@ -3462,7 +3462,7 @@ function findPeriodForActiveTimer(row){
   if(!day || !Array.isArray(day.periods)) return null;
 
   let idx = day.periods.findIndex(p => String(p._id || '') === String(row.period_id || ''));
-  if(idx < 0){
+  if(idx < 0 && !row.period_id){
     const fallback = Number(row.period_index);
     if(Number.isInteger(fallback) && day.periods[fallback]) idx = fallback;
   }
