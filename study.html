@@ -3034,7 +3034,10 @@ $('#settingsCancel').onclick = closeSettings;
 $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#settingsOverlay')) closeSettings(); });
 
 async function deleteAllStudyRecords(){
-  if(!confirm('정말 모든 공부 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.')) return;
+  if(!window.__skipDeleteConfirm){
+    if(!confirm('정말 모든 공부 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.')) return;
+  }
+  window.__skipDeleteConfirm = false;
 
   // 로그인 중이면 클라우드 기록도 먼저 삭제한다. 실패 시 로컬 삭제를 중단해
   // 다음 로그인/동기화 때 기록이 되살아나는 일을 막는다.
@@ -3066,6 +3069,9 @@ async function deleteAllStudyRecords(){
   closeSettings();
   await renderCurrentView();
   showToast('모든 공부 기록을 삭제했어요');
+  if(window.parent !== window){
+    window.parent.postMessage({type:'journal-delete-done', kind:'study'}, location.origin);
+  }
 }
 
 $('#deleteAllRecords').onclick = deleteAllStudyRecords;

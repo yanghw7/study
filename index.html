@@ -93,7 +93,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
         <button id="sharedDeleteLecture" class="shared-delete-one" type="button">강의 기록장 데이터 전체 삭제</button>
         <button id="sharedDeleteSleep" class="shared-delete-one" type="button">수면 기록장 데이터 전체 삭제</button>
       </div>
-      <button id="sharedDeleteAll" class="shared-delete-all" type="button">🗑 데이터 전체 삭제</button>
+      <button id="sharedDeleteAll" class="shared-delete-all" type="button">데이터 전체 삭제</button>
       <div class="shared-settings-note">공부 · 강의 · 수면 기록장의 데이터를 모두 삭제합니다.</div>
     </div>
   </div>
@@ -301,11 +301,12 @@ function initSharedSettingsUI(){
     }
     return fr;
   }
-  async function deleteOneJournal(kind){
+  async function deleteOneJournal(kind, skipChildConfirm){
     const fr=await ensureDeleteFrame(kind);
     const id='deleteAllRecords';
     const childBtn=fr.contentDocument?.getElementById(id);
     if(!childBtn){alert('삭제 기능을 찾지 못했습니다.');return}
+    try{ fr.contentWindow.__skipDeleteConfirm = !!skipChildConfirm; }catch(e){}
     childBtn.click();
   }
   document.getElementById('sharedDeleteStudy').addEventListener('click',()=>deleteOneJournal('study'));
@@ -315,12 +316,10 @@ function initSharedSettingsUI(){
   const del=document.getElementById('sharedDeleteAll');
   del.addEventListener('click',()=>{
     if(!confirm('공부 · 강의 · 수면 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.'))return;
-    if(!confirm('정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.'))return;
     (async()=>{
       for(const kind of ['study','lecture','sleep']){
-        try{ await deleteOneJournal(kind); }catch(e){ console.warn(kind,e); }
+        try{ await deleteOneJournal(kind, true); }catch(e){ console.warn(kind,e); }
       }
-      alert('공부 · 강의 · 수면 기록 데이터가 모두 삭제되었습니다.');
       location.reload();
     })();
   });
