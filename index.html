@@ -301,27 +301,86 @@ function initSharedSettingsUI(){
     }
     return fr;
   }
-  async function deleteOneJournal(kind, skipChildConfirm){
-    const fr=await ensureDeleteFrame(kind);
-    const id='deleteAllRecords';
-    const childBtn=fr.contentDocument?.getElementById(id);
-    if(!childBtn){alert('삭제 기능을 찾지 못했습니다.');return}
-    try{ fr.contentWindow.__skipDeleteConfirm = !!skipChildConfirm; }catch(e){}
-    childBtn.click();
-  }
-  document.getElementById('sharedDeleteStudy').addEventListener('click',()=>deleteOneJournal('study'));
-  document.getElementById('sharedDeleteLecture').addEventListener('click',()=>deleteOneJournal('lecture'));
-  document.getElementById('sharedDeleteSleep').addEventListener('click',()=>deleteOneJournal('sleep'));
+  const JOURNAL_LABELS = { study:'공부 기록장', lecture:'강의 기록장', sleep:'수면 기록장' };
 
-  const del=document.getElementById('sharedDeleteAll');
-  del.addEventListener('click',()=>{
-    if(!confirm('공부 · 강의 · 수면 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.'))return;
-    (async()=>{
+  function waitDeleteDone(kind){
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        window.removeEventListener('message', onDone);
+        resolve(false);
+      }, 8000);
+      function onDone(ev){
+        if(ev.origin !== location.origin) return;
+        if(ev.data?.type !== 'journal-delete-done') return;
+        if(ev.data?.kind !== kind) return;
+        clearTimeout(timer);
+        window.removeEventListener('message', onDone);
+        resolve(true);
+      }
+      window.addEventListener('message', onDone);
+    });
+  }
+
+  async function deleteOneJournal(kind){
+    const fr = await ensureDeleteFrame(kind);
+    const childBtn = fr.contentDocument?.getElementById('deleteAllRecords');
+    if(!childBtn){ alert(`${JOURNAL_LABELS[kind]}의 삭제 기능을 찾지 못했습니다.`); return false; }
+
+    let savedConfirm = null;
+    try{
+      const win = fr.contentWindow;
+      win.__skipDeleteConfirm = true;
+      savedConfirm = win.confirm;
+      win.confirm = () => true;
+    }catch(e){}
+
+    const wait = waitDeleteDone(kind);
+    childBtn.click();
+    return wait.finally(() => {
+      setTimeout(() => {
+        try{
+          if(savedConfirm){ fr.contentWindow.confirm = savedConfirm; }
+        }catch(e){}
+      }, 5000);
+    });
+  }
+
+  const oneButtons = {
+    study:   document.getElementById('sharedDeleteStudy'),
+    lecture: document.getElementById('sharedDeleteLecture'),
+    sleep:   document.getElementById('sharedDeleteSleep')
+  };
+  Object.entries(oneButtons).forEach(([kind, btn]) => {
+    btn.addEventListener('click', async () => {
+      if(btn.dataset.busy === '1') return;
+      if(!confirm(`${JOURNAL_LABELS[kind]} 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.`)) return;
+      btn.dataset.busy = '1';
+      try{ await deleteOneJournal(kind); }
+      finally{ setTimeout(()=>{ btn.dataset.busy = '0'; }, 500); }
+    });
+  });
+
+  const del = document.getElementById('sharedDeleteAll');
+  del.addEventListener('click', () => {
+    if(del.dataset.busy === '1') return;
+    if(!confirm('공부 · 강의 · 수면 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.')) return;
+
+    del.dataset.busy = '1';
+    const originalText = del.textContent;
+    del.textContent = '삭제 중…';
+    del.disabled = true;
+
+    (async () => {
       for(const kind of ['study','lecture','sleep']){
-        try{ await deleteOneJournal(kind, true); }catch(e){ console.warn(kind,e); }
+        try{ await deleteOneJournal(kind); }
+        catch(e){ console.warn(kind, e); }
       }
       location.reload();
-    })();
+    })().catch(() => {
+      del.dataset.busy = '0';
+      del.disabled = false;
+      del.textContent = originalText;
+    });
   });
 }
 initSharedSettingsUI();
