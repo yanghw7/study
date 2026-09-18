@@ -2469,6 +2469,8 @@ $('#periodList').addEventListener('input', async (e) => {
 
 
 // 실행 중인 타이머를, 화면에 지금 어떤 날짜가 표시돼 있는지와 무관하게 찾아낸다.
+let lastAutoStoppedId=null;
+let lastAutoStoppedAt=0;
 // (다른 날짜를 보고 있거나, 자정을 넘겨 이 탭을 새로 열었을 때도 놓치지 않도록)
 async function locateRunningPeriod(){
   if(cloudUser && sbClient){
@@ -2556,6 +2558,9 @@ window.addEventListener('message',async ev=>{
       const {ym,dk,day,p}=found;
       const before=deepClone(p);
       p.endDate=ymd(now);p.endTime=hm(now);
+      p.timerEndedAt=Math.round(atMs);
+      lastAutoStoppedId=p._id;
+      lastAutoStoppedAt=atMs;
       if(cloudUser){
         const row=await cloudStopActiveTimer();const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
         p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
@@ -2578,8 +2583,23 @@ window.addEventListener('message',async ev=>{
   try{
     const atMs=Number(ev.data.atMs);
     if(!Number.isFinite(atMs)) return;
-    const found=await locateStoppedPeriodNear(atMs);
+    let found=null;
+    if(lastAutoStoppedId){
+      for(const ym of Object.keys(monthCache)){
+        const month=monthCache[ym];
+        for(const dk of Object.keys(month)){
+          if(!/^\d{1,2}$/.test(dk)) continue;
+          const day=month[dk];
+          if(!day?.periods) continue;
+          const idx=day.periods.findIndex(x=>String(x._id)===String(lastAutoStoppedId));
+          if(idx>=0){ found={ym,dk,day,p:day.periods[idx],idx}; break; }
+        }
+        if(found) break;
+      }
+    }
+    if(!found) found=await locateStoppedPeriodNear(atMs);
     if(!found) return;
+    lastAutoStoppedId=null;
     const {ym,dk,day,p,idx}=found;
     const before=deepClone(p);
     p.endDate=''; p.endTime=''; p.timerEndedAt=null;
@@ -3855,10 +3875,6 @@ function findPeriodForActiveTimer(row){
   if(!day || !Array.isArray(day.periods)) return null;
 
   let idx = day.periods.findIndex(p => String(p._id || '') === String(row.period_id || ''));
-  if(idx < 0){
-    const fallback = Number(row.period_index);
-    if(Number.isInteger(fallback) && day.periods[fallback]) idx = fallback;
-  }
   if(idx < 0) return null;
   return {ym, dk, day, p:day.periods[idx], idx};
 }
@@ -3881,8 +3897,14 @@ async function applyActiveTimerRow(row){
   if(!Number.isFinite(started)) return false;
 
   found.p.timerStartedAt = started;
-  found.p.timerEndedAt =
-    row.status === 'stopped' && Number.isFinite(stopped) ? stopped : null;
+  if(row.status === 'stopped' && Number.isFinite(stopped)){
+    found.p.timerEndedAt = stopped;
+  }else if(row.status === 'running'){
+    const localEnd = Number(found.p.timerEndedAt);
+    if(!(Number.isFinite(localEnd) && localEnd > started)){
+      found.p.timerEndedAt = null;
+    }
+  }
 
   // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
