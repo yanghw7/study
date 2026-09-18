@@ -1006,9 +1006,9 @@ let currentView = 'day';
 function ymKey(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}`; }
 function dKey(date){ return String(date.getDate()); }
 
-function koDateTimeLabel(date,time){if(!date||!time)return '';const m=/^(\d{2}):(\d{2})/.exec(time);if(!m)return time;const h=Number(m[1]), ap=h<12?'오전':'오후', h12=h%12||12;const d=date.split('-');return `${d[0]}. ${d[1]}. ${d[2]}. ${ap} ${h12}시 ${m[2]}분`; }
-function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function hm(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function koDateTimeLabel(date,time){if(!date||!time)return '';if(String(time).includes('NaN')||String(date).includes('NaN'))return '';const m=/^(\d{2}):(\d{2})/.exec(time);if(!m)return '';const h=Number(m[1]), ap=h<12?'오전':'오후', h12=h%12||12;const d=date.split('-');if(d.length<3)return '';return `${d[0]}. ${d[1]}. ${d[2]}. ${ap} ${h12}시 ${m[2]}분`; }
+function ymd(d){ if(!(d instanceof Date) || isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function hm(d){ if(!(d instanceof Date) || isNaN(d.getTime())) return ''; return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 
 // 옛 버전 데이터(날짜 없이 시간만 저장, 혹은 하나의 dt 문자열)를
 // 날짜(startDate/endDate)와 시간(startTime/endTime)이 분리된 새 구조로 변환
@@ -1018,6 +1018,7 @@ function legacyParse(s, year, mo, dayNum){
     const [datePart, timePart] = s.split('T');
     const [y,m,d] = datePart.split('-').map(Number);
     const [h,mi] = timePart.split(':').map(Number);
+    if([y,m,d,h,mi].some(n=>isNaN(n))) return null;
     return new Date(y,m-1,d,h,mi);
   }
   // 아주 예전 버전(시각만 저장된 데이터): 현재 집계 기준시간으로 날짜 추정
@@ -1787,7 +1788,7 @@ function startBackgroundSensitiveLoops(){
   if(!activeTimerPollId){
     activeTimerPollId = setInterval(()=>{
       if(cloudUser) syncActiveTimerFromCloud(false);
-    }, 30000);   // [RT] 폴백. realtime이 기본
+    }, 60000);   // [RT] 폴백. realtime이 기본
   }
 
   if(!clockCalibrateId){
@@ -1799,7 +1800,7 @@ function startBackgroundSensitiveLoops(){
   if(!rolloverCheckId){
     rolloverCheckId = setInterval(()=>{
       checkStudyDayBoundaryRollover();
-    }, 1000);
+    }, 60000);
   }
 }
 
@@ -2166,6 +2167,42 @@ function refreshStats(){
   $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
   updateSleepExtraSummary(day);
   renderDayCharts();
+}
+
+function refreshSleepTimeFieldDisabled(idx){
+  const day = getDayData();
+  const p = day.periods?.[idx];
+  if(!p) return;
+
+  const hasStart = !!(p.startDate && p.startTime);
+  const hasEnd   = !!(p.endDate && p.endTime);
+  const startDisabled = !hasStart;
+  const endDisabled   = !hasStart || !hasEnd;
+
+  const startInput = document.querySelector(`#periodList input[data-k="start"][data-idx="${idx}"]`);
+  const endInput   = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
+  const startField = startInput?.closest('.field.time');
+  const endField   = endInput?.closest('.field.time');
+
+  if(startInput) startInput.disabled = startDisabled;
+  if(endInput)   endInput.disabled   = endDisabled;
+  if(startField) startField.classList.toggle('disabled', startDisabled);
+  if(endField)   endField.classList.toggle('disabled', endDisabled);
+
+  const startLabel = startField?.querySelector('.ko-time-label');
+  if(startLabel){
+    startLabel.textContent = hasStart
+      ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
+      : '수면 시작을 누르면 자동 기록';
+  }
+  const endLabel = endField?.querySelector('.ko-time-label');
+  if(endLabel){
+    endLabel.textContent = !hasStart
+      ? '수면 시작을 누르면 자동 기록'
+      : (!hasEnd
+          ? '깨어남을 누르면 자동 기록'
+          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
+  }
 }
 
 async function renderDay(){
@@ -3509,8 +3546,8 @@ async function deleteAllStudyRecords(){
       alert('클라우드 기록 삭제에 실패해 삭제를 중단했어요: ' + error.message);
       return;
     }
-    // [FIX4] 유령 타이머 방지를 위해 함께 삭제
-    await cloudClearActiveTimer();
+    // [FIX4] 유령 타이머 방지 + [DEL-FIX-3] 수면장 소유일 때만 삭제
+    await cloudClearActiveTimerIfMine();
   }
 
   // 예약된 자동 저장이 삭제 직후 빈/옛 기록을 다시 저장하지 않도록 모두 취소한다.
@@ -3867,7 +3904,7 @@ if(sbClient){
 
   // v9.6: 초기화 완료 후 foreground 루프가 살아 있는지 보장
   startBackgroundSensitiveLoops();
-})();
+})().finally(()=>{ try{ window.__journalReady = true; }catch(e){} });
 
 
 // ---------- v9 FINAL: Supabase active_timer 동기화 ----------
@@ -3945,9 +3982,28 @@ async function cloudClearActiveTimer(){
   else activeTimerLastFingerprint = '';
 }
 
+// [DEL-FIX-3] 수면장 소유(ym = "S:YYYY-MM")인 경우에만 active_timer 삭제.
+//             공부(숫자) / 강의(L:) 타이머를 실수로 지우지 않도록 방어.
+async function cloudClearActiveTimerIfMine(){
+  if(!sbClient || !cloudUser) return;
+  try{
+    const {data,error:readErr} = await sbClient.from('active_timer')
+      .select('ym').eq('user_id',cloudUser.id).maybeSingle();
+    if(readErr){ console.warn('active_timer 조회 실패:', readErr); return; }
+    const ym = String(data?.ym || '');
+    if(!ym.startsWith('S:')) return;
+    const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
+    if(error) console.warn('서버 타이머 삭제 실패:', error);
+    else activeTimerLastFingerprint = '';
+  }catch(e){
+    console.warn('선택적 타이머 삭제 실패:', e);
+  }
+}
+
 function findPeriodForActiveTimer(row){
   if(!row) return null;
-  const ym = String(row.ym || '');
+  let ym = String(row.ym || '');
+  if(ym.startsWith('L:') || ym.startsWith('S:')) ym = ym.slice(2);
   const dk = String(row.day_key || '');
   const month = monthCache[ym];
   const day = month && month[dk];
