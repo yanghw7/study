@@ -467,7 +467,10 @@ let exclusiveQueue=Promise.resolve();
   }
   ensure();
   const sb=initSettingsClient();
-  if(sb) sb.auth.onAuthStateChange(()=>{ ch=null; setTimeout(ensure,300); });
+  if(sb) sb.auth.onAuthStateChange(()=>{
+    if(ch){ try{ sb.removeChannel(ch); }catch(e){} ch=null; }
+    setTimeout(ensure,300);
+  });
 })();
 
 // 시작 전환 하나의 기록: 새로 시작된 kind와, 그로 인해 자동 종료된 이전 kind.
