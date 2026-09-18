@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script src="./ls-shim.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>수면 기록장</title>
@@ -737,6 +736,16 @@ body{background:#EEF3F8!important}
 }
 </style>
 </head>
+<script>
+(()=> {
+  const P='sleep::';
+  const g=Storage.prototype.getItem, s=Storage.prototype.setItem, r=Storage.prototype.removeItem;
+  const keep=k=>/supabase|sb-|auth|theme|setting|dayStart|weekStart/i.test(String(k||''));
+  Storage.prototype.getItem=function(k){return g.call(this,keep(k)?k:P+k)};
+  Storage.prototype.setItem=function(k,v){return s.call(this,keep(k)?k:P+k,v)};
+  Storage.prototype.removeItem=function(k){return r.call(this,keep(k)?k:P+k)};
+})();
+</script>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
