@@ -2143,7 +2143,7 @@ window.addEventListener('message',async ev=>{
       // 자동 전환 시 페이지 진도는 시작페이지 그대로 저장
       if(String(p.startPage||'').trim()) p.endPage=String(p.startPage).trim();
       if(cloudUser){
-        const row=await cloudStopActiveTimer();
+        const row=await cloudStopActiveTimer(ym, dk, p._id);
         const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
         p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
       }else p.timerEndedAt=Math.round(atMs);
@@ -2342,7 +2342,7 @@ $('#periodList').addEventListener('input', async (e) => {
           }
         } else if(k==='endPage' && Number(p.timerStartedAt) > 0 && !Number(p.timerEndedAt)){
           if(cloudUser){
-            const row = await cloudStopActiveTimer();
+            const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
             const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
             p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
             await calibrateServerClock(true);
@@ -3118,6 +3118,9 @@ async function deleteAllStudyRecords(){
       alert('클라우드 기록 삭제에 실패해 삭제를 중단했어요: ' + error.message);
       return;
     }
+    // [FIX4] study_months 를 지워도 active_timer 가 남으면 유령 타이머로 살아난다.
+    //        함께 삭제해 이후 동기화에서 존재하지 않는 period_id 를 찾지 않도록 한다.
+    await cloudClearActiveTimer();
   }
 
   // 예약된 자동 저장이 삭제 직후 빈/옛 기록을 다시 저장하지 않도록 모두 취소한다.
@@ -3506,9 +3509,14 @@ async function cloudStartActiveTimer(ym, dayKey, p, idx){
   return data || null;
 }
 
-async function cloudStopActiveTimer(){
+// [FIX2] ym/day_key/period_id 를 함께 넘겨 자신의 타이머만 종료한다.
+async function cloudStopActiveTimer(ym, dayKey, periodId){
   if(!sbClient || !cloudUser) return null;
-  const {data,error} = await sbClient.rpc('stop_active_timer');
+  const {data,error} = await sbClient.rpc('stop_active_timer',{
+    p_ym: ym ? String(ym) : null,
+    p_day_key: dayKey != null ? String(dayKey) : null,
+    p_period_id: periodId ? String(periodId) : null
+  });
   if(error){
     console.error('서버 타이머 종료 실패:', error);
     showToast('서버 타이머 종료 실패');
@@ -3574,14 +3582,23 @@ async function applyActiveTimerRow(row){
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
   if(!Number.isFinite(started)) return false;
 
+  // [FIX1] 서버 타이머 값을 startDate/startTime/endDate/endTime 에 함께 반영
+  const startDT = new Date(started);
+  found.p.startDate = ymd(startDT);
+  found.p.startTime = hm(startDT);
   found.p.timerStartedAt = started;
   if(row.status === 'stopped' && Number.isFinite(stopped)){
+    const stopDT = new Date(stopped);
+    found.p.endDate = ymd(stopDT);
+    found.p.endTime = hm(stopDT);
     found.p.timerEndedAt = stopped;
   }else if(row.status === 'running'){
     // 서버가 아직 running인데 로컬에 이미 종료시각이 있으면
     // (stop handler와 2초 폴링 간 race) 로컬 값을 유지한다.
     const localEnd = Number(found.p.timerEndedAt);
     if(!(Number.isFinite(localEnd) && localEnd > started)){
+      found.p.endDate = '';
+      found.p.endTime = '';
       found.p.timerEndedAt = null;
     }
   }

@@ -205,6 +205,19 @@ function notifySharedSettings(v){
     try{item.frame.contentWindow?.postMessage({type:'journal-shared-settings-changed',settings:v},location.origin)}catch(e){}
   }
 }
+
+// [FIX3] 자식이 로드 직후 요청하는 현재 공통 설정을 응답한다.
+// (study/lecture/sleep.html 이 기본값 대신 실제 설정을 받도록)
+window.addEventListener('message', (ev)=>{
+  if(ev.origin !== location.origin) return;
+  if(ev.data?.type !== 'journal-request-shared-settings') return;
+  try{
+    ev.source?.postMessage({
+      type:'journal-shared-settings-changed',
+      settings: sharedSettingsCache
+    }, location.origin);
+  }catch(e){}
+});
 async function writeSharedSettingsToCloud(patch){
   const sb=initSettingsClient();
   if(!sb) throw new Error('클라우드 연결 실패');
@@ -430,7 +443,15 @@ async function stopExclusive(kind, atMs){
   return new Promise(resolve=>{
     if(!frame?.contentWindow){resolve(true);return}
     const req='stop-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-    const timer=setTimeout(()=>{window.removeEventListener('message',done);resolve(true)},1200);
+    // [FIX5] 1200ms 타임아웃을 3000ms 로 늘리고, 타임아웃 시 실패로 간주한다.
+    //        성공(ok:true) 응답을 받은 경우에만 실제로 종료된 것으로 취급해야
+    //        뒤늦게 도착한 stop 이 새로 시작한 세션의 active_timer 를 삭제하는
+    //        레이스 컨디션을 막을 수 있다. (FIX2 와 함께 이중 방어)
+    const timer=setTimeout(()=>{
+      window.removeEventListener('message',done);
+      console.warn('[FIX5] stopExclusive 응답 타임아웃:', kind);
+      resolve(false);
+    },3000);
     function done(ev){
       if(ev.origin!==location.origin||ev.source!==frame.contentWindow||
          ev.data?.type!=='exclusive-session-stopped'||ev.data?.req!==req)return;
