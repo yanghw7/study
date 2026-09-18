@@ -1982,6 +1982,8 @@ $('#periodList').addEventListener('paste', (e) => {
 
 
 // 실행 중인 타이머를, 화면에 지금 어떤 날짜가 표시돼 있는지와 무관하게 찾아낸다.
+let lastAutoStoppedId = null;
+let lastAutoStoppedAt = 0;
 // (다른 날짜를 보고 있거나, 자정을 넘겨 이 탭을 새로 열었을 때도 놓치지 않도록)
 async function locateRunningPeriod(){
   if(cloudUser && sbClient){
@@ -2070,6 +2072,8 @@ window.addEventListener('message',async ev=>{
       const before=deepClone(p);
       p.endDate=ymd(now);p.endTime=hm(now);
       p.timerEndedAt=Math.round(atMs);
+      lastAutoStoppedId = p._id;
+      lastAutoStoppedAt = atMs;
       // 자동 전환 시 페이지 진도는 시작페이지 그대로 저장
       if(String(p.startPage||'').trim()) p.endPage=String(p.startPage).trim();
       if(cloudUser){
@@ -2095,8 +2099,23 @@ window.addEventListener('message',async ev=>{
   try{
     const atMs=Number(ev.data.atMs);
     if(!Number.isFinite(atMs)) return;
-    const found=await locateStoppedPeriodNear(atMs);
+    let found=null;
+    if(lastAutoStoppedId){
+      for(const ym of Object.keys(monthCache)){
+        const month=monthCache[ym];
+        for(const dk of Object.keys(month)){
+          if(!/^\d{1,2}$/.test(dk)) continue;
+          const day=month[dk];
+          if(!day?.periods) continue;
+          const idx=day.periods.findIndex(x=>String(x._id)===String(lastAutoStoppedId));
+          if(idx>=0){ found={ym,dk,day,p:day.periods[idx],idx}; break; }
+        }
+        if(found) break;
+      }
+    }
+    if(!found) found=await locateStoppedPeriodNear(atMs);
     if(!found) return;
+    lastAutoStoppedId=null;
     const {ym,dk,day,p,idx}=found;
     const before=deepClone(p);
     if(p.endPage && p.endPage===p.startPage) p.endPage='';
