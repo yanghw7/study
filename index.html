@@ -17,7 +17,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .tabs button.active.study{background:#285f50;color:#fff}
 .tabs button.active.lecture{background:#67538b;color:#fff}
 .tabs button.active.sleep{background:#456d96;color:#fff}
-.tabs button.recording::before{content:'';display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:#ff3b30;vertical-align:1px;box-shadow:0 0 0 2px rgba(255,59,48,.12)}
+.tabs button.recording::before{content:'';display:inline-block;width:10px;height:10px;margin-right:5px;border-radius:50%;background:#ff3b30;vertical-align:-1px;box-shadow:0 0 0 2px rgba(255,59,48,.12)}
 
 .frame{display:none;flex:1 1 auto;width:100%;min-height:0;border:0;background:#fff}
 .frame.active{display:block}
@@ -439,9 +439,10 @@ loadSharedSettingsFromCloud()
 
 
 const baseTabLabels={study:'📚 공부 기록장',lecture:'🎓 강의 기록장',sleep:'🌙 수면 기록장'};
+const recordingTabLabels={study:'공부 기록장',lecture:'강의 기록장',sleep:'수면 기록장'};
 function setExclusiveTabStatus(kind){
   Object.entries(tabs).forEach(([key,item])=>{
-    item.button.textContent=baseTabLabels[key];
+    item.button.textContent=key===kind?recordingTabLabels[key]:baseTabLabels[key];
     item.button.classList.toggle('recording',key===kind);
   });
 }
