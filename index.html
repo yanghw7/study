@@ -444,12 +444,24 @@ let exclusiveQueue=Promise.resolve();
 
   let ch = null;
 
-  function applyFromRow(row){
+  function applyFromRow(row, opts){
+    const autoSwitch = opts && opts.autoSwitch === true;
+    const prevActive = exclusiveActive;
+
     if(row && row.status === 'running'){
       const kind = kindFromYm(row.ym);
       if(kind && tabs[kind]){
         exclusiveActive = kind;
         setExclusiveTabStatus(kind);
+
+        // 새 타이머가 시작됐고, 다른 탭을 보고 있으면 자동 전환
+        if(autoSwitch && prevActive !== kind){
+          const a = document.activeElement;
+          const isTyping = !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable));
+          if(!isTyping){
+            try{ openTab(kind, true); }catch(_){}
+          }
+        }
       }
       return;
     }
@@ -480,7 +492,7 @@ let exclusiveQueue=Promise.resolve();
       ch = sb.channel(`gongbujang-tab-${user.id}`)
         .on('postgres_changes',
             {event:'*', schema:'public', table:'active_timer', filter:`user_id=eq.${user.id}`},
-            (payload)=>applyFromRow(payload.new))
+            (payload)=>applyFromRow(payload.new, {autoSwitch:true}))
         .subscribe((status)=>{
           if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
             try{ sb.removeChannel(ch); }catch(_){}
