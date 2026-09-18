@@ -1055,27 +1055,34 @@ function wasteTimerForCurrentDay(){
   const day = getDayData();
   if(!day.periods.length) return null;
 
-  // 공부 중에는 낭비시간 타이머를 멈춘다.
+  const getStart = p => {
+    const ts = Number(p.timerStartedAt);
+    if(ts > 0) return ts;
+    const dt = periodStartDT(p);
+    return dt ? dt.getTime() : 0;
+  };
+  const getEnd = p => {
+    const te = Number(p.timerEndedAt);
+    const dt = periodEndDT(p);
+    const dtMs = dt ? dt.getTime() : 0;
+    return Math.max(te || 0, dtMs);
+  };
+
+  // 진행 중인 교시(시작 있고 끝 없음)가 있으면 낭비시간은 멈춘다.
   const running = day.periods.some(p => {
-    if(!(Number(p.timerStartedAt) > 0)) return false;
-    if(Number(p.timerEndedAt) >= Number(p.timerStartedAt)) return false;
-    if(p.endDate && p.endTime) return false;
-    return true;
+    const s = getStart(p);
+    const e = getEnd(p);
+    return s > 0 && (!e || e < s);
   });
   if(running) return null;
 
-  // 가장 최근에 끝난 교시 이후, 아직 다음 교시가 시작되지 않았을 때만 흐른다.
+  // 가장 최근에 "시작+끝"이 모두 있는 교시의 끝 시각부터 낭비시간이 흐른다.
   for(let i=day.periods.length-1; i>=0; i--){
     const p = day.periods[i];
-    const started = Number(p.timerStartedAt);
-    const endedByTime = combineDT(p.endDate, p.endTime);
-    const ended = Math.max(Number(p.timerEndedAt)||0, endedByTime ? endedByTime.getTime() : 0);
-    if(started > 0 && ended >= started){
-      const laterStarted = day.periods.slice(i+1).some(x =>
-        Number(x.timerStartedAt) > 0 || !!periodStartDT(x)
-      );
-      if(laterStarted) return null;
-      return {p, idx:i, startedAt:ended};
+    const s = getStart(p);
+    const e = getEnd(p);
+    if(s > 0 && e >= s){
+      return {p, idx:i, startedAt:e};
     }
   }
   return null;
