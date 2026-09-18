@@ -1180,7 +1180,7 @@ function mergeMonths(localMonth, remoteMonth, ym=''){
 async function loadMonth(ym){
   if(monthCache[ym]) return monthCache[ym];
   try{
-    const raw = localStorage.getItem(`lectureMonth:${ym}`);
+    const raw = localStorage.getItem(`sleepMonth:${ym}`);
     const m = raw ? JSON.parse(raw) : {};
     const [year, mo] = ym.split('-').map(Number);
     Object.keys(m).forEach(dk => {
@@ -1196,7 +1196,7 @@ async function loadMonth(ym){
 async function saveMonth(ym){
   // 로컬 저장과 클라우드 동기화를 분리해서 실패 원인을 정확히 표시한다.
   try{
-    localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(monthCache[ym]));
+    localStorage.setItem(`sleepMonth:${ym}`, JSON.stringify(monthCache[ym]));
   }catch(e){
     console.error('로컬 저장 실패:', e);
     showToast('로컬 저장에 실패했어요. 브라우저 저장 공간이나 사이트 저장 권한을 확인해주세요.');
@@ -3062,7 +3062,7 @@ async function renderYearView(){
   const years = new Set([cur.getFullYear()]);
   for(let i=0; i<localStorage.length; i++){
     const k = localStorage.key(i);
-    const m = k && k.match(/^lectureMonth:(\d{4})-\d{2}$/);
+    const m = k && k.match(/^sleepMonth:(\d{4})-\d{2}$/);
     if(m) years.add(Number(m[1]));
   }
   Object.keys(monthCache).forEach(k=>{ const m=k.match(/^(\d{4})-\d{2}$/); if(m) years.add(Number(m[1])); });
@@ -3476,7 +3476,7 @@ async function deleteAllStudyRecords(){
       alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
       return;
     }
-    const {error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id).like('ym','L:%');
+    const {error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id).like('ym','S:%');
     if(error){
       alert('클라우드 기록 삭제에 실패해 삭제를 중단했어요: ' + error.message);
       return;
@@ -3489,7 +3489,7 @@ async function deleteAllStudyRecords(){
   const keys=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
-    if(k && k.startsWith('lectureMonth:')) keys.push(k);
+    if(k && k.startsWith('sleepMonth:')) keys.push(k);
   }
   keys.forEach(k=>localStorage.removeItem(k));
   monthCache = {};
@@ -3507,7 +3507,7 @@ async function stampExistingStudyDays(){
   const monthKeys = new Set();
   for(let i=0; i<localStorage.length; i++){
     const k = localStorage.key(i);
-    const m = k && k.match(/^lectureMonth:(\d{4}-\d{2})$/);
+    const m = k && k.match(/^sleepMonth:(\d{4}-\d{2})$/);
     if(m) monthKeys.add(m[1]);
   }
   Object.keys(monthCache).forEach(k=>{ if(/^\d{4}-\d{2}$/.test(k)) monthKeys.add(k); });
@@ -3590,8 +3590,8 @@ async function refreshCloudStatus(){
 }
 
 
-function lectureCloudYm(ym){ return `L:${ym}`; }
-function lectureLocalYm(v){ return String(v||'').startsWith('L:') ? String(v).slice(2) : null; }
+function sleepCloudYm(ym){ return `S:${ym}`; }
+function sleepLocalYm(v){ return String(v||'').startsWith('S:') ? String(v).slice(2) : null; }
 
 async function cloudSaveMonth(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
@@ -3601,7 +3601,7 @@ async function cloudSaveMonth(ym){
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym)).limit(1);
+      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym)).limit(1);
     if(readErr){
       console.error('클라우드 저장 전 읽기 실패:', readErr);
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
@@ -3612,20 +3612,20 @@ async function cloudSaveMonth(ym){
     let writeOk=false;
     if(row){
       let q = sbClient.from('study_months').update({data:merged,updated_at:nowIso})
-        .eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym));
+        .eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
-      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:lectureCloudYm(ym),data:merged,updated_at:nowIso});
+      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:sleepCloudYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
       else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
     if(writeOk){
       monthCache[ym]=merged;
-      localStorage.setItem(`lectureMonth:${ym}`,JSON.stringify(merged));
+      localStorage.setItem(`sleepMonth:${ym}`,JSON.stringify(merged));
       return;
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
@@ -3658,17 +3658,17 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:'));
   if(lectureRows.length===0) return;
   const needsPush=[];
   for(const row of lectureRows){
-    const ym=lectureLocalYm(row.ym);
+    const ym=sleepLocalYm(row.ym);
     if(!ym) continue;
     let local={};
-    try{ local=JSON.parse(localStorage.getItem(`lectureMonth:${ym}`)||'{}'); }catch(e){}
+    try{ local=JSON.parse(localStorage.getItem(`sleepMonth:${ym}`)||'{}'); }catch(e){}
     const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
     const merged=mergeMonths(local,remoteNorm,ym);
-    localStorage.setItem(`lectureMonth:${ym}`,JSON.stringify(merged));
+    localStorage.setItem(`sleepMonth:${ym}`,JSON.stringify(merged));
     monthCache[ym]=merged;
     if(!jsonSame(merged,remoteNorm)) needsPush.push(ym);
   }
@@ -3692,17 +3692,17 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:'));
   if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 강의 기록을 교체할까요?')) return;
   const keys=[];
   for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i); if(k && k.startsWith('lectureMonth:')) keys.push(k);
+    const k=localStorage.key(i); if(k && k.startsWith('sleepMonth:')) keys.push(k);
   }
   keys.forEach(k=>localStorage.removeItem(k));
   lectureRows.forEach(row=>{
-    const ym=lectureLocalYm(row.ym);
-    if(ym) localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(row.data || {}));
+    const ym=sleepLocalYm(row.ym);
+    if(ym) localStorage.setItem(`sleepMonth:${ym}`, JSON.stringify(row.data || {}));
   });
   monthCache={};
   enforceStudyDayLimit();
@@ -4100,7 +4100,7 @@ function collectBackupData(){
   const months = {};
   for(let i=0; i<localStorage.length; i++){
     const key = localStorage.key(i);
-    if(key && key.startsWith('lectureMonth:')){
+    if(key && key.startsWith('sleepMonth:')){
       try{ months[key.slice(13)] = JSON.parse(localStorage.getItem(key)); }
       catch(e){ months[key.slice(13)] = {}; }
     }
@@ -4145,12 +4145,12 @@ $('#restoreFile').addEventListener('change', async (e) => {
     const keysToRemove = [];
     for(let i=0; i<localStorage.length; i++){
       const key = localStorage.key(i);
-      if(key && key.startsWith('lectureMonth:')) keysToRemove.push(key);
+      if(key && key.startsWith('sleepMonth:')) keysToRemove.push(key);
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
     Object.entries(parsed.months).forEach(([ym, data]) => {
       if(/^\d{4}-\d{2}$/.test(ym)){
-        localStorage.setItem(`lectureMonth:${ym}`, JSON.stringify(data || {}));
+        localStorage.setItem(`sleepMonth:${ym}`, JSON.stringify(data || {}));
       }
     });
     if(parsed.settings && typeof parsed.settings === 'object'){
