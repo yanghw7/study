@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<script src="./ls-shim.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>공부장</title>
@@ -207,8 +208,9 @@
   .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px 9px;}
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
-  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;}
-  .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
+  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
+  .chart-avg-note{font-size:12px;font-weight:800;color:#2563eb;margin:-2px 4px 7px;text-align:right;line-height:1.35;}
+  .chart-period-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
   .chart-axis-label{font-size:9.5px;fill:var(--ink-soft);font-family:inherit;}
@@ -219,7 +221,7 @@
   .chart-dot-pages{fill:var(--accent);}
   .chart-dot-waste{fill:var(--waste);}
   .chart-bar-study{fill:var(--study);}
-  .chart-bar-pages{fill:#2563eb;}
+  .chart-bar-pages{fill:#111111;}
   .chart-bar-waste{fill:#dc2626;}
   .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
   .chart-card{position:relative;}
@@ -394,7 +396,7 @@
 .field.time .ko-time-label{
   left:10px!important;right:10px!important;bottom:8px!important;
   pointer-events:none!important;z-index:3!important;
-  text-align:left!important;font-size:12.5px!important;
+  text-align:right!important;font-size:12.5px!important;
   letter-spacing:-.2px!important;color:#302b3d!important;
 }
 </style>
@@ -455,9 +457,6 @@
   </div>
 
   <div class="data-tools">
-    <button class="data-btn" id="backupData">데이터 백업</button>
-    <button class="data-btn" id="restoreData">데이터 복원</button>
-    <input type="file" id="restoreFile" accept="application/json,.json">
   </div>
 <div class="cloud-card">
     <div class="cloud-head">
@@ -832,8 +831,8 @@ function mergeMonths(localMonth, remoteMonth, ym=''){
 }
 
 async function loadMonth(ym){
-  if(monthCache[ym]) return monthCache[ym];
   try{
+    if(monthCache[ym]) return monthCache[ym];
     const raw = localStorage.getItem(`month:${ym}`);
     const m = raw ? JSON.parse(raw) : {};
     const [year, mo] = ym.split('-').map(Number);
@@ -1959,6 +1958,66 @@ $('#periodList').addEventListener('paste', (e) => {
 });
 
 
+// 실행 중인 타이머를, 화면에 지금 어떤 날짜가 표시돼 있는지와 무관하게 찾아낸다.
+// (다른 날짜를 보고 있거나, 자정을 넘겨 이 탭을 새로 열었을 때도 놓치지 않도록)
+async function locateRunningPeriod(){
+  if(cloudUser && sbClient){
+    try{
+      const {data,error} = await sbClient.from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
+      if(!error && data?.status==='running'){
+        const ym=String(data.ym||''), dk=String(data.day_key||'');
+        await loadMonth(ym);
+        const day=monthCache[ym]?.[dk];
+        if(day?.periods){
+          let idx=day.periods.findIndex(p=>String(p._id||'')===String(data.period_id||''));
+          if(idx<0){
+            const fb=Number(data.period_index);
+            if(Number.isInteger(fb) && day.periods[fb]) idx=fb;
+          }
+          if(idx>=0 && Number(day.periods[idx].timerStartedAt)>0 && !Number(day.periods[idx].timerEndedAt)){
+            return {ym,dk,day,p:day.periods[idx],idx};
+          }
+        }
+      }
+    }catch(e){}
+  }
+  const curYm=ymKey(cur), curDk=dKey(cur);
+  const curDay=monthCache[curYm]?.[curDk];
+  if(curDay?.periods){
+    const idx=curDay.periods.findIndex(p=>Number(p.timerStartedAt)>0 && !Number(p.timerEndedAt));
+    if(idx>=0) return {ym:curYm,dk:curDk,day:curDay,p:curDay.periods[idx],idx};
+  }
+  for(const ym of Object.keys(monthCache)){
+    const month=monthCache[ym];
+    for(const dk of Object.keys(month)){
+      if(!/^\d{1,2}$/.test(dk)) continue;
+      const day=month[dk];
+      if(!day?.periods) continue;
+      const idx=day.periods.findIndex(p=>Number(p.timerStartedAt)>0 && !Number(p.timerEndedAt));
+      if(idx>=0) return {ym,dk,day,p:day.periods[idx],idx};
+    }
+  }
+  return null;
+}
+
+// 취소된 새 타이머 때문에 되돌려야 할, 방금 자동 종료된 기록을 찾는다.
+async function locateStoppedPeriodNear(atMsTarget, toleranceMs=8000){
+  for(const ym of Object.keys(monthCache)){
+    const month=monthCache[ym];
+    for(const dk of Object.keys(month)){
+      if(!/^\d{1,2}$/.test(dk)) continue;
+      const day=month[dk];
+      if(!day?.periods) continue;
+      const idx=day.periods.findIndex(p=>{
+        const st=Number(p.timerStartedAt), en=Number(p.timerEndedAt);
+        return st>0 && Number.isFinite(en) && Math.abs(en-atMsTarget)<=toleranceMs;
+      });
+      if(idx>=0) return {ym,dk,day,p:day.periods[idx],idx};
+    }
+  }
+  return null;
+}
+
 async function requestExclusiveSessionStart(atMs){
   if(window.parent === window) return true;
   try{
@@ -1982,9 +2041,10 @@ window.addEventListener('message',async ev=>{
     // 이 공부 세션의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
     const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
     const now=new Date(atMs);
-    const day=getDayData();
-    const p=(day.periods||[]).find(x=>Number(x.timerStartedAt)>0 && !Number(x.timerEndedAt));
-    if(p){
+    const found=await locateRunningPeriod();
+    if(found){
+      const {ym,dk,day,p}=found;
+      const before=deepClone(p);
       p.endDate=ymd(now);p.endTime=hm(now);
       // 자동 전환 시 페이지 진도는 시작페이지 그대로 저장
       if(String(p.startPage||'').trim()) p.endPage=String(p.startPage).trim();
@@ -1993,14 +2053,38 @@ window.addEventListener('message',async ev=>{
         const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
         p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
       }else p.timerEndedAt=Math.round(atMs);
-      p._updatedAt=syncNow();
+      markChangedPeriodFields(p, before);
       autoSortPeriodsByStart(day);
-      await persistToday();
-      renderPeriods();updateStudyTimer();updateWasteTimer();
+      // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
+      await saveMonth(ym);
+      if(ym===ymKey(cur) && dk===dKey(cur)){
+        renderPeriods();updateStudyTimer();updateWasteTimer();
+      }
       stopped=true;
     }
   }catch(e){console.warn('자동 공부 종료 실패',e)}
   window.parent.postMessage({type:'exclusive-session-stopped',kind:'study',req:ev.data.req,ok:true,stopped},location.origin);
+});
+// 새로 시작한 다른 기록장의 타이머가 곧바로 취소되면, 그로 인해 자동 종료됐던 이 기록을 되돌린다.
+window.addEventListener('message',async ev=>{
+  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-undo-stop') return;
+  try{
+    const atMs=Number(ev.data.atMs);
+    if(!Number.isFinite(atMs)) return;
+    const found=await locateStoppedPeriodNear(atMs);
+    if(!found) return;
+    const {ym,dk,day,p,idx}=found;
+    const before=deepClone(p);
+    if(p.endPage && p.endPage===p.startPage) p.endPage='';
+    p.endDate=''; p.endTime=''; p.timerEndedAt=null;
+    if(cloudUser) await cloudResumeActiveTimer(ym, dk, p, idx);
+    markChangedPeriodFields(p, before);
+    autoSortPeriodsByStart(day);
+    await saveMonth(ym);
+    if(ym===ymKey(cur) && dk===dKey(cur)){
+      renderPeriods();updateStudyTimer();updateWasteTimer();
+    }
+  }catch(e){console.warn('타이머 복원 실패',e)}
 });
 
 $('#periodList').addEventListener('input', async (e) => {
@@ -2029,6 +2113,14 @@ $('#periodList').addEventListener('input', async (e) => {
   const prevEndDate=p.endDate||'', prevEndTime=p.endTime||'';  ensureDaySync(day, ymKey(cur), dKey(cur));
   const beforeSync = deepClone(p);
   const prevVal = p[k];
+
+  // 시작 페이지 없이 종료 페이지만 입력하려는 경우 입력을 막고 안내한다.
+  if(k==='endPage' && String(t.value ?? '').trim() && !String(p.startPage ?? '').trim()){
+    t.value = '';
+    p.endPage = '';
+    alert('시작 페이지를 먼저 입력해주세요.');
+    return;
+  }
 
   if(k==='start' || k==='end'){
     // datetime-local 하나로 날짜+시간을 함께 입력받아 "YYYY-MM-DDTHH:MM" 형태로 들어온다
@@ -2122,9 +2214,15 @@ $('#periodList').addEventListener('input', async (e) => {
       p[timeKey] = '';
       const di = dtInput(); if(di) di.value = '';
       if(k==='startPage'){
+        const wasRunning = Number(p.timerStartedAt) > 0 && !Number(p.timerEndedAt);
         p.timerStartedAt = null;
         p.timerEndedAt = null;
         if(cloudUser) await cloudClearActiveTimer();
+        // 방금 시작했던 타이머를 취소하는 것이므로, 그로 인해 자동 종료됐던
+        // 다른 기록장(강의/수면)의 기록을 되돌려 달라고 알린다.
+        if(wasRunning && window.parent!==window){
+          window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'study'},location.origin);
+        }
       } else if(k==='endPage' && Number(p.timerStartedAt) > 0){
         // 끝 페이지를 지우면 같은 서버 시작 시점에서 다시 카운트한다.
         p.timerEndedAt = null;
@@ -2256,8 +2354,21 @@ function chartSvg(points, valueKey, kind, unit){
   const y=v=>T+innerH-(v/max)*innerH;
   const grid=[0,.5,1].map(fr=>{
     const gy=T+innerH-(innerH*fr);
-    const val=Math.round(max*fr);
-    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/><text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${val}</text>`;
+    const rawVal=max*fr;
+    let axisLabel;
+    if(valueKey==='study' || valueKey==='waste'){
+      const mins=Math.max(0,Math.round(rawVal));
+      const hours=Math.floor(mins/60);
+      const minutes=mins%60;
+      const lines=[];
+      if(hours) lines.push(`${hours}시간`);
+      if(minutes || !hours) lines.push(`${minutes}분`);
+      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy - (lines.length>1 ? 3 : -3)}" text-anchor="end">${lines.map((line,i)=>`<tspan x="${L-5}" dy="${i===0?0:10}">${escHtml(line)}</tspan>`).join('')}</text>`;
+    }else{
+      const val=Math.round(rawVal);
+      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${escHtml(val)}</text>`;
+    }
+    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/>${axisLabel}`;
   }).join('');
   const n=Math.max(points.length,1);
   const slot=innerW/n;
@@ -2304,7 +2415,7 @@ function chartTotalTime(points,key){
   const mins=points.reduce((sum,p)=>sum+(Number(p[key])||0),0);
   return formatAvgTime(mins);
 }
-function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote=""){
+function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote="", activeDayAveragePoints=null){
   if(!chartsVisible) return '';
   if(!points.length || points.every(p=>!p.study && !p.pages && !p.waste)) return '';
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
@@ -2315,11 +2426,16 @@ function chartsHtml(points, averagePoints=points, averageLabel="평균", average
   const totalStudy = chartTotalTime(points,'study');
   const totalPages = Math.round(points.reduce((sum,p)=>sum+(Number(p.pages)||0),0));
   const totalWaste = chartTotalTime(points,'waste');
-  const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
+  const activeBase = Array.isArray(activeDayAveragePoints) ? activeDayAveragePoints : [];
+  const activeAvgStudy = activeBase.length ? formatAvgTime(chartAverage(activeBase,'study')) : '—';
+  const activeAvgWaste = activeBase.length ? formatAvgTime(chartAverage(activeBase,'waste')) : '—';
+  const activeStudyExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 공부시간 ${activeAvgStudy}</div>` : '';
+  const activeWasteExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 낭비시간 ${activeAvgWaste}</div>` : '';
+  const note = averageNote ? `<div class="chart-period-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${note}${chartSvg(points,'study','study','분')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages} Page</div></div>${note}${chartSvg(points,'pages','pages','Page')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste} · 총 ${totalWaste}</div></div>${note}${chartSvg(points,'waste','waste','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy}<br>총 ${totalStudy}</div></div>${activeStudyExtra}${note}${chartSvg(points,'study','study','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages}<br>총 ${totalPages} Page</div></div>${note}${chartSvg(points,'pages','pages','Page')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste}<br>총 ${totalWaste}</div></div>${activeWasteExtra}${note}${chartSvg(points,'waste','waste','분')}</div>
   </div>`;
 }
 
@@ -2372,7 +2488,8 @@ async function renderDayCharts(){
     d.setHours(0,0,0,0);
     return d <= currentStudyDay;
   });
-  el.innerHTML = heading + chartsHtml(points, averagePoints, '일 평균');
+  const activeDayAveragePoints = averagePoints.filter(p => (Number(p.study)||0) > 0);
+  el.innerHTML = heading + chartsHtml(points, averagePoints, '일 평균', '', activeDayAveragePoints);
 }
 
 // ---------- 주별/월별 집계 ----------
@@ -2403,6 +2520,7 @@ async function computeMonthAgg(ym){
   }
 
   let monthStudy=0, monthPages=0, monthWaste=0;
+  const activeDays = [];
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
     const dayData = m[dk];
@@ -2416,13 +2534,16 @@ async function computeMonthAgg(ym){
     const w = weekOfMonth(year, mo, dayNum);
     weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].days += 1;
     monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste;
+    if(dStudy > 0){
+      activeDays.push({date:new Date(year, mo-1, dayNum), study:dStudy, pages:dPages, waste:dWaste});
+    }
   });
-  return { weeks, monthStudy, monthPages, monthWaste };
+  return { weeks, monthStudy, monthPages, monthWaste, activeDays };
 }
 
 async function renderWeekView(){
   const ym = ymKey(cur);
-  const { weeks } = await computeMonthAgg(ym);
+  const { weeks, activeDays } = await computeMonthAgg(ym);
   const el = $('#weekView');
   const today = logicalToday();
   const weekNums = Object.keys(weeks).map(Number).sort((a,b)=>a-b)
@@ -2433,7 +2554,7 @@ async function renderWeekView(){
   }
   const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste}));
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${cur.getFullYear()}년 ${cur.getMonth()+1}월 · 주별 정리 (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>` +
-    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.') +
+    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.', activeDays.filter(p => p.date <= logicalToday())) +
     weekNums.map(w => `
       <div class="agg-row">
         <div>
@@ -2454,9 +2575,11 @@ async function renderMonthView(){
   let html = '';
   let any = false;
   const chartPoints = [];
+  const activeDayPoints = [];
   for(let mo=1; mo<=12; mo++){
     const ym = `${year}-${pad(mo)}`;
-    const { monthStudy, monthPages, monthWaste } = await computeMonthAgg(ym);
+    const { monthStudy, monthPages, monthWaste, activeDays } = await computeMonthAgg(ym);
+    activeDayPoints.push(...activeDays);
     chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste});
     if(monthStudy===0 && monthPages===0 && monthWaste===0) continue;
     any = true;
@@ -2475,7 +2598,7 @@ async function renderMonthView(){
     return (idx + 1) < (currentStudyDay.getMonth() + 1);
   });
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div>` +
-    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.') +
+    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.', activeDayPoints.filter(p => p.date <= logicalToday())) +
     (any ? html : `<div class="empty-state">${year}년에 기록된 데이터가 없어요.</div>`);
 }
 
@@ -2493,11 +2616,13 @@ async function renderYearView(){
   let rows = '';
   let any = false;
   const chartPoints = [];
+  const activeDayPoints = [];
   for(const year of sorted){
     let study=0, pages=0, waste=0;
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
       study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste;
+      activeDayPoints.push(...a.activeDays);
     }
     chartPoints.push({label:`${year}`, study, pages, waste});
     if(study===0 && pages===0 && waste===0) continue;
@@ -2505,7 +2630,7 @@ async function renderYearView(){
     rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">공부 <b class="study-color">${fmtDuration(study)}</b> · 페이지 <b>${pages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(waste)}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">년도별 정리</div>` +
-    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +
+    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.', activeDayPoints.filter(p => p.date <= logicalToday())) +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
 }
 
@@ -3717,5 +3842,7 @@ if ('serviceWorker' in navigator) {
 
 
 <!-- vibration-repeat-verified-v1 -->
+
+<div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
 </body>
 </html>
