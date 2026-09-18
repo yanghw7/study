@@ -847,7 +847,7 @@ body{background:#EEF3F8!important}
 
     <div id="dayCharts"></div>
     <div id="periodList"></div>
-    <button class="add-btn" id="addPeriod">+ 수면 추가</button>
+    <button class="add-btn" id="addPeriod">+ 수면 기록 추가</button>
   </div>
 
   <div id="weekView" style="display:none;"></div>
@@ -2104,9 +2104,6 @@ function renderPeriods(){
   updateSleepExtraSummary(day);
   renderDayCharts();
 
-  if(day.periods.length===0){
-    list.innerHTML = `<div class="empty-state">아직 기록한 수면이 없어요.<br>아래 버튼으로 추가해보세요.</div>`;
-  }
 }
 
 // 입력칸을 다시 그리지 않고 숫자만 갱신 (포커스/커서 유지용)

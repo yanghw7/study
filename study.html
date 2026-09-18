@@ -399,6 +399,15 @@
   letter-spacing:-.2px!important;color:#302b3d!important;
 }
 </style>
+<style id="study-add-btn-filled">
+.add-btn{
+  background:#3B6E5C !important;
+  border:1.5px solid #3B6E5C !important;
+  color:#fff !important;
+  box-shadow:0 2px 7px rgba(59,110,92,.16);
+}
+.add-btn:active{transform:translateY(1px)}
+</style>
 </head>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
@@ -509,7 +518,7 @@
 
     <div id="dayCharts"></div>
     <div id="periodList"></div>
-    <button class="add-btn" id="addPeriod">+ 교시 추가</button>
+    <button class="add-btn" id="addPeriod">+ 공부 기록 추가</button>
   </div>
 
   <div id="weekView" style="display:none;"></div>
@@ -1747,9 +1756,6 @@ function renderPeriods(){
   $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
   renderDayCharts();
 
-  if(day.periods.length===0){
-    list.innerHTML = `<div class="empty-state">아직 기록한 교시가 없어요.<br>아래 버튼으로 추가해보세요.</div>`;
-  }
 }
 
 // 입력칸을 다시 그리지 않고 숫자만 갱신 (포커스/커서 유지용)
