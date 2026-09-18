@@ -303,7 +303,7 @@ function initSharedSettingsUI(){
   }
   async function deleteOneJournal(kind){
     const fr=await ensureDeleteFrame(kind);
-    const id=kind==='sleep'?'deleteAll':'deleteAllRecords';
+    const id='deleteAllRecords';
     const childBtn=fr.contentDocument?.getElementById(id);
     if(!childBtn){alert('삭제 기능을 찾지 못했습니다.');return}
     childBtn.click();
