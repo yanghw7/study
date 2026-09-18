@@ -1,0 +1,34 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase server_now RPC
+        run: |
+          echo "Pinging Supabase at $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "apikey: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "https://nvpvxtwebzefhgulswsv.supabase.co/rest/v1/rpc/server_now")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+
+          echo "HTTP status: $http_code"
+          echo "Response body: $body"
+
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Supabase ping failed with HTTP $http_code"
+            exit 1
+          fi
+
+          echo "✅ Supabase ping successful — inactivity timer reset"
