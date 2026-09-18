@@ -45,6 +45,8 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .shared-settings-note{margin-top:8px;font-size:10px;line-height:1.45;color:#6b7773}
 .shared-danger-zone{margin-top:12px;padding-top:10px;border-top:1px solid #ead9d9}.shared-delete-all{width:100%;height:36px;margin-top:14px;border:1px solid #c9362b;border-radius:8px;background:#fff;color:#b42318;font-size:11px;font-weight:900}.shared-delete-all:active{background:#fff1f0}.shared-delete-grid{display:grid;gap:6px;margin-top:8px}.shared-delete-one{width:100%;height:34px;border:1px solid #e2c7c4;border-radius:8px;background:#fff;color:#8f3028;font-size:10.5px;font-weight:850}.shared-delete-one:active{background:#fff5f4}
 
+
+.shared-data-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.shared-backup-location{width:100%;height:40px;margin-top:8px;border:1px solid #d9dfdc;border-radius:10px;background:#fff;color:#1f2926;font-size:11.5px;font-weight:900}.shared-backup-location:active{background:#f4f7f5}.shared-backup-location-status{margin-top:5px;font-size:10px;color:#6b7773}.shared-data-btn{height:44px;border:1px solid #d9dfdc;border-radius:12px;background:#fff;color:#1f2926;font-size:13px;font-weight:900}.shared-data-btn:active{background:#f4f7f5}.backup-choice{display:none;margin-top:8px;padding:10px;border:1px solid #dfe4e1;border-radius:12px;background:#f8faf9}.backup-choice.open{display:block}.backup-choice-title{font-size:11px;font-weight:900;margin-bottom:8px;color:#46534f}.backup-choice-grid{display:grid;gap:6px}.backup-choice-btn{width:100%;height:36px;border:1px solid #d9dfdc;border-radius:9px;background:#fff;color:#26312e;font-size:11px;font-weight:850}.backup-choice-btn:active{background:#eef3f0}#sharedRestoreFile{display:none}
 </style>
 
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
@@ -69,6 +71,22 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
     </select></label>
     <div class="shared-settings-note">선택한 요일부터 한 주가 시작되며 주간 통계에 공통 적용됩니다.</div>
     <div class="shared-settings-note">공통 설정은 공부 · 강의 · 수면 기록장에 모두 적용됩니다.</div>
+    <div class="shared-data-actions">
+      <button id="sharedBackupBtn" class="shared-data-btn" type="button">데이터 백업</button>
+      <button id="sharedRestoreBtn" class="shared-data-btn" type="button">데이터 복원</button>
+    </div>
+    <button id="sharedBackupLocationBtn" class="shared-backup-location" type="button">백업파일 저장 위치 설정</button>
+    <div id="sharedBackupLocationStatus" class="shared-backup-location-status">저장 위치: 기본 다운로드 폴더</div>
+    <div id="sharedBackupChoice" class="backup-choice" aria-hidden="true">
+      <div class="backup-choice-title">백업할 기록장을 선택하세요</div>
+      <div class="backup-choice-grid">
+        <button class="backup-choice-btn" data-backup-kind="study" type="button">공부 기록장 백업</button>
+        <button class="backup-choice-btn" data-backup-kind="lecture" type="button">강의 기록장 백업</button>
+        <button class="backup-choice-btn" data-backup-kind="sleep" type="button">수면 기록장 백업</button>
+        <button class="backup-choice-btn" data-backup-kind="all" type="button">전체 기록장 백업</button>
+      </div>
+    </div>
+    <input id="sharedRestoreFile" type="file" accept="application/json,.json">
     <div class="shared-danger-zone">
       <div class="shared-delete-grid">
         <button id="sharedDeleteStudy" class="shared-delete-one" type="button">공부 기록장 데이터 전체 삭제</button>
@@ -395,6 +413,74 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
  function catchUp(){const x=read();if(!x)return;if(x.enabled&&Date.now()>=x.due){fire()}else if(x.enabled){arm(x)}}
  document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',updatePreview);$('#alarmMinutes').addEventListener('input',updatePreview);$('#alarmPreview').onclick=async()=>{await cacheSelected();const u=await audioURL();if(!u)return alert('알람음을 선택해주세요.');try{const preview=new Audio(u);preview.volume=1;await preview.play();setTimeout(()=>{try{preview.pause();preview.currentTime=0}catch(e){}},2500)}catch(e){alert('미리듣기를 재생할 수 없습니다.')}};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await ensureNotifyPermission();await cacheSelected();stopRing();try{const u=await audioURL();if(u){ring=new Audio(u);ring.loop=true;ring.volume=1;await ring.play();ring.pause();ring.currentTime=0}ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(e){}const a={enabled:true,ringing:false,due:alignedDue(ms),sound:$('#alarmSoundSelect').value};write(a);arm(a)};$('#alarmCancel').onclick=()=>{if(!confirm('알람을 정말 해제하시겠습니까?'))return;resetAlarm()};$('#alarmStop').onclick=()=>{resetAlarm()};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp();requestWake()}});window.addEventListener('pageshow',()=>{catchUp();requestWake()});window.addEventListener('focus',()=>{catchUp()})});
 })();
+
+function ensureFrameLoaded(kind){
+  return new Promise((resolve,reject)=>{
+    const frame=tabs[kind]?.frame;
+    if(!frame)return reject(new Error('frame not found'));
+    if(frame.contentWindow && frame.contentDocument?.readyState==='complete')return resolve(frame);
+    if(!frame.getAttribute('src') && frame.dataset.src) frame.src=frame.dataset.src;
+    const timer=setTimeout(()=>reject(new Error('load timeout')),8000);
+    frame.addEventListener('load',()=>{clearTimeout(timer);resolve(frame)},{once:true});
+  });
+}
+let sharedBackupDirectoryHandle=null;
+async function downloadJSON(data,name){
+  const text=JSON.stringify(data,null,2);
+  if(sharedBackupDirectoryHandle){
+    try{
+      const permission=await sharedBackupDirectoryHandle.queryPermission({mode:'readwrite'});
+      if(permission==='granted'||await sharedBackupDirectoryHandle.requestPermission({mode:'readwrite'})==='granted'){
+        const fileHandle=await sharedBackupDirectoryHandle.getFileHandle(name,{create:true});
+        const writable=await fileHandle.createWritable();
+        await writable.write(text);await writable.close();return;
+      }
+    }catch(e){}
+  }
+  const blob=new Blob([text],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function backupDate(){
+  const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+async function getJournalBackup(kind){
+  const frame=await ensureFrameLoaded(kind);
+  const fn=frame.contentWindow?.collectBackupData;
+  if(typeof fn!=='function')throw new Error('backup function unavailable');
+  return fn.call(frame.contentWindow);
+}
+function initSharedBackupUI(){
+  const main=document.getElementById('sharedBackupBtn'),choice=document.getElementById('sharedBackupChoice');
+  const restore=document.getElementById('sharedRestoreBtn'),file=document.getElementById('sharedRestoreFile');
+  const locationBtn=document.getElementById('sharedBackupLocationBtn'),locationStatus=document.getElementById('sharedBackupLocationStatus');
+  locationBtn.addEventListener('click',async()=>{
+    if(typeof window.showDirectoryPicker!=='function'){alert('이 브라우저에서는 저장 위치를 직접 지정할 수 없습니다. 백업 파일은 기본 다운로드 폴더에 저장됩니다.');return;}
+    try{
+      sharedBackupDirectoryHandle=await window.showDirectoryPicker({mode:'readwrite'});
+      locationStatus.textContent=`저장 위치: ${sharedBackupDirectoryHandle.name}`;
+    }catch(e){if(e?.name!=='AbortError')alert('저장 위치를 설정하지 못했습니다.');}
+  });
+  main.addEventListener('click',()=>{const open=!choice.classList.contains('open');choice.classList.toggle('open',open);choice.setAttribute('aria-hidden',String(!open));});
+  choice.querySelectorAll('[data-backup-kind]').forEach(btn=>btn.addEventListener('click',async()=>{
+    const kind=btn.dataset.backupKind;
+    try{
+      if(kind==='all'){
+        const [study,lecture,sleep]=await Promise.all(['study','lecture','sleep'].map(getJournalBackup));
+        downloadJSON({app:'journal-all',version:1,exportedAt:new Date().toISOString(),study,lecture,sleep},`journal-all-backup-${backupDate()}.json`);
+      }else{
+        const data=await getJournalBackup(kind);
+        const names={study:'study-log',lecture:'lecture-log',sleep:'sleep-log'};
+        downloadJSON(data,`${names[kind]}-backup-${backupDate()}.json`);
+      }
+      choice.classList.remove('open');choice.setAttribute('aria-hidden','true');
+    }catch(e){alert('백업 파일을 만들지 못했습니다. 잠시 후 다시 시도해주세요.');}
+  }));
+  restore.addEventListener('click',()=>file.click());
+  file.addEventListener('change',()=>{alert('복원 선택 메뉴는 다음 단계에서 연결할 수 있습니다.');file.value='';});
+}
+initSharedBackupUI();
 </script>
 </body>
 </html>

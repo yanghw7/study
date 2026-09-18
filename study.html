@@ -455,9 +455,6 @@
   </div>
 
   <div class="data-tools">
-    <button class="data-btn" id="backupData">데이터 백업</button>
-    <button class="data-btn" id="restoreData">데이터 복원</button>
-    <input type="file" id="restoreFile" accept="application/json,.json">
   </div>
 <div class="cloud-card">
     <div class="cloud-head">
@@ -3832,5 +3829,7 @@ if ('serviceWorker' in navigator) {
 
 
 <!-- vibration-repeat-verified-v1 -->
+
+<div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
 </body>
 </html>
