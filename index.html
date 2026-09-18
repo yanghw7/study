@@ -208,15 +208,21 @@ function notifySharedSettings(v){
 
 // [FIX3] 자식이 로드 직후 요청하는 현재 공통 설정을 응답한다.
 // (study/lecture/sleep.html 이 기본값 대신 실제 설정을 받도록)
-window.addEventListener('message', (ev)=>{
+// [FIX3-보강] 요청이 부팅 직후(클라우드 로드 전) 도착할 수 있으므로,
+//            캐시가 아직 로드되지 않았으면 실제 클라우드 설정을 먼저 읽고 응답한다.
+window.addEventListener('message', async (ev)=>{
   if(ev.origin !== location.origin) return;
   if(ev.data?.type !== 'journal-request-shared-settings') return;
   try{
+    if(!sharedSettingsLoaded){
+      await loadSharedSettingsFromCloud();
+      sharedSettingsLoaded = true;
+    }
     ev.source?.postMessage({
       type:'journal-shared-settings-changed',
       settings: sharedSettingsCache
     }, location.origin);
-  }catch(e){}
+  }catch(e){ console.warn('[FIX3] 설정 응답 실패', e); }
 });
 async function writeSharedSettingsToCloud(patch){
   const sb=initSettingsClient();
@@ -402,6 +408,15 @@ function initSharedSettingsUI(){
   });
 }
 initSharedSettingsUI();
+
+// [FIX3-보강] 부팅 시 클라우드 설정 로드가 끝나면, 이미 떠 있는 iframe 들에게
+//            실제 설정을 브로드캐스트한다. (자식이 기본값으로 그려진 상태를 교정)
+loadSharedSettingsFromCloud()
+  .then(()=>{
+    sharedSettingsLoaded = true;
+    notifySharedSettings(sharedSettingsCache);
+  })
+  .catch(e => console.warn('[FIX3] 초기 설정 브로드캐스트 실패', e));
 
 
 const baseTabLabels={study:'📚 공부 기록장',lecture:'🎓 강의 기록장',sleep:'🌙 수면 기록장'};
