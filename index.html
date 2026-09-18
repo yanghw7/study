@@ -458,6 +458,7 @@ window.addEventListener('message',ev=>{
     setExclusiveTabStatus(kind);
     lastTransition = previousActive ? {startedKind:kind, previousKind:previousActive, atMs} : null;
     ev.source?.postMessage({type:'exclusive-session-result',req,ok:true},location.origin);
+    if(pendingStart?.req===req) pendingStart=null;
   });
 });
 
