@@ -4007,7 +4007,7 @@ async function applyActiveTimerRow(row){
   found.p.timerEndedAt =
     row.status === 'stopped' && Number.isFinite(stopped) ? stopped : null;
 
-  localStorage.setItem(`month:${found.ym}`, JSON.stringify(monthCache[found.ym]));
+  localStorage.setItem(`sleepMonth:${found.ym}`, JSON.stringify(monthCache[found.ym]));
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
     await renderCurrentView();
