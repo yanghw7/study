@@ -3568,7 +3568,7 @@ async function refreshCloudStatus(){
 }
 
 
-function lectureCloudYm(ym){ return `L:${ym}`; }
+function lectureCloudYm(ym){ const s=String(ym||''); return s.startsWith('L:') ? s : `L:${s}`; }
 function lectureLocalYm(v){ return String(v||'').startsWith('L:') ? String(v).slice(2) : null; }
 
 async function cloudSaveMonth(ym){
@@ -3887,7 +3887,7 @@ function activeTimerRowFingerprint(row){
 async function cloudStartActiveTimer(ym, dayKey, p, idx){
   if(!sbClient || !cloudUser) return null;
   const {data,error} = await sbClient.rpc('start_active_timer',{
-    p_ym: ym,
+    p_ym: lectureCloudYm(ym),
     p_day_key: String(dayKey),
     p_period_id: String(p._id || ''),
     p_period_index: Number(idx || 0)
@@ -3904,7 +3904,7 @@ async function cloudStartActiveTimer(ym, dayKey, p, idx){
 async function cloudStopActiveTimer(ym, dayKey, periodId){
   if(!sbClient || !cloudUser) return null;
   const {data,error} = await sbClient.rpc('stop_active_timer',{
-    p_ym: ym ? String(ym) : null,
+    p_ym: ym ? lectureCloudYm(ym) : null,
     p_day_key: dayKey != null ? String(dayKey) : null,
     p_period_id: periodId ? String(periodId) : null
   });
@@ -3919,7 +3919,7 @@ async function cloudStopActiveTimer(ym, dayKey, periodId){
 async function cloudResumeActiveTimer(ym, dayKey, p, idx){
   if(!sbClient || !cloudUser || !Number(p.timerStartedAt)) return null;
   const {data,error} = await sbClient.rpc('resume_active_timer',{
-    p_ym: ym,
+    p_ym: lectureCloudYm(ym),
     p_day_key: String(dayKey),
     p_period_id: String(p._id || ''),
     p_period_index: Number(idx || 0),
