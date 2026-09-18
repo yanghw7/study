@@ -2189,32 +2189,6 @@ $('#periodList').addEventListener('input', async (e) => {
     if(endEl) endEl.min = String(p.startPage||'').trim() || '1';
   }
 
-  // 종료 페이지 제한: 입력 도중 필요한 접두 숫자는 허용하되,
-  // 시작 페이지와 같은 자릿수 이상이 된 순간 더 작은 값이면 즉시 거부한다.
-  // 예: 시작 35 -> 끝 40 입력 시 첫 '4'는 허용, '40'도 허용.
-  // 시작 35 -> 끝 20 입력 시 '20'이 되는 순간 즉시 삭제한다.
-  if(k==='endPage'){
-    const startRaw = String(p.startPage ?? '').trim();
-    const endRaw = String(t.value ?? '').trim();
-    const startNum = Number(startRaw), endNum = Number(endRaw);
-    if(startRaw && endRaw && /^\d+$/.test(endRaw) &&
-       Number.isFinite(startNum) && startNum > 0 && Number.isFinite(endNum) && endNum > 0 &&
-       endRaw.length >= startRaw.length && endNum < startNum){
-      p.endPage=''; p.endDate=''; p.endTime=''; p.timerEndedAt=null;
-      t.value='';
-      const endDT=$('#periodList').querySelector(`input[data-k="end"][data-idx="${idx}"]`);
-      if(endDT){
-        endDT.value='';
-        const labelEl=endDT.nextElementSibling;
-        if(labelEl && labelEl.classList.contains('ko-time-label')) labelEl.textContent='';
-      }
-      showToast('종료 페이지는 시작 페이지보다 작을 수 없어요');
-      refreshStats();
-      await persistToday();
-      return;
-    }
-  }
-
   // 페이지 번호와 자동기록 시간을 서로 연동:
   // - 페이지를 처음 입력하는 순간(빈칸/0→값) 현재 날짜+시간을 자동 기록
   // - 페이지를 지우거나 0으로 만들면(값→빈칸/0) 자동 기록됐던 날짜+시간도 함께 지움
