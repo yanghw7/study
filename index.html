@@ -139,13 +139,13 @@ openTab(first);
 
 
 const SHARED_SETTINGS_KEY='journalSharedSettings:v1';
-const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStart:6};
+const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
 function readSharedSettings(){
   try{
     const x=JSON.parse(localStorage.getItem(SHARED_SETTINGS_KEY)||'null')||{};
     return {
       dayStartHour:Number.isInteger(+x.dayStartHour)&&+x.dayStartHour>=0&&+x.dayStartHour<=11?+x.dayStartHour:SHARED_SETTINGS_DEFAULT.dayStartHour,
-      weekStart:Number.isInteger(+x.weekStart)&&+x.weekStart>=0&&+x.weekStart<=6?+x.weekStart:SHARED_SETTINGS_DEFAULT.weekStart
+      weekStartDay:Number.isInteger(+(x.weekStartDay ?? x.weekStart))&&+(x.weekStartDay ?? x.weekStart)>=0&&+(x.weekStartDay ?? x.weekStart)<=6?+(x.weekStartDay ?? x.weekStart):SHARED_SETTINGS_DEFAULT.weekStartDay
     };
   }catch(e){return {...SHARED_SETTINGS_DEFAULT}}
 }
@@ -174,7 +174,7 @@ function initSharedSettingsUI(){
   function paint(){
     const v=readSharedSettings();
     hour.value=String(v.dayStartHour);
-    week.value=String(v.weekStart);
+    week.value=String(v.weekStartDay);
   }
   paint();
   btn.addEventListener('click',e=>{
@@ -187,7 +187,7 @@ function initSharedSettingsUI(){
   panel.addEventListener('click',e=>e.stopPropagation());
   document.addEventListener('click',()=>{panel.classList.remove('show');panel.setAttribute('aria-hidden','true')});
   hour.addEventListener('change',()=>writeSharedSettings({dayStartHour:+hour.value}));
-  week.addEventListener('change',()=>writeSharedSettings({weekStart:+week.value}));
+  week.addEventListener('change',()=>writeSharedSettings({weekStartDay:+week.value}));
   window.addEventListener('storage',e=>{if(e.key===SHARED_SETTINGS_KEY)paint()});
 
   async function ensureDeleteFrame(kind){
