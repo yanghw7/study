@@ -1056,16 +1056,20 @@ function wasteTimerForCurrentDay(){
   if(!day.periods.length) return null;
 
   // 공부 중에는 낭비시간 타이머를 멈춘다.
-  const running = day.periods.some(p =>
-    Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
-  );
+  const running = day.periods.some(p => {
+    if(!(Number(p.timerStartedAt) > 0)) return false;
+    if(Number(p.timerEndedAt) >= Number(p.timerStartedAt)) return false;
+    if(p.endDate && p.endTime) return false;
+    return true;
+  });
   if(running) return null;
 
   // 가장 최근에 끝난 교시 이후, 아직 다음 교시가 시작되지 않았을 때만 흐른다.
   for(let i=day.periods.length-1; i>=0; i--){
     const p = day.periods[i];
     const started = Number(p.timerStartedAt);
-    const ended = Number(p.timerEndedAt);
+    const endedByTime = combineDT(p.endDate, p.endTime);
+    const ended = Math.max(Number(p.timerEndedAt)||0, endedByTime ? endedByTime.getTime() : 0);
     if(started > 0 && ended >= started){
       const laterStarted = day.periods.slice(i+1).some(x =>
         Number(x.timerStartedAt) > 0 || !!periodStartDT(x)
@@ -2058,6 +2062,7 @@ window.addEventListener('message',async ev=>{
       const {ym,dk,day,p}=found;
       const before=deepClone(p);
       p.endDate=ymd(now);p.endTime=hm(now);
+      p.timerEndedAt=Math.round(atMs);
       // 자동 전환 시 페이지 진도는 시작페이지 그대로 저장
       if(String(p.startPage||'').trim()) p.endPage=String(p.startPage).trim();
       if(cloudUser){
