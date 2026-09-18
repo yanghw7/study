@@ -558,7 +558,6 @@
 // BUILD: v9.3-cross-device-period-lock
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2,'0');
-const fmtHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 function fmtDuration(min){
   min = Math.max(0, Math.round(min));
   if(min < 60) return `${min}분`;
@@ -584,7 +583,6 @@ const dayKeys = ['일','월','화','수','목','금','토'];
 // v2: 설정은 index(부모)가 Supabase journal_settings 에서 로드해 postMessage 로 전달.
 const DEFAULT_SETTINGS = { dayStartHour: 11, weekStartDay: 6, pendingDayStart: null };
 let appSettings = { ...DEFAULT_SETTINGS };
-function saveSettings(){ /* v2: 설정 저장은 index(부모)가 담당. */ }
 function normalizeSharedSettings(x){
   const s = (x && typeof x==='object') ? x : {};
   const h = Number(s.dayStartHour);
@@ -616,11 +614,6 @@ window.addEventListener('message', (ev)=>{
 });
 if(window.parent!==window){
   try{ window.parent.postMessage({type:'journal-request-shared-settings'}, location.origin); }catch(e){}
-}
-function nextBoundaryForHour(hour, from = new Date()){
-  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate(), hour, 0, 0, 0);
-  if(d <= from) d.setDate(d.getDate()+1);
-  return d;
 }
 function maybeActivatePending(){
   const p = appSettings.pendingDayStart;
@@ -3047,20 +3040,6 @@ async function deleteAllStudyRecords(){
 }
 
 $('#deleteAllRecords').onclick = deleteAllStudyRecords;
-
-// 기존 공부일에 현재 기준시간을 찍어 두어, 이후 설정 변경으로 과거 기록 범위가 바뀌지 않게 한다.
-async function stampExistingStudyDays(){
-  const monthKeys = new Set(Object.keys(monthCache).filter(k=>/^\d{4}-\d{2}$/.test(k)));
-  for(const ym of monthKeys){
-    await loadMonth(ym);
-    const m = monthCache[ym] || {};
-    let changed = false;
-    Object.values(m).forEach(day=>{
-      if(day && !Number.isInteger(day.cutoffHour)){ day.cutoffHour = appSettings.dayStartHour; day._metaUpdatedAt=syncNow(); changed = true; }
-    });
-    if(changed) await saveMonth(ym);
-  }
-}
 
 $('#settingsSave').onclick = async () => {
   // v2: 설정 UI 는 index(부모)의 공통 설정 패널로 일원화.

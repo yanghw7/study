@@ -156,7 +156,6 @@ openTab(first);
 restoreLastTabFromCloud().then(tab=>{ if(tab && tab!==first && tabs[tab]) openTab(tab); });
 
 
-const SHARED_SETTINGS_KEY='journalSharedSettings:v1';
 const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
 let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
 let sharedSettingsLoaded=false;
@@ -288,7 +287,7 @@ function initSharedSettingsUI(){
       paint();
       notifySharedSettings(sharedSettingsCache);
       const t=await restoreLastTabFromCloud();
-      if(t && tabs[t]) openTab(t);
+      if(t && tabs[t]) openTab(t, true);
     });
   }
 
@@ -317,18 +316,13 @@ function initSharedSettingsUI(){
   del.addEventListener('click',()=>{
     if(!confirm('공부 · 강의 · 수면 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.'))return;
     if(!confirm('정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.'))return;
-    const keep=new Set(['githubAlarmSounds:v1','githubAlarmSelected:v1','sharedAlarm:v126']);
-    const keys=[];
-    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k)keys.push(k)}
-    for(const k of keys){
-      if(keep.has(k) || k.startsWith('sb-') || k.toLowerCase().includes('supabase.auth'))continue;
-      localStorage.removeItem(k);
-    }
-    for(const item of Object.values(tabs)){
-      try{item.frame.contentWindow?.postMessage({type:'journal-all-data-deleted'},location.origin)}catch(e){}
-    }
-    alert('공부 · 강의 · 수면 기록 데이터가 모두 삭제되었습니다.');
-    location.reload();
+    (async()=>{
+      for(const kind of ['study','lecture','sleep']){
+        try{ await deleteOneJournal(kind); }catch(e){ console.warn(kind,e); }
+      }
+      alert('공부 · 강의 · 수면 기록 데이터가 모두 삭제되었습니다.');
+      location.reload();
+    })();
   });
 }
 initSharedSettingsUI();
