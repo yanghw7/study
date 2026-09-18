@@ -1468,6 +1468,7 @@ window.addEventListener('pageshow', ()=>{
 let activeTimerPollId = null;
 let clockCalibrateId = null;
 let rolloverCheckId = null;
+let studySyncPollId = null;
 
 function startBackgroundSensitiveLoops(){
   // hidden 상태에서는 시작하지 않는다.
@@ -1490,6 +1491,14 @@ function startBackgroundSensitiveLoops(){
       checkStudyDayBoundaryRollover();
     }, 1000);
   }
+
+  // [FIX8] 다른 기기의 study_months 입력(시작/종료 페이지 등)을
+  //        주기적으로 따라잡는다. active_timer 폴링만으로는 페이지 값이 안 옴.
+  if(!studySyncPollId){
+    studySyncPollId = setInterval(()=>{
+      if(cloudUser) autoSyncFromCloud();
+    }, 5000);
+  }
 }
 
 function stopBackgroundSensitiveLoops(){
@@ -1506,6 +1515,11 @@ function stopBackgroundSensitiveLoops(){
   if(rolloverCheckId){
     clearInterval(rolloverCheckId);
     rolloverCheckId = null;
+  }
+
+  if(studySyncPollId){
+    clearInterval(studySyncPollId);
+    studySyncPollId = null;
   }
 }
 
@@ -3606,7 +3620,12 @@ async function applyActiveTimerRow(row){
   // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
-    await renderCurrentView();
+    // [FIX7] 입력 중이면 재렌더 미룸 (입력 필드 파괴 방지)
+    if(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing()){
+      periodRenderPending = true;
+    }else{
+      await renderCurrentView();
+    }
   }else{
     updateStudyTimer();
   }
