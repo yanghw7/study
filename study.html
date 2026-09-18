@@ -207,8 +207,9 @@
   .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px 9px;}
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
-  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;}
+  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
   .chart-avg-note{font-size:12px;font-weight:800;color:#2563eb;margin:-2px 4px 7px;text-align:right;line-height:1.35;}
+  .chart-period-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
   .chart-axis-label{font-size:9.5px;fill:var(--ink-soft);font-family:inherit;}
@@ -829,8 +830,8 @@ function mergeMonths(localMonth, remoteMonth, ym=''){
 }
 
 async function loadMonth(ym){
-  if(monthCache[ym]) return monthCache[ym];
   try{
+    if(monthCache[ym]) return monthCache[ym];
     const raw = localStorage.getItem(`month:${ym}`);
     const m = raw ? JSON.parse(raw) : {};
     const [year, mo] = ym.split('-').map(Number);
@@ -2353,17 +2354,20 @@ function chartSvg(points, valueKey, kind, unit){
   const grid=[0,.5,1].map(fr=>{
     const gy=T+innerH-(innerH*fr);
     const rawVal=max*fr;
-    const val = valueKey==='study'
-      ? (()=>{
-          const mins=Math.max(0,Math.round(rawVal));
-          const hours=Math.floor(mins/60);
-          const minutes=mins%60;
-          if(hours && minutes) return `${hours}시간 ${minutes}분`;
-          if(hours) return `${hours}시간`;
-          return `${minutes}분`;
-        })()
-      : Math.round(rawVal);
-    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/><text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${val}</text>`;
+    let axisLabel;
+    if(valueKey==='study' || valueKey==='waste'){
+      const mins=Math.max(0,Math.round(rawVal));
+      const hours=Math.floor(mins/60);
+      const minutes=mins%60;
+      const lines=[];
+      if(hours) lines.push(`${hours}시간`);
+      if(minutes || !hours) lines.push(`${minutes}분`);
+      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy - (lines.length>1 ? 3 : -3)}" text-anchor="end">${lines.map((line,i)=>`<tspan x="${L-5}" dy="${i===0?0:10}">${escHtml(line)}</tspan>`).join('')}</text>`;
+    }else{
+      const val=Math.round(rawVal);
+      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${escHtml(val)}</text>`;
+    }
+    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/>${axisLabel}`;
   }).join('');
   const n=Math.max(points.length,1);
   const slot=innerW/n;
@@ -2426,11 +2430,11 @@ function chartsHtml(points, averagePoints=points, averageLabel="평균", average
   const activeAvgWaste = activeBase.length ? formatAvgTime(chartAverage(activeBase,'waste')) : '—';
   const activeStudyExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 공부시간 ${activeAvgStudy}</div>` : '';
   const activeWasteExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 낭비시간 ${activeAvgWaste}</div>` : '';
-  const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
+  const note = averageNote ? `<div class="chart-period-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${activeStudyExtra}${note}${chartSvg(points,'study','study','분')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages} Page</div></div>${note}${chartSvg(points,'pages','pages','Page')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste} · 총 ${totalWaste}</div></div>${activeWasteExtra}${note}${chartSvg(points,'waste','waste','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy}<br>총 ${totalStudy}</div></div>${activeStudyExtra}${note}${chartSvg(points,'study','study','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages}<br>총 ${totalPages} Page</div></div>${note}${chartSvg(points,'pages','pages','Page')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste}<br>총 ${totalWaste}</div></div>${activeWasteExtra}${note}${chartSvg(points,'waste','waste','분')}</div>
   </div>`;
 }
 
@@ -2515,6 +2519,7 @@ async function computeMonthAgg(ym){
   }
 
   let monthStudy=0, monthPages=0, monthWaste=0;
+  const activeDays = [];
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
     const dayData = m[dk];
@@ -2528,13 +2533,16 @@ async function computeMonthAgg(ym){
     const w = weekOfMonth(year, mo, dayNum);
     weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].days += 1;
     monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste;
+    if(dStudy > 0){
+      activeDays.push({date:new Date(year, mo-1, dayNum), study:dStudy, pages:dPages, waste:dWaste});
+    }
   });
-  return { weeks, monthStudy, monthPages, monthWaste };
+  return { weeks, monthStudy, monthPages, monthWaste, activeDays };
 }
 
 async function renderWeekView(){
   const ym = ymKey(cur);
-  const { weeks } = await computeMonthAgg(ym);
+  const { weeks, activeDays } = await computeMonthAgg(ym);
   const el = $('#weekView');
   const today = logicalToday();
   const weekNums = Object.keys(weeks).map(Number).sort((a,b)=>a-b)
@@ -2545,7 +2553,7 @@ async function renderWeekView(){
   }
   const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste}));
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${cur.getFullYear()}년 ${cur.getMonth()+1}월 · 주별 정리 (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>` +
-    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.') +
+    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.', activeDays.filter(p => p.date <= logicalToday())) +
     weekNums.map(w => `
       <div class="agg-row">
         <div>
@@ -2566,9 +2574,11 @@ async function renderMonthView(){
   let html = '';
   let any = false;
   const chartPoints = [];
+  const activeDayPoints = [];
   for(let mo=1; mo<=12; mo++){
     const ym = `${year}-${pad(mo)}`;
-    const { monthStudy, monthPages, monthWaste } = await computeMonthAgg(ym);
+    const { monthStudy, monthPages, monthWaste, activeDays } = await computeMonthAgg(ym);
+    activeDayPoints.push(...activeDays);
     chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste});
     if(monthStudy===0 && monthPages===0 && monthWaste===0) continue;
     any = true;
@@ -2587,7 +2597,7 @@ async function renderMonthView(){
     return (idx + 1) < (currentStudyDay.getMonth() + 1);
   });
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div>` +
-    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.') +
+    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.', activeDayPoints.filter(p => p.date <= logicalToday())) +
     (any ? html : `<div class="empty-state">${year}년에 기록된 데이터가 없어요.</div>`);
 }
 
@@ -2605,11 +2615,13 @@ async function renderYearView(){
   let rows = '';
   let any = false;
   const chartPoints = [];
+  const activeDayPoints = [];
   for(const year of sorted){
     let study=0, pages=0, waste=0;
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
       study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste;
+      activeDayPoints.push(...a.activeDays);
     }
     chartPoints.push({label:`${year}`, study, pages, waste});
     if(study===0 && pages===0 && waste===0) continue;
@@ -2617,7 +2629,7 @@ async function renderYearView(){
     rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">공부 <b class="study-color">${fmtDuration(study)}</b> · 페이지 <b>${pages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(waste)}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">년도별 정리</div>` +
-    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +
+    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.', activeDayPoints.filter(p => p.date <= logicalToday())) +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
 }
 

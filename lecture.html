@@ -207,7 +207,7 @@
   .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px 9px;}
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
-  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;}
+  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
   .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
@@ -218,8 +218,8 @@
   .chart-dot-study{fill:var(--study);}
   .chart-dot-pages{fill:var(--accent);}
   .chart-dot-waste{fill:var(--waste);}
-  .chart-bar-study{fill:var(--study);}
-  .chart-bar-pages{fill:#2563eb;}
+  .chart-bar-study{fill:var(--accent);}
+  .chart-bar-pages{fill:#111827;}
   .chart-bar-waste{fill:#dc2626;}
   .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
   .chart-card{position:relative;}
@@ -340,7 +340,7 @@
   .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px 9px;}
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
-  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;}
+  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
   .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
@@ -351,8 +351,8 @@
   .chart-dot-study{fill:var(--study);}
   .chart-dot-pages{fill:var(--accent);}
   .chart-dot-waste{fill:var(--waste);}
-  .chart-bar-study{fill:var(--study);}
-  .chart-bar-pages{fill:#2563eb;}
+  .chart-bar-study{fill:var(--accent);}
+  .chart-bar-pages{fill:#111827;}
   .chart-bar-waste{fill:#dc2626;}
   .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
   .chart-card{position:relative;}
@@ -715,6 +715,7 @@ body{background:#f7f5fb!important}
   Storage.prototype.removeItem=function(k){return r.call(this,keep(k)?k:P+k)};
 })();
 </script>
+
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
@@ -1145,8 +1146,8 @@ function mergeMonths(localMonth, remoteMonth, ym=''){
 }
 
 async function loadMonth(ym){
-  if(monthCache[ym]) return monthCache[ym];
   try{
+    if(monthCache[ym]) return monthCache[ym];
     const raw = localStorage.getItem(`lectureMonth:${ym}`);
     const m = raw ? JSON.parse(raw) : {};
     const [year, mo] = ym.split('-').map(Number);
@@ -2776,7 +2777,19 @@ function chartSvg(points, valueKey, kind, unit){
   const grid=[0,.5,1].map(fr=>{
     const gy=T+innerH-(innerH*fr);
     const val=Math.round(max*fr);
-    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/><text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${val}</text>`;
+    let axisLabel;
+    if(valueKey==='study'){
+      const mins = Math.max(0, Math.round(Number(val)||0));
+      const hours = Math.floor(mins / 60);
+      const minutes = mins % 60;
+      const lines = [];
+      if(hours) lines.push(`${hours}시간`);
+      if(minutes || !hours) lines.push(`${minutes}분`);
+      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy - (lines.length>1 ? 3 : -3)}" text-anchor="end">${lines.map((line,i)=>`<tspan x="${L-5}" dy="${i===0?0:10}">${escHtml(line)}</tspan>`).join('')}</text>`;
+    }else{
+      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${escHtml(val)}</text>`;
+    }
+    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/>${axisLabel}`;
   }).join('');
   const n=Math.max(points.length,1);
   const slot=innerW/n;
@@ -2825,20 +2838,20 @@ function chartTotalTime(points,key){
 }
 function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote=""){
   if(!chartsVisible) return '';
-  if(!points.length || points.every(p=>!p.study && !p.pages && !p.waste)) return '';
+  if(!points.length || points.every(p=>!p.study && !p.pages)) return '';
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
   const hasAverage = avgBase.length > 0;
   const avgStudy = hasAverage ? formatAvgTime(chartAverage(avgBase,'study')) : '—';
-  const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))}쪽` : '—';
-  const avgWaste = hasAverage ? formatAvgTime(chartAverage(avgBase,'waste')) : '—';
+  const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))}회` : '—';
+  const activeBase = avgBase.filter(p => (Number(p.study)||0) > 0);
+  const restAvgStudy = activeBase.length ? formatAvgTime(chartAverage(activeBase,'study')) : '—';
+  const restAvgPages = activeBase.length ? `${Math.round(chartAverage(activeBase,'pages'))}회` : '—';
   const totalStudy = chartTotalTime(points,'study');
   const totalPages = Math.round(points.reduce((sum,p)=>sum+(Number(p.pages)||0),0));
-  const totalWaste = chartTotalTime(points,'waste');
   const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">강의시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${note}${chartSvg(points,'study','study','분')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 강의 횟수 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages}쪽</div></div>${note}${chartSvg(points,'pages','pages','쪽')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste} · 총 ${totalWaste}</div></div>${note}${chartSvg(points,'waste','waste','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">강의시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy}<br>총 ${totalStudy}<br>쉬는 날 제외 평균 ${restAvgStudy}</div></div>${note}${chartSvg(points,'study','study','시간')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 강의 횟수 추이</div><div class="chart-unit">${averageLabel} ${avgPages}<br>총 ${totalPages}회<br>쉬는 날 제외 평균 ${restAvgPages}</div></div>${note}${chartSvg(points,'pages','pages','회')}</div>
   </div>`;
 }
 
@@ -4229,6 +4242,8 @@ if ('serviceWorker' in navigator) {
  });
 })();
 </script>
+
+
 
 
 
