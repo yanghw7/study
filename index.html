@@ -295,9 +295,17 @@ function initSharedSettingsUI(){
     const fr=tabs[kind].frame;
     if(!fr.getAttribute('src')){
       fr.src=fr.dataset.src;
-      await new Promise(r=>fr.addEventListener('load',r,{once:true}));
+      await new Promise(r=>{
+        if(fr.contentDocument?.readyState==='complete'){r();return;}
+        const t=setTimeout(r,5000);
+        fr.addEventListener('load',()=>{clearTimeout(t);r();},{once:true});
+      });
     }else if(!fr.contentDocument || fr.contentDocument.readyState!=='complete'){
-      await new Promise(r=>fr.addEventListener('load',r,{once:true}));
+      await new Promise(r=>{
+        if(fr.contentDocument?.readyState==='complete'){r();return;}
+        const t=setTimeout(r,5000);
+        fr.addEventListener('load',()=>{clearTimeout(t);r();},{once:true});
+      });
     }
     return fr;
   }
@@ -326,22 +334,23 @@ function initSharedSettingsUI(){
     const childBtn = fr.contentDocument?.getElementById('deleteAllRecords');
     if(!childBtn){ alert(`${JOURNAL_LABELS[kind]}의 삭제 기능을 찾지 못했습니다.`); return false; }
 
-    let savedConfirm = null;
+    const win = fr.contentWindow;
+    if(!win) return false;
     try{
-      const win = fr.contentWindow;
       win.__skipDeleteConfirm = true;
-      savedConfirm = win.confirm;
+      win.__skipPostDeleteRender = true;
+      if(!win.__nativeConfirm) win.__nativeConfirm = win.confirm;
       win.confirm = () => true;
     }catch(e){}
 
     const wait = waitDeleteDone(kind);
     childBtn.click();
     return wait.finally(() => {
-      setTimeout(() => {
-        try{
-          if(savedConfirm){ fr.contentWindow.confirm = savedConfirm; }
-        }catch(e){}
-      }, 5000);
+      try{
+        win.confirm = win.__nativeConfirm || win.confirm;
+        win.__skipPostDeleteRender = false;
+        win.__skipDeleteConfirm = false;
+      }catch(e){}
     });
   }
 
@@ -370,17 +379,13 @@ function initSharedSettingsUI(){
     del.textContent = '삭제 중…';
     del.disabled = true;
 
-    (async () => {
-      for(const kind of ['study','lecture','sleep']){
-        try{ await deleteOneJournal(kind); }
-        catch(e){ console.warn(kind, e); }
-      }
-      location.reload();
-    })().catch(() => {
-      del.dataset.busy = '0';
-      del.disabled = false;
-      del.textContent = originalText;
-    });
+    Promise.allSettled(['study','lecture','sleep'].map(k => deleteOneJournal(k)))
+      .then(() => { location.reload(); })
+      .catch(() => {
+        del.dataset.busy = '0';
+        del.disabled = false;
+        del.textContent = originalText;
+      });
   });
 }
 initSharedSettingsUI();

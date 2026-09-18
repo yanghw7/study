@@ -3454,7 +3454,9 @@ async function deleteAllStudyRecords(){
   cur = logicalToday();
   enforceStudyDayLimit();
   closeSettings();
-  await renderCurrentView();
+  if(!window.__skipPostDeleteRender){
+    await renderCurrentView();
+  }
   showToast('모든 강의 기록을 삭제했어요');
   if(window.parent !== window){
     window.parent.postMessage({type:'journal-delete-done', kind:'lecture'}, location.origin);
