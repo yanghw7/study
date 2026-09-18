@@ -2115,6 +2115,14 @@ $('#periodList').addEventListener('input', async (e) => {
   const beforeSync = deepClone(p);
   const prevVal = p[k];
 
+  // 시작 페이지 없이 종료 페이지만 입력하려는 경우 입력을 막고 안내한다.
+  if(k==='endPage' && String(t.value ?? '').trim() && !String(p.startPage ?? '').trim()){
+    t.value = '';
+    p.endPage = '';
+    alert('시작 페이지를 먼저 입력해주세요.');
+    return;
+  }
+
   if(k==='start' || k==='end'){
     // datetime-local 하나로 날짜+시간을 함께 입력받아 "YYYY-MM-DDTHH:MM" 형태로 들어온다
     const dateKey = k==='start' ? 'startDate' : 'endDate';
