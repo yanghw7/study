@@ -431,6 +431,45 @@ function setExclusiveTabStatus(kind){
 const exclusiveFrames={study:tabs.study.frame,lecture:tabs.lecture.frame,sleep:tabs.sleep.frame};
 let exclusiveActive=null;
 let exclusiveQueue=Promise.resolve();
+
+// [RT-TAB] 다른 기기에서 시작/종료한 타이머도 탭 라벨에 반영한다.
+(function(){
+  function kindFromYm(ym){
+    const s = String(ym||'');
+    if(s.startsWith('L:')) return 'lecture';
+    if(s.startsWith('S:')) return 'sleep';
+    if(/^\d{4}-\d{2}$/.test(s)) return 'study';
+    return null;
+  }
+  let ch=null;
+  function apply(row){
+    if(row && row.status==='running'){
+      const kind=kindFromYm(row.ym);
+      if(kind && tabs[kind]){ exclusiveActive=kind; setExclusiveTabStatus(kind); }
+    }else{
+      if(!exclusiveActive) setExclusiveTabStatus(null);
+    }
+  }
+  function ensure(){
+    const sb=initSettingsClient();
+    if(!sb || ch) return;
+    sb.auth.getSession().then(({data:{session}})=>{
+      const user=session?.user;
+      if(!user || ch) return;
+      ch=sb.channel(`gongbujang-tab-${user.id}`)
+        .on('postgres_changes',
+            {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${user.id}`},
+            (payload)=>apply(payload.new))
+        .subscribe();
+      sb.from('active_timer').select('*').eq('user_id',user.id).maybeSingle()
+        .then(({data:row})=>apply(row));
+    });
+  }
+  ensure();
+  const sb=initSettingsClient();
+  if(sb) sb.auth.onAuthStateChange(()=>{ ch=null; setTimeout(ensure,300); });
+})();
+
 // 시작 전환 하나의 기록: 새로 시작된 kind와, 그로 인해 자동 종료된 이전 kind.
 // 새 타이머가 곧바로 취소되면 이 정보를 이용해 이전 기록을 되돌린다.
 let lastTransition=null; // {startedKind, previousKind, atMs}
