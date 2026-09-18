@@ -381,6 +381,23 @@
 .field-grid{grid-template-columns:minmax(118px,34fr) minmax(0,66fr)!important;}
 .field-grid .ko-time-label{left:8px!important;right:8px!important;text-align:center!important;font-size:11.5px!important;letter-spacing:-.45px!important;text-overflow:clip!important;}
 </style>
+<style id="study-time-field-v2">
+.field.time{position:relative;min-height:52px!important;overflow:hidden}
+.field.time label{position:relative;z-index:1}
+.field.time input[type="datetime-local"]{
+  position:absolute!important;inset:0!important;
+  width:100%!important;height:100%!important;min-height:0!important;
+  opacity:0!important;color:transparent!important;
+  z-index:4!important;cursor:pointer!important;
+  font-size:16px!important;
+}
+.field.time .ko-time-label{
+  left:10px!important;right:10px!important;bottom:8px!important;
+  pointer-events:none!important;z-index:3!important;
+  text-align:left!important;font-size:12.5px!important;
+  letter-spacing:-.2px!important;color:#302b3d!important;
+}
+</style>
 </head>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
@@ -1680,7 +1697,7 @@ function renderPeriods(){
         </div>
         <div class="field time">
           <label>시작 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime)}</div>
+          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.startDate,p.startTime) || '시간을 눌러 수정'}</div>
         </div>
         <div class="field">
           <label>종료 페이지</label>
@@ -1688,7 +1705,7 @@ function renderPeriods(){
         </div>
         <div class="field time">
           <label>종료 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime)}</div>
+          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${koDateTimeLabel(p.endDate,p.endTime) || '시간을 눌러 수정'}</div>
         </div>
       </div>
       <div class="period-stats">
@@ -1901,6 +1918,21 @@ $('#periodList').addEventListener('click', async (e) => {
     renderPeriods();
     updateStudyTimer();
     await persistToday();
+  }
+});
+
+// 시작/종료 시간 필드(투명 처리된 input)를 어디를 클릭해도 시간 선택기가 열리도록 한다.
+$('#periodList').addEventListener('click', (e) => {
+  if(e.target.closest('button')) return;
+  const field = e.target.closest('.field.time');
+  if(!field) return;
+  const input = field.querySelector('input[type="datetime-local"]');
+  if(!input) return;
+  try{
+    if(typeof input.showPicker === 'function') input.showPicker();
+    else { input.focus(); input.click(); }
+  }catch(_){
+    input.focus();
   }
 });
 
