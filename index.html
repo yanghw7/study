@@ -139,7 +139,7 @@ const tabs={
  sleep:{button:document.getElementById('sleepTab'),frame:document.getElementById('sleepFrame')}
 };
 
-function openTab(which){
+function openTab(which, skipSave){
   Object.entries(tabs).forEach(([key,item])=>{
     const active=key===which;
     item.button.classList.toggle('active',active);
@@ -148,12 +148,12 @@ function openTab(which){
       item.frame.src=item.frame.dataset.src;
     }
   });
-  saveLastTabToCloud(which);
+  if(!skipSave) saveLastTabToCloud(which);
 }
 Object.entries(tabs).forEach(([key,item])=>item.button.onclick=()=>openTab(key));
 let first='study';
-openTab(first);
-restoreLastTabFromCloud().then(tab=>{ if(tab && tab!==first && tabs[tab]) openTab(tab); });
+openTab(first, true);
+restoreLastTabFromCloud().then(tab=>{ if(tab && tab!==first && tabs[tab]) openTab(tab, true); });
 
 
 const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
