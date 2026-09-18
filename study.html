@@ -208,7 +208,7 @@
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
   .chart-unit{font-size:12px;font-weight:800;color:#2563eb;}
-  .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
+  .chart-avg-note{font-size:12px;font-weight:800;color:#2563eb;margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
   .chart-axis-label{font-size:9.5px;fill:var(--ink-soft);font-family:inherit;}
@@ -219,7 +219,7 @@
   .chart-dot-pages{fill:var(--accent);}
   .chart-dot-waste{fill:var(--waste);}
   .chart-bar-study{fill:var(--study);}
-  .chart-bar-pages{fill:#2563eb;}
+  .chart-bar-pages{fill:#111111;}
   .chart-bar-waste{fill:#dc2626;}
   .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
   .chart-card{position:relative;}
@@ -2355,7 +2355,17 @@ function chartSvg(points, valueKey, kind, unit){
   const y=v=>T+innerH-(v/max)*innerH;
   const grid=[0,.5,1].map(fr=>{
     const gy=T+innerH-(innerH*fr);
-    const val=Math.round(max*fr);
+    const rawVal=max*fr;
+    const val = valueKey==='study'
+      ? (()=>{
+          const mins=Math.max(0,Math.round(rawVal));
+          const hours=Math.floor(mins/60);
+          const minutes=mins%60;
+          if(hours && minutes) return `${hours}시간 ${minutes}분`;
+          if(hours) return `${hours}시간`;
+          return `${minutes}분`;
+        })()
+      : Math.round(rawVal);
     return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/><text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${val}</text>`;
   }).join('');
   const n=Math.max(points.length,1);
@@ -2403,7 +2413,7 @@ function chartTotalTime(points,key){
   const mins=points.reduce((sum,p)=>sum+(Number(p[key])||0),0);
   return formatAvgTime(mins);
 }
-function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote=""){
+function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote="", activeDayAveragePoints=null){
   if(!chartsVisible) return '';
   if(!points.length || points.every(p=>!p.study && !p.pages && !p.waste)) return '';
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
@@ -2414,11 +2424,16 @@ function chartsHtml(points, averagePoints=points, averageLabel="평균", average
   const totalStudy = chartTotalTime(points,'study');
   const totalPages = Math.round(points.reduce((sum,p)=>sum+(Number(p.pages)||0),0));
   const totalWaste = chartTotalTime(points,'waste');
+  const activeBase = Array.isArray(activeDayAveragePoints) ? activeDayAveragePoints : [];
+  const activeAvgStudy = activeBase.length ? formatAvgTime(chartAverage(activeBase,'study')) : '—';
+  const activeAvgWaste = activeBase.length ? formatAvgTime(chartAverage(activeBase,'waste')) : '—';
+  const activeStudyExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 공부시간 ${activeAvgStudy}</div>` : '';
+  const activeWasteExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 낭비시간 ${activeAvgWaste}</div>` : '';
   const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${note}${chartSvg(points,'study','study','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${activeStudyExtra}${note}${chartSvg(points,'study','study','분')}</div>
     <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages} Page</div></div>${note}${chartSvg(points,'pages','pages','Page')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste} · 총 ${totalWaste}</div></div>${note}${chartSvg(points,'waste','waste','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste} · 총 ${totalWaste}</div></div>${activeWasteExtra}${note}${chartSvg(points,'waste','waste','분')}</div>
   </div>`;
 }
 
@@ -2471,7 +2486,8 @@ async function renderDayCharts(){
     d.setHours(0,0,0,0);
     return d <= currentStudyDay;
   });
-  el.innerHTML = heading + chartsHtml(points, averagePoints, '일 평균');
+  const activeDayAveragePoints = averagePoints.filter(p => (Number(p.study)||0) > 0);
+  el.innerHTML = heading + chartsHtml(points, averagePoints, '일 평균', '', activeDayAveragePoints);
 }
 
 // ---------- 주별/월별 집계 ----------
