@@ -541,6 +541,12 @@ let exclusiveQueue=Promise.resolve();
     if(document.visibilityState === 'visible') fetchOnce();
   });
   window.addEventListener('pageshow', ()=>{ fetchOnce(); });
+
+  // [RT-FALLBACK] 30초 폴링 안전망 — Realtime 이벤트를 놓쳐도 최대 30초 안에 반영
+  setInterval(()=>{
+    if(document.visibilityState !== 'visible') return;
+    fetchOnce();
+  }, 30000);
 })();
 
 // 시작 전환 하나의 기록: 새로 시작된 kind와, 그로 인해 자동 종료된 이전 kind.
