@@ -404,7 +404,16 @@ function initSharedSettingsUI(){
       if(btn.dataset.busy === '1') return;
       if(!confirm(`${JOURNAL_LABELS[kind]} 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.`)) return;
       btn.dataset.busy = '1';
-      try{ await deleteOneJournal(kind); }
+      try{
+        const ok = await deleteOneJournal(kind);
+        if(ok){
+          alert(`✅ ${JOURNAL_LABELS[kind]} 데이터가 삭제되었습니다.`);
+        }else{
+          alert(`❌ ${JOURNAL_LABELS[kind]} 삭제에 실패했습니다.\n다시 시도해주세요.`);
+        }
+      }catch(e){
+        alert(`❌ ${JOURNAL_LABELS[kind]} 삭제 중 오류: ${e?.message || e}`);
+      }
       finally{ setTimeout(()=>{ btn.dataset.busy = '0'; }, 500); }
     });
   });
@@ -420,8 +429,19 @@ function initSharedSettingsUI(){
     del.disabled = true;
 
     Promise.allSettled(['study','lecture','sleep'].map(k => deleteOneJournal(k)))
-      .then(() => { location.reload(); })
-      .catch(() => {
+      .then((results) => {
+        const failed = results
+          .map((r, i) => (r.status === 'fulfilled' && r.value === true) ? null : ['study','lecture','sleep'][i])
+          .filter(Boolean);
+        if(failed.length === 0){
+          alert('✅ 공부 · 강의 · 수면 기록이 모두 삭제되었습니다.');
+        }else{
+          alert(`❌ 일부 기록 삭제 실패: ${failed.map(k => JOURNAL_LABELS[k]).join(', ')}\n다시 시도해주세요.`);
+        }
+        location.reload();
+      })
+      .catch((e) => {
+        alert(`❌ 전체 삭제 중 오류: ${e?.message || e}`);
         del.dataset.busy = '0';
         del.disabled = false;
         del.textContent = originalText;
