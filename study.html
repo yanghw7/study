@@ -3147,30 +3147,20 @@ async function deleteAllStudyRecords(){
       return;
     }
     const studyYms=(studyRows||[]).map(r=>String(r.ym||'')).filter(ym=>/^\d{4}-\d{2}$/.test(ym));
-    const markerTs = Math.round(serverNowMs());
-    const markerIso = new Date(markerTs).toISOString();
+    const markerIso = new Date(Math.round(serverNowMs())).toISOString();
     for(const ym of studyYms){
       const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
         .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
-      if(readOneErr){
-        alert('삭제 확인 실패: ' + readOneErr.message);
-        return;
-      }
+      if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); return; }
       if(existingRow){
         const {error:updErr} = await sbClient.from('study_months')
-          .update({data:{ _ymDeleted:true, _ymDeletedAt:markerTs }, updated_at: markerIso})
+          .update({data:{}, deleted_at: markerIso, updated_at: markerIso})
           .eq('user_id', cloudUser.id).eq('ym', ym);
-        if(updErr){
-          alert('삭제 마커 저장 실패: ' + updErr.message);
-          return;
-        }
+        if(updErr){ alert('삭제 실패: ' + updErr.message); return; }
       } else {
         const {error:insErr} = await sbClient.from('study_months')
-          .insert({user_id: cloudUser.id, ym, data:{ _ymDeleted:true, _ymDeletedAt:markerTs }, updated_at: markerIso});
-        if(insErr){
-          alert('삭제 마커 저장 실패: ' + insErr.message);
-          return;
-        }
+          .insert({user_id: cloudUser.id, ym, data:{}, deleted_at: markerIso, updated_at: markerIso});
+        if(insErr){ alert('삭제 실패: ' + insErr.message); return; }
       }
     }
     // [FIX4] study_months 를 지워도 active_timer 가 남으면 유령 타이머로 살아난다.
