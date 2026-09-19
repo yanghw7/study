@@ -1238,6 +1238,15 @@ const saveTimers = {};
 
 // v9.8: 태블릿/모바일 입력 중에는 클라우드 동기화가 input DOM을 다시 만들지 않게 한다.
 let periodRenderPending = false;
+// v-race-fix: 사용자 액션 중 autoSync 재렌더 방지
+let userActionCount = 0;
+async function flushPendingRender(){
+  if(!periodRenderPending) return;
+  if(userActionCount > 0) return;
+  if(isPeriodInputEditing()) return;
+  periodRenderPending = false;
+  await renderCurrentView();
+}
 function isPeriodInputEditing(){
   const a = document.activeElement;
   return !!(a && a.tagName === 'INPUT' && a.closest && a.closest('#periodList'));
@@ -2398,6 +2407,8 @@ $('#periodList').addEventListener('paste', (e) => {
 });
 
 $('#periodList').addEventListener('input', async (e) => {
+  userActionCount++;
+  try{
   const t = e.target;
   if(t.tagName !== 'INPUT') return;
   const idx = Number(t.dataset.idx);
@@ -2588,6 +2599,10 @@ $('#periodList').addEventListener('input', async (e) => {
     ? autoSortPeriodsByStart(day) : false;
   await persistToday();
   if(reordered) renderPeriods();
+  }finally{
+    userActionCount--;
+    await flushPendingRender();
+  }
 });
 
 
@@ -3752,7 +3767,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
     monthCache[ym]= existing ? mergeMonths(existing, remoteNorm, ym) : remoteNorm;
   }
   enforceStudyDayLimit();
-  if(isPeriodInputEditing()){
+  if(isPeriodInputEditing() || userActionCount > 0){
     // 입력 중 input 요소를 교체하면 Android/Samsung 플로팅 키보드가 닫힐 수 있다.
     periodRenderPending = true;
   }else{
