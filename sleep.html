@@ -1088,6 +1088,18 @@ function markChangedPeriodFields(p, before){
   });
   if(changed) p._updatedAt=ts;
 }
+function hasPeriodCreatedAfter(monthData, ts){
+  if(!monthData || typeof monthData !== 'object') return false;
+  for(const dk of Object.keys(monthData)){
+    if(!/^\d{1,2}$/.test(dk)) continue;
+    const day = monthData[dk];
+    if(!day || typeof day !== 'object') continue;
+    for(const p of (day.periods || [])){
+      if(Number(p._createdAt) > ts) return true;
+    }
+  }
+  return false;
+}
 function tombstonePeriod(day, p){
   ensureDaySync(day);
   if(!p?._id) return;
@@ -1181,8 +1193,9 @@ async function loadMonth(ym){
   }
   try{
     const {data, error} = await sbClient.from('study_months')
-      .select('data').eq('user_id', cloudUser.id).eq('ym', sleepCloudYm(ym)).maybeSingle();
+      .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', sleepCloudYm(ym)).maybeSingle();
     if(error) throw error;
+    if(data?.deleted_at){ monthCache[ym] = {}; return monthCache[ym]; }
     const m = data?.data || {};
     const [year, mo] = ym.split('-').map(Number);
     Object.keys(m).forEach(dk => {
@@ -3544,12 +3557,26 @@ async function deleteAllStudyRecords(){
       alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
       return;
     }
-    const {error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id).like('ym','S:%');
-    if(error){
-      alert('클라우드 기록 삭제에 실패해 삭제를 중단했어요: ' + error.message);
-      return;
+    const {data:sleepRows,error:readErr} = await sbClient.from('study_months')
+      .select('ym').eq('user_id', cloudUser.id).like('ym','S:%');
+    if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); return; }
+    const sleepYms=(sleepRows||[]).map(r=>String(r.ym||''));
+    const markerIso = new Date(Math.round(serverNowMs())).toISOString();
+    for(const ym of sleepYms){
+      const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
+        .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
+      if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); return; }
+      if(existingRow){
+        const {error:updErr} = await sbClient.from('study_months')
+          .update({data:{}, deleted_at: markerIso, updated_at: markerIso})
+          .eq('user_id', cloudUser.id).eq('ym', ym);
+        if(updErr){ alert('삭제 실패: ' + updErr.message); return; }
+      } else {
+        const {error:insErr} = await sbClient.from('study_months')
+          .insert({user_id: cloudUser.id, ym, data:{}, deleted_at: markerIso, updated_at: markerIso});
+        if(insErr){ alert('삭제 실패: ' + insErr.message); return; }
+      }
     }
-    // [FIX4] 유령 타이머 방지 + [DEL-FIX-3] 수면장 소유일 때만 삭제
     await cloudClearActiveTimerIfMine();
   }
 
@@ -3570,6 +3597,14 @@ async function deleteAllStudyRecords(){
 }
 
 $('#deleteAllRecords').onclick = deleteAllStudyRecords;
+
+// [MOBILE-FIX] 부모(index)가 postMessage로 삭제 명령을 내리면 실행
+window.addEventListener('message', async (ev)=>{
+  if(ev.origin !== location.origin) return;
+  if(ev.data?.type !== 'journal-delete-request') return;
+  if(ev.data?.kind !== 'sleep') return;
+  await deleteAllStudyRecords();
+});
 
 $('#settingsSave').onclick = async () => {
   alert('설정은 상단 ⚙ 공통 설정에서 변경해주세요.');
@@ -3625,12 +3660,28 @@ async function cloudSaveMonth(ym){
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at').eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym)).limit(1);
+      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym)).limit(1);
     if(readErr){
       console.error('클라우드 저장 전 읽기 실패:', readErr);
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
+    if(row?.deleted_at){
+      const delTs = Date.parse(row.deleted_at);
+      if(!hasPeriodCreatedAfter(local, delTs)){
+        delete monthCache[ym];
+        throw new Error('이 달의 기록이 다른 기기에서 삭제되었습니다.');
+      }
+      const nowIso2 = new Date(serverNowMs()).toISOString();
+      let q2 = sbClient.from('study_months').update({data:local, deleted_at:null, updated_at:nowIso2})
+        .eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym));
+      if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
+      const {data:w2,error:wErr2} = await q2.select('updated_at');
+      if(!wErr2 && w2 && w2.length){ monthCache[ym]=local; return; }
+      lastSaveErr = wErr2 || new Error('삭제 후 재생성 실패');
+      await new Promise(r=>setTimeout(r,120*(attempt+1)));
+      continue;
+    }
     const merged = mergeMonths(local, row?.data || {}, ym);
     const nowIso = new Date(serverNowMs()).toISOString();
     let writeOk=false;
@@ -3676,7 +3727,7 @@ async function autoSyncFromCloud(lockOwned=false){
     fullCloudSyncRunning = true;
   }
   try{
-const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
+const {data,error} = await sbClient.from('study_months').select('ym,data,deleted_at').eq('user_id',cloudUser.id).order('ym');
   if(error){
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
@@ -3692,6 +3743,10 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
   for(const row of sleepRows){
     const ym=sleepLocalYm(row.ym);
     if(!ym) continue;
+    if(row.deleted_at){
+      delete monthCache[ym];
+      continue;
+    }
     const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
     const existing=monthCache[ym];
     monthCache[ym]= existing ? mergeMonths(existing, remoteNorm, ym) : remoteNorm;
