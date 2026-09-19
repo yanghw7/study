@@ -760,6 +760,24 @@ function markChangedPeriodFields(p, before){
   });
   if(changed) p._updatedAt=ts;
 }
+// 월 데이터에서 가장 최신 timestamp 찾기 (ym 삭제 마커 비교용)
+function getLatestTs(monthData){
+  let max = 0;
+  if(!monthData || typeof monthData !== 'object') return max;
+  for(const dk of Object.keys(monthData)){
+    if(!/^\d{1,2}$/.test(dk)) continue;
+    const day = monthData[dk];
+    if(!day || typeof day !== 'object') continue;
+    max = Math.max(max, Number(day._metaUpdatedAt) || 0);
+    for(const p of (day.periods || [])){
+      if(!p || typeof p !== 'object') continue;
+      max = Math.max(max, Number(p._updatedAt) || 0);
+      const fu = p._fieldUpdatedAt || {};
+      for(const k of Object.keys(fu)) max = Math.max(max, Number(fu[k]) || 0);
+    }
+  }
+  return max;
+}
 function tombstonePeriod(day, p){
   ensureDaySync(day);
   if(!p?._id) return;
@@ -3116,11 +3134,31 @@ async function deleteAllStudyRecords(){
       return;
     }
     const studyYms=(studyRows||[]).map(r=>String(r.ym||'')).filter(ym=>/^\d{4}-\d{2}$/.test(ym));
-    let error=null;
-    if(studyYms.length){ ({error} = await sbClient.from('study_months').delete().eq('user_id', cloudUser.id).in('ym',studyYms)); }
-    if(error){
-      alert('클라우드 기록 삭제에 실패해 삭제를 중단했어요: ' + error.message);
-      return;
+    const markerTs = Math.round(serverNowMs());
+    const markerIso = new Date(markerTs).toISOString();
+    for(const ym of studyYms){
+      const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
+        .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
+      if(readOneErr){
+        alert('삭제 확인 실패: ' + readOneErr.message);
+        return;
+      }
+      if(existingRow){
+        const {error:updErr} = await sbClient.from('study_months')
+          .update({data:{ _ymDeleted:true, _ymDeletedAt:markerTs }, updated_at: markerIso})
+          .eq('user_id', cloudUser.id).eq('ym', ym);
+        if(updErr){
+          alert('삭제 마커 저장 실패: ' + updErr.message);
+          return;
+        }
+      } else {
+        const {error:insErr} = await sbClient.from('study_months')
+          .insert({user_id: cloudUser.id, ym, data:{ _ymDeleted:true, _ymDeletedAt:markerTs }, updated_at: markerIso});
+        if(insErr){
+          alert('삭제 마커 저장 실패: ' + insErr.message);
+          return;
+        }
+      }
     }
     // [FIX4] study_months 를 지워도 active_timer 가 남으면 유령 타이머로 살아난다.
     //        함께 삭제해 이후 동기화에서 존재하지 않는 period_id 를 찾지 않도록 한다.
@@ -3202,6 +3240,25 @@ async function cloudSaveMonth(ym){
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
+    // ★ ym 레벨 삭제 마커 확인 — 부활 방지
+    if(row?.data?._ymDeleted){
+      const delTs = Number(row.data._ymDeletedAt) || 0;
+      const localLatest = getLatestTs(local);
+      if(localLatest <= delTs){
+        delete monthCache[ym];
+        throw new Error('이 달의 기록이 다른 기기에서 삭제되었습니다.');
+      }
+      // 로컬이 삭제 이후 편집됨 → 마커 덮어쓰기 (재생성)
+      const nowIso2 = new Date(serverNowMs()).toISOString();
+      let q2 = sbClient.from('study_months').update({data:local, updated_at:nowIso2})
+        .eq('user_id',cloudUser.id).eq('ym',ym);
+      if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
+      const {data:w2,error:wErr2} = await q2.select('updated_at');
+      if(!wErr2 && w2 && w2.length){ monthCache[ym]=local; return; }
+      lastSaveErr = wErr2 || new Error('삭제 마커 덮어쓰기 실패');
+      await new Promise(r=>setTimeout(r,120*(attempt+1)));
+      continue;
+    }
     const merged = mergeMonths(local, row?.data || {}, ym);
     const nowIso = new Date(serverNowMs()).toISOString();
     let writeOk=false;
@@ -3262,6 +3319,11 @@ const {data,error} = await sbClient.from('study_months').select('ym,data').eq('u
   });
   for(const row of studyRows){
     const ym=row.ym;
+    // ★ ym 레벨 삭제 마커 → 로컬 캐시에서도 삭제
+    if(row.data && row.data._ymDeleted){
+      delete monthCache[ym];
+      continue;
+    }
     const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
     const existing=monthCache[ym];
     monthCache[ym]= existing ? mergeMonths(existing, remoteNorm, ym) : remoteNorm;
