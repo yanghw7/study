@@ -3183,6 +3183,14 @@ async function deleteAllStudyRecords(){
 
 $('#deleteAllRecords').onclick = deleteAllStudyRecords;
 
+// [MOBILE-FIX] 부모(index)가 postMessage로 삭제 명령을 내리면 실행
+window.addEventListener('message', async (ev)=>{
+  if(ev.origin !== location.origin) return;
+  if(ev.data?.type !== 'journal-delete-request') return;
+  if(ev.data?.kind !== 'study') return;
+  await deleteAllStudyRecords();
+});
+
 $('#settingsSave').onclick = async () => {
   // v2: 설정 UI 는 index(부모)의 공통 설정 패널로 일원화.
   alert('설정은 상단 ⚙ 공통 설정에서 변경해주세요.');

@@ -370,14 +370,13 @@ function initSharedSettingsUI(){
 
   async function deleteOneJournal(kind){
     const fr = await ensureDeleteFrame(kind);
-    const childBtn = fr.contentDocument?.getElementById('deleteAllRecords');
-    if(!childBtn){ alert(`${JOURNAL_LABELS[kind]}의 삭제 기능을 찾지 못했습니다.`); return false; }
+
+    // [MOBILE-FIX] contentDocument 접근 대신 postMessage 사용
+    // (Android WebView/PWA에서 iframe DOM 접근이 차단될 수 있음)
+    await waitChildReady(fr, 6000);
 
     const win = fr.contentWindow;
-    if(!win) return false;
-
-    // [DEL-FIX-2] 자식이 클라우드 준비될 때까지 대기
-    await waitChildReady(fr, 6000);
+    if(!win){ alert(`${JOURNAL_LABELS[kind]} 프레임을 찾지 못했습니다.`); return false; }
 
     try{
       win.__skipDeleteConfirm = true;
@@ -386,7 +385,7 @@ function initSharedSettingsUI(){
     }catch(e){}
 
     const wait = waitDeleteDone(kind);
-    childBtn.click();
+    win.postMessage({type:'journal-delete-request', kind}, location.origin);
     return wait.finally(() => {
       try{
         win.confirm = win.__nativeConfirm || win.confirm;
