@@ -3556,6 +3556,14 @@ async function deleteAllStudyRecords(){
 
 $('#deleteAllRecords').onclick = deleteAllStudyRecords;
 
+// [MOBILE-FIX] 부모(index)가 postMessage로 삭제 명령을 내리면 실행
+window.addEventListener('message', async (ev)=>{
+  if(ev.origin !== location.origin) return;
+  if(ev.data?.type !== 'journal-delete-request') return;
+  if(ev.data?.kind !== 'lecture') return;
+  await deleteAllStudyRecords();
+});
+
 $('#settingsSave').onclick = async () => {
   alert('설정은 상단 ⚙ 공통 설정에서 변경해주세요.');
 };
@@ -3677,7 +3685,7 @@ async function autoSyncFromCloud(lockOwned=false){
     fullCloudSyncRunning = true;
   }
   try{
-const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
+const {data,error} = await sbClient.from('study_months').select('ym,data,deleted_at').eq('user_id',cloudUser.id).order('ym');
   if(error){
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
