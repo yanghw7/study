@@ -1854,7 +1854,7 @@ async function recoverFromBackground(){
     // 3. 기준시점 소급 분할
     // 4. 화면/알림 타이머 갱신
     if(cloudUser){
-      await calibrateServerClock(true);
+      void calibrateServerClock(true);
       await autoSyncFromCloud();
       await syncActiveTimerFromCloud(true);
     }
@@ -2523,10 +2523,10 @@ $('#periodList').addEventListener('input', async (e) => {
         if(k==='startPage'){
           p.timerEndedAt = null;
           if(cloudUser){
-            const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+            const row = null; void cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
             const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
             p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            await calibrateServerClock(true);
+            void calibrateServerClock(true);
           }else{
             p.timerStartedAt = Math.round(serverNowMs());
           }
@@ -2535,7 +2535,7 @@ $('#periodList').addEventListener('input', async (e) => {
             const row = await cloudStopActiveTimer();
             const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
             p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            await calibrateServerClock(true);
+            void calibrateServerClock(true);
           }else{
             p.timerEndedAt = Math.round(serverNowMs());
           }
@@ -2686,6 +2686,7 @@ async function requestExclusiveSessionStart(atMs){
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='sleep')return;
+  window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped:true},location.origin);
   let stopped=false;
   try{
     // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
@@ -2701,13 +2702,14 @@ window.addEventListener('message',async ev=>{
       lastAutoStoppedId=p._id;
       lastAutoStoppedAt=atMs;
       if(cloudUser){
-        const row=await cloudStopActiveTimer(ym, dk, p._id);const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
+        const row=await cloudStopActiveTimer(ym, dk, p._id);
+const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
         p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
       }else p.timerEndedAt=Math.round(atMs);
       markChangedPeriodFields(p, before);
       autoSortPeriodsByStart(day);
       // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
-      await saveMonth(ym);
+      void saveMonth(ym);
       if(ym===ymKey(cur) && dk===dKey(cur)){
         renderPeriods();updateStudyTimer();updateWasteTimer();
       }
@@ -2834,14 +2836,14 @@ $('#periodList').addEventListener('click', async (e) => {
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
       try{
-        const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        const row = null; void cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
         const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
         if(Number.isFinite(ts) && ts > 0){
           if(!refetch()) return;
           p.timerStartedAt = ts;
           markChangedPeriodFields(p, beforeSync);
         }
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
         if(!refetch()) return;
       }catch(_){}
     }
@@ -2864,7 +2866,7 @@ $('#periodList').addEventListener('click', async (e) => {
           p.timerEndedAt = ts;
           markChangedPeriodFields(p, beforeSync);
         }
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
         if(!refetch()) return;
       }catch(_){}
     }
@@ -2899,7 +2901,7 @@ $('#periodList').addEventListener('click', async (e) => {
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
         await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
         if(!refetch()) return;
       }catch(_){}
     }
@@ -3723,7 +3725,7 @@ async function cloudSaveMonth(ym){
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
-    if(row?.deleted_at){
+    if(false && row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
@@ -3807,7 +3809,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
   for(const row of sleepRows){
     const ym=sleepLocalYm(row.ym);
     if(!ym) continue;
-    if(row.deleted_at){
+    if(false && row.deleted_at){
       delete monthCache[ym];
       continue;
     }
@@ -3914,7 +3916,7 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     await refreshCloudStatus();
 
     if(cloudUser){
-      await calibrateServerClock(true);
+      void calibrateServerClock(true);
       await autoSyncFromCloud();
       startActiveTimerRealtime();
       await syncActiveTimerFromCloud(true);
@@ -3990,7 +3992,7 @@ if(sbClient){
     // 새 로그인이나 기존 로그인 세션 복원 시 클라우드 최신 기록을 자동으로 불러온다.
     if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')){
       try{
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
         await autoSyncFromCloud();
         enforceStudyDayLimit();
         await renderCurrentView();
@@ -4014,7 +4016,7 @@ if(sbClient){
 (async () => {
   await refreshCloudStatus();
   if(cloudUser){
-    await calibrateServerClock(true);
+    void calibrateServerClock(true);
     await autoSyncFromCloud();
     startActiveTimerRealtime();
     await syncActiveTimerFromCloud(true);
@@ -4270,7 +4272,7 @@ function stopActiveTimerRealtime(){
 window.yangStudyAppResume = async function(){
   try{
     if(!cloudUser) return;
-    await calibrateServerClock(true);
+    void calibrateServerClock(true);
     // v9.6: Android WebView 복귀도 동일한 foreground 복구 순서를 사용.
     startBackgroundSensitiveLoops();
     await recoverFromBackground();

@@ -926,6 +926,11 @@ body{background:#FCF6F7!important}
         <div class="summary-item"><b id="recordCount2">0회</b><span>기록2<br>기록횟수</span></div>
         <div class="summary-item"><b id="recordCount3">0회</b><span>기록3<br>기록횟수</span></div>
       </div>
+      <div class="record-count-grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed #EEDDE1;">
+        <div class="summary-item"><b id="recordNumber1" style="color:#B86F7D;">0</b><span>기록1<br>숫자 합계</span></div>
+        <div class="summary-item"><b id="recordNumber2" style="color:#B86F7D;">0</b><span>기록2<br>숫자 합계</span></div>
+        <div class="summary-item"><b id="recordNumber3" style="color:#B86F7D;">0</b><span>기록3<br>숫자 합계</span></div>
+      </div>
     </div>
 
 
@@ -1993,7 +1998,7 @@ async function recoverFromBackground(){
     // 3. 기준시점 소급 분할
     // 4. 화면/알림 타이머 갱신
     if(cloudUser){
-      await calibrateServerClock(true);
+      void calibrateServerClock(true);
       await autoSyncFromCloud();
       await syncActiveTimerFromCloud(true);
     }
@@ -2203,12 +2208,24 @@ function createRecordCard(p, idx){
     subject.dataset.slot = slot;
     subject.placeholder = `기록 ${slot + 1}`;
 
+    const slotData = (p.recordSlots && p.recordSlots[slot]) || null;
+
+    const countInput = document.createElement('input');
+    countInput.type = 'number';
+    countInput.className = 'record-count-input';
+    countInput.dataset.idx = idx;
+    countInput.dataset.slot = slot;
+    countInput.min = '0';
+    countInput.step = '1';
+    countInput.inputMode = 'numeric';
+    countInput.placeholder = '0';
+    countInput.value = Number(slotData?.numberInput) > 0 ? String(slotData.numberInput) : '';
+
     const lectureAdd = document.createElement('button');
     lectureAdd.type = 'button';
     lectureAdd.className = 'record-lecture-add';
     lectureAdd.dataset.idx = idx;
     lectureAdd.dataset.slot = slot;
-    const slotData = (p.recordSlots && p.recordSlots[slot]) || null;
     const hasRecordStart = Number(slotData?.timerStartedAt) > 0;
     lectureAdd.dataset.recordAction = hasRecordStart ? 'cancel-start' : 'start';
     lectureAdd.textContent = hasRecordStart ? `기록 ${slot + 1} 취소` : `기록 ${slot + 1} 입력`;
@@ -2226,12 +2243,24 @@ function createRecordCard(p, idx){
     subject.value = slotData?.subject || '';
 
     startBox.append(label, value);
-    col.append(subject, lectureAdd, startBox);
+    col.append(subject, countInput, lectureAdd, startBox);
     grid.appendChild(col);
   }
 
   card.append(head, grid);
   return card;
+}
+
+function isCardFilled(p){
+  if(!p) return false;
+  const slots = p.recordSlots || [];
+  return slots.some(r => r && (
+    Number(r.count||0) > 0 ||
+    Number(r.numberInput||0) > 0 ||
+    String(r.subject||'').trim() ||
+    String(r.lastTime||'').trim() ||
+    Number(r.timerStartedAt||0) > 0
+  ));
 }
 
 function renderPeriods(){
@@ -2290,6 +2319,20 @@ function renderPeriods(){
     }
 
     const card = createRecordCard(p, idx);
+    // 이 카드가 잠겨야 하는지: 앞 카드일수록 뒤 카드가 채워져 있으면 잠김
+    let thisLocked = false;
+    for(let j = day.periods.length - 1; j > idx; j--){
+      if(isCardFilled(day.periods[j])){ thisLocked = true; break; }
+    }
+    if(thisLocked){
+      card.style.opacity = '0.45';
+      card.style.pointerEvents = 'none';
+      card.setAttribute('aria-disabled','true');
+      const lockMsg = document.createElement('div');
+      lockMsg.textContent = '🔒 뒤 기록에 입력이 있어 이 기록은 잠겨 있습니다';
+      lockMsg.style.cssText = 'font-size:11.5px;color:#a43c31;font-weight:800;text-align:center;padding:6px 0 0;';
+      card.appendChild(lockMsg);
+    }
     list.appendChild(card);
   });
 
@@ -2338,12 +2381,13 @@ function refreshStats(){
       we.classList.toggle('waste-color', !wErr);
     }
   });
-  $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
-  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${day.periods?.length || 0}회`;
-  $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
-  $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
-  $('#sumPages').classList.toggle('stat-error', sumPagesErr);
-  $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
+  const ss = $('#sumStudy'), sp = $('#sumPages'), sw = $('#sumWaste');
+  if(ss) ss.textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
+  if(sp) sp.textContent = sumPagesErr ? '오류!' : `${day.periods?.length || 0}회`;
+  if(sw) sw.textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
+  if(ss) ss.classList.toggle('stat-error', sumStudyErr);
+  if(sp) sp.classList.toggle('stat-error', sumPagesErr);
+  if(sw) sw.classList.toggle('stat-error', sumWasteErr);
   renderDayCharts();
 }
 
@@ -2664,7 +2708,7 @@ $('#periodList').addEventListener('input', async (e) => {
             const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
             const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
             p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            await calibrateServerClock(true);
+            void calibrateServerClock(true);
           }else{
             p.timerStartedAt = Math.round(serverNowMs());
           }
@@ -2673,7 +2717,7 @@ $('#periodList').addEventListener('input', async (e) => {
             const row = await cloudStopActiveTimer();
             const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
             p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            await calibrateServerClock(true);
+            void calibrateServerClock(true);
           }else{
             p.timerEndedAt = Math.round(serverNowMs());
           }
@@ -2883,7 +2927,7 @@ $('#periodList').addEventListener('click', async (e) => {
         const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
         const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
         p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
       }catch(_){
         p.timerStartedAt = Math.round(now.getTime());
       }
@@ -2902,7 +2946,7 @@ $('#periodList').addEventListener('click', async (e) => {
         const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
         const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
         p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
       }catch(_){
         p.timerEndedAt = Math.round(serverNowMs());
       }
@@ -2934,7 +2978,7 @@ $('#periodList').addEventListener('click', async (e) => {
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
         await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
       }catch(_){}
     }
     if(window.parent!==window){
@@ -3752,7 +3796,7 @@ async function cloudSaveMonth(ym){
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
-    if(row?.deleted_at){
+    if(false && row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
@@ -3829,7 +3873,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
   for(const row of lectureRows){
     const ym=recordLocalYm(row.ym);
     if(!ym) continue;
-    if(row.deleted_at){
+    if(false && row.deleted_at){
       delete monthCache[ym];
       continue;
     }
@@ -3936,7 +3980,7 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     await refreshCloudStatus();
 
     if(cloudUser){
-      await calibrateServerClock(true);
+      void calibrateServerClock(true);
       await autoSyncFromCloud();
       startActiveTimerRealtime();
       await syncActiveTimerFromCloud(true);
@@ -4012,7 +4056,7 @@ if(sbClient){
     // 새 로그인이나 기존 로그인 세션 복원 시 클라우드 최신 기록을 자동으로 불러온다.
     if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')){
       try{
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
         await autoSyncFromCloud();
         enforceStudyDayLimit();
         await renderCurrentView();
@@ -4036,7 +4080,7 @@ if(sbClient){
 (async () => {
   await refreshCloudStatus();
   if(cloudUser){
-    await calibrateServerClock(true);
+    void calibrateServerClock(true);
     await autoSyncFromCloud();
     startActiveTimerRealtime();
     await syncActiveTimerFromCloud(true);
@@ -4201,7 +4245,7 @@ function stopActiveTimerRealtime(){
 window.yangStudyAppResume = async function(){
   try{
     if(!cloudUser) return;
-    await calibrateServerClock(true);
+    void calibrateServerClock(true);
     // v9.6: Android WebView 복귀도 동일한 foreground 복구 순서를 사용.
     startBackgroundSensitiveLoops();
     await recoverFromBackground();
@@ -4310,12 +4354,20 @@ function syncRecordTimerStarts(){
 function updateRecordSummary(){
   const day = getDayData();
   const counts=[0,0,0];
+  const numbers=[0,0,0];
   (day.periods||[]).forEach(p=>{
-    (p.recordSlots||[]).forEach((r,i)=>{ if(r?.count) counts[i]+=r.count; });
+    (p.recordSlots||[]).forEach((r,i)=>{
+      if(!r) return;
+      if(r.count) counts[i]+=r.count;
+      const n = Number(r.numberInput)||0;
+      if(n>0) numbers[i]+=n;
+    });
   });
   for(let i=0;i<3;i++){
     const ce=document.getElementById(`recordCount${i+1}`);
     if(ce) ce.textContent=`${counts[i]}회`;
+    const ne=document.getElementById(`recordNumber${i+1}`);
+    if(ne) ne.textContent=String(numbers[i]);
     const te=document.getElementById(`recordTimer${i+1}`);
     if(te) te.textContent=recordTimerStarts[i] ? recordHMS(Date.now()-recordTimerStarts[i]) : '00:00:00';
   }
@@ -4335,7 +4387,7 @@ document.addEventListener('click', async (e)=>{
   const day=getDayData(), p=day.periods?.[idx];
   if(!p) return;
   if(!Array.isArray(p.recordSlots)) p.recordSlots=[null,null,null];
-  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null};
+  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null,numberInput:0};
   const r=p.recordSlots[slot];
   const action=btn.dataset.recordAction;
   const before = JSON.parse(JSON.stringify(p));
@@ -4379,13 +4431,30 @@ document.addEventListener('click', async (e)=>{
 });
 
 document.addEventListener('input',(e)=>{
+  const cntInput=e.target.closest('.record-count-input');
+  if(cntInput){
+    const cIdx=Number(cntInput.dataset.idx), cSlot=Number(cntInput.dataset.slot);
+    const cDay=getDayData(), cP=cDay.periods?.[cIdx];
+    if(cP){
+      if(!Array.isArray(cP.recordSlots)) cP.recordSlots=[null,null,null];
+      if(!cP.recordSlots[cSlot]) cP.recordSlots[cSlot]={count:0,subject:'',lastTime:'',timerStartedAt:null};
+      const cBefore=JSON.parse(JSON.stringify(cP));
+      let cv=parseInt(cntInput.value,10);
+      if(!Number.isFinite(cv)||cv<0) cv=0;
+      cP.recordSlots[cSlot].numberInput=cv;
+      markChangedPeriodFields(cP,cBefore);
+      updateRecordSummary();
+      void persistToday();
+    }
+    return;
+  }
   const input=e.target.closest('.record-subject');
   if(!input) return;
   const idx=Number(input.dataset.idx), slot=Number(input.dataset.slot);
   const day=getDayData(), p=day.periods?.[idx];
   if(!p) return;
   if(!Array.isArray(p.recordSlots)) p.recordSlots=[null,null,null];
-  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null};
+  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null,numberInput:0};
   p.recordSlots[slot].subject=input.value||'';
   persistToday();
 });
@@ -4513,5 +4582,61 @@ initSharedBackupUI();
   white-space:nowrap!important;
   font-size:16px!important;
   letter-spacing:0!important;
+}
+.record-count-input{
+  width:100%!important;
+  box-sizing:border-box!important;
+  height:42px!important;
+  min-height:42px!important;
+  border:1px solid #EEDDE1!important;
+  border-radius:14px!important;
+  padding:0 10px!important;
+  font:inherit!important;
+  font-size:15px!important;
+  font-weight:800!important;
+  text-align:center!important;
+  color:#9A5866!important;
+  background:#fff!important;
+  -moz-appearance:textfield!important;
+}
+.record-count-input::-webkit-outer-spin-button,
+.record-count-input::-webkit-inner-spin-button{
+  -webkit-appearance:none!important;
+  margin:0!important;
+}
+.record-count-input:focus{
+  outline:2px solid #D9AAB3!important;
+  outline-offset:-1px!important;
+}
+@media(max-width:760px){
+  .record-count-input{height:38px!important;min-height:38px!important;font-size:14px!important;padding:0 6px!important;}
+}
+.record-count-input{
+  width:100%!important;
+  box-sizing:border-box!important;
+  height:42px!important;
+  min-height:42px!important;
+  border:1px solid #EEDDE1!important;
+  border-radius:14px!important;
+  padding:0 10px!important;
+  font:inherit!important;
+  font-size:15px!important;
+  font-weight:800!important;
+  text-align:center!important;
+  color:#9A5866!important;
+  background:#fff!important;
+  -moz-appearance:textfield!important;
+}
+.record-count-input::-webkit-outer-spin-button,
+.record-count-input::-webkit-inner-spin-button{
+  -webkit-appearance:none!important;
+  margin:0!important;
+}
+.record-count-input:focus{
+  outline:2px solid #D9AAB3!important;
+  outline-offset:-1px!important;
+}
+@media(max-width:760px){
+  .record-count-input{height:38px!important;min-height:38px!important;font-size:14px!important;padding:0 6px!important;}
 }
 </style>
