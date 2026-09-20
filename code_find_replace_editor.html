@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTML 찾아 바꾸기 편집기</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light dark}*{box-sizing:border-box}body{margin:0;background:#f5f5f7;color:#171717}.app{height:100vh;display:flex;flex-direction:column}.bar{padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.title{font-weight:800;margin-right:auto}button,input,textarea.searchbox{font:inherit;border:1px solid #c9c9ce;border-radius:8px;padding:8px 10px;background:#fff;color:#171717}button{cursor:pointer}button:hover{background:#f0f0f3}.find{display:grid;grid-template-columns:minmax(260px,1fr) minmax(260px,1fr) auto auto auto auto;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;align-items:start}.searchbox{width:100%;min-height:96px;max-height:220px;resize:vertical;border:1px solid #c9c9ce;border-radius:8px;padding:8px 10px;background:#fff;color:#171717;font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;overflow:auto}.main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#ccc}.pane{background:#fff;min-width:0;display:flex;flex-direction:column}.head{padding:8px 12px;font-weight:700;border-bottom:1px solid #ddd;display:flex;justify-content:space-between}.status{font-weight:400;color:#666;font-size:13px}textarea{flex:1;width:100%;resize:none;border:0;outline:0;padding:14px;font:14px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;background:#111827;color:#e5e7eb;tab-size:2}iframe{flex:1;border:0;background:white}.foot{padding:6px 12px;background:#fff;border-top:1px solid #ddd;color:#666;font-size:12px}@media(max-width:800px){.main{grid-template-columns:1fr}.pane.preview{display:none}.find{grid-template-columns:1fr 1fr}.find button{width:100%}}@media(prefers-color-scheme:dark){body{background:#111;color:#eee}.bar,.find,.pane,.head,.foot{background:#1c1c1e;border-color:#3a3a3c}button,input,.searchbox{background:#2c2c2e;color:#fff;border-color:#48484a}.status,.foot{color:#aaa}}
+#count.unique{background:#22c55e;color:#fff;font-size:24px;font-weight:900;border-radius:9px;padding:3px 12px;min-width:52px} #count.duplicate{background:#ef4444;color:#fff;border-radius:9px;padding:5px 10px} #count.none{background:transparent;color:inherit;padding:5px 10px}
+</style></head>
+<body><div class="app">
+<div class="bar"><div class="title">HTML 찾아 바꾸기 편집기</div><input id="file" type="file" accept=".html,.htm,text/html" hidden><button id="open">HTML 열기</button><button id="save">저장</button><button id="saveAs">다른 이름으로 저장</button><button id="refresh">미리보기 새로고침</button></div>
+<div class="find"><textarea class="searchbox" id="find" placeholder="찾을 코드 (여러 줄 가능)" spellcheck="false"></textarea><textarea class="searchbox" id="replace" placeholder="바꿀 코드 (여러 줄 가능)" spellcheck="false"></textarea><button id="next">다음 찾기</button><span id="count" style="align-self:center;min-width:70px;text-align:center;font-weight:700">0개</span><button id="one">하나 바꾸기</button><button id="all">모두 바꾸기</button></div>
+<div class="main"><section class="pane"><div class="head"><span id="name">새 문서.html</span><span class="status" id="status">준비</span></div><textarea id="editor" spellcheck="false"><!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>예제</title></head>
+<body><h1>HTML 파일을 열어 수정하세요.</h1></body>
+</html></textarea></section><section class="pane preview"><div class="head">미리보기 <span class="status">Ctrl+F 대신 위 찾기창 사용</span></div><iframe id="preview" sandbox="allow-scripts allow-forms allow-modals"></iframe></section></div>
+<div class="foot">코드 전용 찾아 바꾸기 · 여러 줄/긴 코드/HTML·CSS·JS 특수문자 그대로 검색 · Ctrl/Cmd+S 저장 · Ctrl/Cmd+H 찾기창</div></div>
+<script>
+const $=id=>document.getElementById(id), editor=$('editor'), file=$('file'), status=$('status'); let filename='새 문서.html', handle=null;
+function preview(){ $('preview').srcdoc=editor.value }
+function msg(t){status.textContent=t; clearTimeout(msg.t); msg.t=setTimeout(()=>status.textContent='준비',2200)}
+$('open').onclick=async()=>{if(window.showOpenFilePicker){try{[handle]=await showOpenFilePicker({types:[{description:'HTML',accept:{'text/html':['.html','.htm']}}],multiple:false});const f=await handle.getFile();editor.value=await f.text();filename=f.name;$('name').textContent=filename;preview();msg('파일을 열었습니다');return}catch(e){if(e.name==='AbortError')return}}file.click()};
+file.onchange=async()=>{const f=file.files[0];if(!f)return;editor.value=await f.text();filename=f.name;handle=null;$('name').textContent=filename;preview();msg('파일을 열었습니다')};
+async function save(as=false){if(!as&&handle&&handle.createWritable){const w=await handle.createWritable();await w.write(editor.value);await w.close();msg('원본 파일에 저장했습니다');return}if(window.showSaveFilePicker){try{handle=await showSaveFilePicker({suggestedName:filename,types:[{description:'HTML',accept:{'text/html':['.html']}}]});filename=(await handle.getFile()).name;$('name').textContent=filename;const w=await handle.createWritable();await w.write(editor.value);await w.close();msg('저장했습니다');return}catch(e){if(e.name==='AbortError')return}}const blob=new Blob([editor.value],{type:'text/html;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);msg('파일을 저장했습니다')}
+$('save').onclick=()=>save(false);$('saveAs').onclick=()=>save(true);$('refresh').onclick=preview;
+function countMatches(text,q){if(!q)return 0;let n=0,pos=0;while((pos=text.indexOf(q,pos))!==-1){n++;pos+=q.length}return n}
+function updateCount(){const q=$('find').value;const n=countMatches(editor.value,q);const c=$('count');c.textContent=n+'개';c.className=n===1?'unique':n>1?'duplicate':'none';return n}
+$('find').addEventListener('input',updateCount);
+function findNext(){const q=$('find').value;updateCount();if(!q)return msg('찾을 내용을 입력하세요');let start=editor.selectionEnd,i=editor.value.indexOf(q,start);if(i<0)i=editor.value.indexOf(q);if(i<0)return msg('찾는 내용이 없습니다');editor.focus();editor.setSelectionRange(i,i+q.length);const before=editor.value.slice(0,i).split('\n').length;msg(before+'번째 줄에서 찾았습니다')}
+$('next').onclick=findNext;
+$('one').onclick=()=>{const q=$('find').value,r=$('replace').value;if(!q)return msg('찾을 내용을 입력하세요');const selected=editor.value.slice(editor.selectionStart,editor.selectionEnd);if(selected!==q){findNext();return}const s=editor.selectionStart,e=editor.selectionEnd;editor.setRangeText(r,s,e,'end');preview();updateCount();msg('1개 바꿨습니다')};
+$('all').onclick=()=>{const q=$('find').value,r=$('replace').value;if(!q)return msg('찾을 내용을 입력하세요');const n=countMatches(editor.value,q);if(!n)return msg('찾는 내용이 없습니다');editor.value=editor.value.split(q).join(r);preview();updateCount();msg(n+'개 모두 바꿨습니다')};
+editor.addEventListener('input',()=>{updateCount();clearTimeout(editor.pt);editor.pt=setTimeout(preview,350)});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save(false)}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='h'){e.preventDefault();$('find').focus()}});preview();updateCount();
+</script></body></html>

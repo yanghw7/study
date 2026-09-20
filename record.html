@@ -6,7 +6,7 @@
 <title>강의 기록장</title>
 
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
-<meta name="theme-color" content="#3B6E5C">
+<meta name="theme-color" content="#B86F7D">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="강의 기록장">
@@ -484,7 +484,7 @@
 </style>
 
 <style>
-:root{--accent:#67538b;--bg:#f7f5fb;--surface:#fff;--ink:#302b3d;--muted:#746e82;--line:#e2ddea}
+:root{--accent:#B86F7D;--bg:#FCF6F7;--surface:#fff;--ink:#463437;--muted:#8A7378;--line:#EEDDE1}
 body{background:#f7f5fb!important}
 .add-btn,.primary,.study-alarm-row .alarm-start{background:#67538b!important;border-color:#67538b!important}
 .study-alarm-due{color:#67538b!important}
@@ -710,6 +710,176 @@ body{background:#f7f5fb!important}
 .field.time.disabled{opacity:.55;cursor:not-allowed;}
 .field.time.disabled .ko-time-label{color:#746e82;font-weight:600;}
 </style>
+
+<style id="record-dynamic-card-style">
+body{background:#FCF6F7!important}
+.add-btn,.primary{background:#B86F7D!important;border-color:#B86F7D!important}
+#periodList{display:block!important}
+.period-card{border-color:#EEDDE1!important;background:#fff!important}
+.record-triple-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.record-slot{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.record-slot .record-subject{
+  width:100%!important;
+  box-sizing:border-box;
+  margin:0!important;
+  height:46px;
+  border:1px solid #EEDDE1!important;
+  border-radius:14px!important;
+  padding:0 10px!important;
+}
+.record-lecture-add{
+  width:100%;
+  min-width:0;
+  height:48px;
+  border:0;
+  border-radius:14px;
+  background:#F3DADD;
+  color:#9A5866;
+  font:inherit;
+  font-weight:900;
+}
+.record-start-box{
+  min-height:58px;
+  box-sizing:border-box;
+  padding:8px 10px;
+  border:1px solid #EEDDE1;
+  border-radius:14px;
+  background:#fff;
+}
+.record-start-box label{
+  display:block;
+  color:#8A7378;
+  font-size:12px;
+  font-weight:800;
+}
+.record-start-value{
+  margin-top:5px;
+  text-align:right;
+  color:#463437;
+  font-size:16px;
+  font-weight:900;
+}
+@media(max-width:760px){
+  .record-triple-grid{gap:7px}
+  .record-slot .record-subject{padding:0 8px!important;font-size:13px!important}
+  .record-lecture-add{font-size:13px;padding:0 3px}
+  .record-start-box{padding:7px}
+}
+</style>
+
+<style id="record-v103-style">
+.record-top-timers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px;}
+.record-top-timers .study-timer{border-color:#D9AAB3!important;background:#FCF6F7!important;}
+.record-top-timers .study-timer-label{color:#8A7378!important;}
+.record-top-timers .study-timer-time{color:#B86F7D!important;}
+.record-count-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+</style>
+
+<style id="record-v104-style">
+.record-count-grid{gap:8px!important;}
+.record-count-grid .summary-item{text-align:center!important;align-items:center!important;}
+
+@media(max-width:760px){
+  .record-slot .record-subject{font-size:14px!important;}
+}
+</style>
+
+
+<style id="record-v113-subject-height">
+.record-slot .record-subject{
+  height:42px!important;
+  min-height:42px!important;
+  box-sizing:border-box!important;
+}
+</style>
+
+<style id="record-v122-count-spacing">
+.record-count-grid .summary-item span{
+  line-height:1.15!important;
+}
+</style>
+
+<style id="record-index-alarm-style">
+.alarmbar{flex:0 0 auto;margin:6px 8px 0;padding:6px 8px;border:1px solid #dbe4e0;border-radius:11px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font-size:12px}
+.alarmline{display:flex;align-items:center;gap:5px;min-width:0}
+.alarmline strong{font-size:16px;line-height:1;white-space:nowrap;color:#26332f}
+.alarmline input{width:36px;height:30px;border:1px solid #dbe4e0;border-radius:8px;text-align:center;font-weight:800;font-size:13px;background:#f8faf9}
+.alarmline .unit{font-size:11px;font-weight:700;color:#6b7773;margin-left:-3px}
+.alarmline select{height:30px;width:92px;min-width:72px;max-width:92px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 5px;font-size:10.5px;font-weight:800;color:#34423d}
+.alarmline button{height:30px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 6px;font-size:10.5px;font-weight:800;white-space:nowrap;color:#34423d}
+#alarmStart{margin-left:auto}
+#alarmStart,#alarmCancel{width:54px;min-width:0;flex:0 1 54px;padding:0 5px}
+#alarmCancel{margin-right:0}
+.alarmline button.primary{background:#285f50;border-color:#285f50;color:#fff}
+.alarmline button.danger{display:none!important;background:#b42318;border-color:#b42318;color:#fff}
+.alarmline button.danger.show{display:inline-block!important}
+#alarmFileName{min-width:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#77827e}
+.alarmstatusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;min-height:30px}.alarmstatusline:has(#alarmStatus:empty){display:none}#alarmStatus{display:block;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}.alarmstatusline #alarmStop{display:none;height:27px;padding:0 8px;border:1px solid #b42318;border-radius:8px;background:#b42318;color:#fff;font-size:10.5px;font-weight:800;white-space:nowrap}.alarmstatusline #alarmStop.show{display:inline-block}
+@media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{font-size:13px}}
+.record-fixed-top{position:sticky!important;top:0!important;z-index:50!important;background:var(--bg);padding-top:1px;padding-bottom:1px}
+</style>
+
+<style id="record-alarm-summary-harmony">
+.record-fixed-top{
+  padding:8px 0 6px!important;
+}
+.record-fixed-top #recordAlarmBar{
+  margin:0 0 8px!important;
+  padding:10px 12px!important;
+  border:1px solid var(--line)!important;
+  border-radius:14px!important;
+  background:var(--card)!important;
+  box-shadow:none!important;
+}
+.record-fixed-top #recordAlarmBar .alarmline{
+  gap:7px!important;
+}
+.record-fixed-top #recordAlarmBar input,
+.record-fixed-top #recordAlarmBar select,
+.record-fixed-top #recordAlarmBar button{
+  border-color:var(--line)!important;
+  border-radius:10px!important;
+}
+.record-fixed-top #recordAlarmBar #alarmStart{
+  background:var(--accent)!important;
+  border-color:var(--accent)!important;
+  color:#fff!important;
+}
+.record-fixed-top #recordAlarmBar #alarmCancel,
+.record-fixed-top #recordAlarmBar #alarmPreview{
+  background:var(--card)!important;
+  color:var(--ink)!important;
+}
+.record-fixed-top #recordAlarmBar .alarmstatusline{
+  margin-top:7px!important;
+}
+.record-fixed-top .summary-card{
+  margin-top:0!important;
+}
+</style>
+
+
+<style id="record-alarm-button-size-fix">
+#recordAlarmBar #alarmStart,
+#recordAlarmBar #alarmCancel{
+  min-width:52px!important;
+  width:auto!important;
+  padding-left:10px!important;
+  padding-right:10px!important;
+  white-space:nowrap!important;
+  flex-shrink:0!important;
+}
+</style>
+
 </head>
 
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
@@ -717,25 +887,49 @@ body{background:#f7f5fb!important}
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
 <div class="wrap">
 
-  <div class="summary-card">
-      <div class="summary-head">
-        <div class="summary-title today-summary-title">오늘 강의 합계</div>
-        <div class="study-timer" id="studyTimer" aria-live="polite" title="강의 시작 입력 시 시작 · 끝 강의 횟수 입력 시 종료">
-          <span class="study-timer-label" id="studyTimerLabel">타이머</span>
-          <span class="study-timer-time" id="studyTimerTime">00:00:00</span>
+  <div class="record-fixed-top">
+  <div class="alarmbar" id="recordAlarmBar">
+    <div class="alarmline">
+      <strong aria-label="알람">⏰</strong>
+      <input id="alarmHours" type="number" min="0" max="48" value="" placeholder="" aria-label="시간"><span class="unit">시간</span>
+      <input id="alarmMinutes" type="number" min="0" max="59" value="" placeholder="" aria-label="분"><span class="unit">분</span>
+      <span class="unit afterAlarm">후</span>
+      <select id="alarmSoundSelect" aria-label="알람음"><option value="">불러오는 중...</option></select>
+      <span id="alarmFileName" hidden></span>
+      <button id="alarmPreview" type="button">▶ 미리듣기</button>
+      <button id="alarmStart" class="primary" type="button">시작</button>
+      <button id="alarmCancel" type="button">해제</button>
+    </div>
+    <div class="alarmstatusline"><div id="alarmStatus"></div><button id="alarmStop" class="danger" type="button" hidden style="display:none">🔕 끄기</button></div>
+  </div>
+
+<div class="summary-card">
+      <div class="summary-title today-summary-title">합계</div>
+      <div class="record-top-timers">
+        <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
+          <span class="study-timer-label">기록1 경과시간</span>
+          <span class="study-timer-time" id="recordTimer1">00:00:00</span>
         </div>
-        <div class="study-timer waste-timer" id="wasteTimer" aria-live="polite" title="강의 종료 후부터 다음 강의 시작까지 자동 측정">
-          <span class="study-timer-label" id="wasteTimerLabel">강의 종료 후 시간</span>
-          <span class="study-timer-time" id="wasteTimerTime">00:00:00</span>
+        <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
+          <span class="study-timer-label">기록2 경과시간</span>
+          <span class="study-timer-time" id="recordTimer2">00:00:00</span>
+        </div>
+        <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
+          <span class="study-timer-label">기록3 경과시간</span>
+          <span class="study-timer-time" id="recordTimer3">00:00:00</span>
         </div>
       </div>
-      <div class="summary-grid">
-        <div class="summary-item ok"><b id="sumStudy">0분</b><span>강의시간</span></div>
-        <div class="summary-item"><b id="sumPages">0회</b><span>강의 횟수</span></div>
-        <div class="summary-item warn"><b id="sumWaste">0분</b><span>강의 종료 후 시간</span></div>
+      <div id="studyTimer" style="display:none"><span id="studyTimerLabel"></span><span id="studyTimerTime">00:00:00</span></div>
+      <div id="wasteTimer" style="display:none"><span id="wasteTimerLabel"></span><span id="wasteTimerTime">00:00:00</span></div>
+      <div class="record-count-grid">
+        <div class="summary-item"><b id="recordCount1">0회</b><span>기록1<br>기록횟수</span></div>
+        <div class="summary-item"><b id="recordCount2">0회</b><span>기록2<br>기록횟수</span></div>
+        <div class="summary-item"><b id="recordCount3">0회</b><span>기록3<br>기록횟수</span></div>
       </div>
     </div>
 
+
+  </div>
 
   <div class="top-actions">
     <button class="chart-toggle-btn top-chart-btn" id="chartToggle" aria-pressed="false">📈 그래프 보기</button>
@@ -795,33 +989,9 @@ body{background:#f7f5fb!important}
   </div>
 
   <div id="dayView">
-  <div class="study-alarm-card">
-    <div class="study-alarm-row">
-      <strong>⏰ 알람</strong>
-      <select id="studyAlarmSound" aria-label="알람 소리">
-        <option value="bright">밝은 알람</option>
-        <option value="classic">기본 알람</option>
-        <option value="gentle">부드러운 알람</option>
-      </select>
-      <button id="studyAlarmPreview" type="button">미리듣기</button>
-      <button id="studyAlarmFilePick" type="button">파일 선택</button>
-      <input id="studyAlarmFile" type="file" accept="audio/*" hidden>
-    </div>
-    <div class="study-alarm-row alarm-time-row">
-      <input id="studyAlarmHours" type="number" inputmode="numeric" min="0" max="48" value=""><span>시간</span>
-      <input id="studyAlarmMinutes" type="number" inputmode="numeric" min="0" max="59" value=""><span>분 뒤</span>
-      <button class="alarm-start" id="studyAlarmStart" type="button">알람 시작</button>
-      <button id="studyAlarmCancel" type="button">알람 해제</button>
-    </div>
-    <div class="study-alarm-due" id="studyAlarmDue">알람이 설정되지 않았습니다.</div>
-    <button class="study-alarm-stop" id="studyAlarmStop" type="button">🔕 알람 끄기</button>
-  </div>
-
-    
-
     <div id="dayCharts"></div>
     <div id="periodList"></div>
-    <button class="add-btn" id="addPeriod">+ 강의 기록 추가</button>
+    <button class="add-btn" id="addPeriod">+ 기록 추가</button>
   </div>
 
   <div id="weekView" style="display:none;"></div>
@@ -1162,7 +1332,7 @@ async function loadMonth(ym){
   }
   try{
     const {data, error} = await sbClient.from('study_months')
-      .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', lectureCloudYm(ym)).maybeSingle();
+      .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', recordCloudYm(ym)).maybeSingle();
     if(error) throw error;
     if(data?.deleted_at){ monthCache[ym] = {}; return monthCache[ym]; }
     const m = data?.data || {};
@@ -2000,6 +2170,70 @@ function wasteInvalid(periods, idx){
   return (curStart - prevEnd) < 0;
 }
 
+
+function createRecordCard(p, idx){
+  const card = document.createElement('div');
+  card.className = 'period-card';
+
+  const head = document.createElement('div');
+  head.className = 'period-head';
+
+  const num = document.createElement('div');
+  num.className = 'period-num';
+  num.textContent = `${idx+1}기록`;
+
+  const del = document.createElement('button');
+  del.className = 'period-del';
+  del.dataset.idx = idx;
+  del.textContent = '✕';
+
+  head.append(num, del);
+
+  const grid = document.createElement('div');
+  grid.className = 'record-triple-grid';
+
+  for(let slot=0; slot<3; slot++){
+    const col = document.createElement('div');
+    col.className = 'record-slot';
+
+    const subject = document.createElement('input');
+    subject.type = 'text';
+    subject.className = 'subject-input record-subject';
+    subject.dataset.idx = idx;
+    subject.dataset.slot = slot;
+    subject.placeholder = `기록 ${slot + 1}`;
+
+    const lectureAdd = document.createElement('button');
+    lectureAdd.type = 'button';
+    lectureAdd.className = 'record-lecture-add';
+    lectureAdd.dataset.idx = idx;
+    lectureAdd.dataset.slot = slot;
+    const slotData = (p.recordSlots && p.recordSlots[slot]) || null;
+    const hasRecordStart = Number(slotData?.timerStartedAt) > 0;
+    lectureAdd.dataset.recordAction = hasRecordStart ? 'cancel-start' : 'start';
+    lectureAdd.textContent = hasRecordStart ? `기록 ${slot + 1} 취소` : `기록 ${slot + 1} 입력`;
+    if(hasRecordStart) lectureAdd.classList.add('cancel-start');
+
+    const startBox = document.createElement('div');
+    startBox.className = 'record-start-box';
+
+    const label = document.createElement('label');
+    label.textContent = '기록 시간';
+
+    const value = document.createElement('div');
+    value.className = 'record-start-value';
+    value.textContent = slotData?.lastTime || '--:--';
+    subject.value = slotData?.subject || '';
+
+    startBox.append(label, value);
+    col.append(subject, lectureAdd, startBox);
+    grid.appendChild(col);
+  }
+
+  card.append(head, grid);
+  return card;
+}
+
 function renderPeriods(){
   const day = getDayData();
   const list = $('#periodList');
@@ -2055,46 +2289,18 @@ function renderPeriods(){
       endClass = 'end cancel-end';
     }
 
-    const card = document.createElement('div');
-    card.className = 'period-card';
-    card.innerHTML = `
-      <div class="period-head">
-        <div class="period-num">${idx+1}강의</div>
-        <input type="text" class="subject-input" data-idx="${idx}" data-k="subject" value="${p.subject || ''}" placeholder="과목">
-        <button class="period-del" data-idx="${idx}">✕</button>
-      </div>
-      <div class="field-grid">
-        <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action ${startClass}" data-lecture-action="${startAction}" data-idx="${idx}" ${startDisabled ? 'disabled' : ''}>${startLabel}</button>
-        </div>
-        <div class="field time${startTimeDisabled ? ' disabled' : ''}">
-          <label>시작 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" ${startTimeDisabled ? 'disabled' : ''} value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${startTimePlaceholder}</div>
-        </div>
-        <div class="field lecture-action-field">
-          <button type="button" class="lecture-card-action ${endClass}" data-lecture-action="${endAction}" data-idx="${idx}" ${endDisabled ? 'disabled' : ''}>${endLabel}</button>
-        </div>
-        <div class="field time${endTimeDisabled ? ' disabled' : ''}">
-          <label>종료 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" ${endTimeDisabled ? 'disabled' : ''} value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${endTimePlaceholder}</div>
-        </div>
-      </div>
-      <div class="period-stats">
-        <div class="stat">강의시간<b id="study-${idx}" class="${sErr ? 'stat-error' : 'study-color'}">${sErr ? '오류!' : fmtDuration(study)}</b></div>
-        <div class="stat">강의 횟수<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : '1회'}</b></div>
-        ${idx>0 ? `<div class="stat">강의 종료 후 시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
-      </div>
-    `;
+    const card = createRecordCard(p, idx);
     list.appendChild(card);
   });
 
-  $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
-  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${day.periods?.length || 0}회`;
-  $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
-  $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
-  $('#sumPages').classList.toggle('stat-error', sumPagesErr);
-  $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
+  if($('#sumStudy')) $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
+  if($('#sumPages')) $('#sumPages').textContent = sumPagesErr ? '오류!' : `${day.periods?.length || 0}회`;
+  if($('#sumWaste')) $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
+  if($('#sumStudy')) $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
+  if($('#sumPages')) $('#sumPages').classList.toggle('stat-error', sumPagesErr);
+  if($('#sumWaste')) $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
   renderDayCharts();
+  updateRecordSummary();
 
 }
 
@@ -2244,42 +2450,25 @@ $('#datePicker').onchange = async (e) => {
 };
 
 $('#addPeriod').onclick = async () => {
-  // 새 강의 제한: 마지막 강의가 진행 중이면 다음 강의를 추가할 수 없음.
-  const currentDay = getDayData();
-  const currentPeriods = currentDay.periods || [];
-  if(currentPeriods.length > 0){
-    const last = currentPeriods[currentPeriods.length - 1];
-    const hasStarted = !!(last.startDate && last.startTime);
-    const hasEnded = !!(last.endDate && last.endTime);
-
-    // 마지막 강의가 아예 시작되지 않았어도 다음 강의 추가 금지
-    if(!hasStarted){
-      alert(`${currentPeriods.length}강의를 먼저 시작해주세요.`);
-      return;
-    }
-
-    // 시작했지만 아직 종료되지 않은 경우도 다음 강의 추가 금지
-    if(!hasEnded){
-      alert(`${currentPeriods.length}강의가 진행 중입니다.\n강의를 종료한 후 다음 강의를 추가해주세요.`);
-      return;
-    }
-  }
-
-  // v9.3: 다른 기기에서도 반드시 Supabase 최신 상태를 먼저 확인한다.
-  if(cloudUser){
-    try{
-      await autoSyncFromCloud();
-      enforceStudyDayLimit();
-      await renderCurrentView();
-    }catch(e){
-      console.error('강의 추가 전 최신 기록 확인 실패:', e);
-      alert('최신 강의 기록을 확인하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.');
-      return;
-    }
-  }
-
   const day = getDayData();
   const periods = day.periods || [];
+
+  if(periods.length){
+    const last = periods[periods.length - 1];
+    const slots = last.recordSlots || [];
+    const hasAnyRecord = slots.some(r =>
+      r && (
+        String(r.subject || '').trim() ||
+        Number(r.count || 0) > 0 ||
+        String(r.lastTime || '').trim() ||
+        Number(r.timerStartedAt || 0) > 0
+      )
+    );
+    if(!hasAnyRecord){
+      await askConfirm('기록 1·2·3 중 하나를 먼저 기록해주세요.');
+      return;
+    }
+  }
 
   const ts = syncNow();
   const nextOrder = periods.reduce((mx,p)=>Math.max(mx,Number(p._order||0)),0)+1;
@@ -2619,87 +2808,11 @@ async function locateStoppedPeriodNear(atMsTarget, toleranceMs=8000){
 }
 
 async function requestExclusiveSessionStart(atMs){
-  if(window.parent===window) return true;
-  try{
-    const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-    return await new Promise(resolve=>{
-      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
-      function onMsg(ev){
-        if(ev.source!==window.parent || ev.data?.type!=='exclusive-session-result' || ev.data?.req!==req)return;
-        clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
-      }
-      window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req,at:atMs},location.origin);
-    });
-  }catch(e){return true}
+  // 기타 기록장 타이머는 다른 기록장과 완전히 독립적으로 동작한다.
+  return true;
 }
-window.addEventListener('message',async ev=>{
-  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
-  let stopped=false;
-  try{
-    // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
-    // 이 강의의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
-    const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
-    const now=new Date(atMs);
-    const found=await locateRunningPeriod();
-    if(found){
-      const {ym,dk,day,p}=found;
-      const before=deepClone(p);
-      p.endDate=ymd(now);p.endTime=hm(now);
-      p.timerEndedAt=Math.round(atMs);
-      lastAutoStoppedId=p._id;
-      lastAutoStoppedAt=atMs;
-      if(cloudUser){
-        const row=await cloudStopActiveTimer(ym, dk, p._id);const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
-      }else p.timerEndedAt=Math.round(atMs);
-      markChangedPeriodFields(p, before);
-      autoSortPeriodsByStart(day);
-      // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
-      await saveMonth(ym);
-      if(ym===ymKey(cur) && dk===dKey(cur)){
-        renderPeriods();updateStudyTimer();updateWasteTimer();
-      }
-      stopped=true;
-    }
-  }catch(e){console.warn('자동 강의 종료 실패',e)}
-  window.parent.postMessage({type:'exclusive-session-stopped',kind:'lecture',req:ev.data.req,ok:true,stopped},location.origin);
-});
-// 새로 시작한 다른 기록장의 타이머가 곧바로 취소되면, 그로 인해 자동 종료됐던 이 기록을 되돌린다.
-window.addEventListener('message',async ev=>{
-  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-undo-stop') return;
-  try{
-    const atMs=Number(ev.data.atMs);
-    if(!Number.isFinite(atMs)) return;
-    let found=null;
-    if(lastAutoStoppedId){
-      for(const ym of Object.keys(monthCache)){
-        const month=monthCache[ym];
-        for(const dk of Object.keys(month)){
-          if(!/^\d{1,2}$/.test(dk)) continue;
-          const day=month[dk];
-          if(!day?.periods) continue;
-          const idx=day.periods.findIndex(x=>String(x._id)===String(lastAutoStoppedId));
-          if(idx>=0){ found={ym,dk,day,p:day.periods[idx],idx}; break; }
-        }
-        if(found) break;
-      }
-    }
-    if(!found) found=await locateStoppedPeriodNear(atMs);
-    if(!found) return;
-    lastAutoStoppedId=null;
-    const {ym,dk,day,p,idx}=found;
-    const before=deepClone(p);
-    p.endDate=''; p.endTime=''; p.timerEndedAt=null;
-    if(cloudUser) await cloudResumeActiveTimer(ym, dk, p, idx);
-    markChangedPeriodFields(p, before);
-    autoSortPeriodsByStart(day);
-    await saveMonth(ym);
-    if(ym===ymKey(cur) && dk===dKey(cur)){
-      renderPeriods();updateStudyTimer();updateWasteTimer();
-    }
-  }catch(e){console.warn('타이머 복원 실패',e)}
-});
+
+// 기타 기록장은 exclusive-session-stop / undo-stop 메시지를 사용하지 않는다.
 
 function askConfirm(message, danger=false){
   return new Promise(resolve => {
@@ -2796,7 +2909,6 @@ $('#periodList').addEventListener('click', async (e) => {
     }else{
       p.timerEndedAt = Math.round(serverNowMs());
     }
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
   }else if(action === 'cancel-start'){
     const msg = (p.endDate || p.endTime)
       ? `${idx+1}강의의 시작·종료 기록을 모두 지울까요?`
@@ -2813,7 +2925,6 @@ $('#periodList').addEventListener('click', async (e) => {
     }
     // 방금 시작했던 타이머를 취소하는 것이므로, 그로 인해 자동 종료됐던
     // 다른 기록장(공부/수면)의 기록을 되돌려 달라고 알린다.
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'lecture'},location.origin);
     showToast('시작 기록을 취소했어요');
   }else if(action === 'cancel-end'){
     if(!(await askConfirm(`${idx+1}강의 종료를 취소할까요?`, true))) return;
@@ -3025,6 +3136,16 @@ function weekRange(year, monthIdx1, w){
 }
 function fmtMD(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
 
+function recordCountsFromPeriods(periods){
+  const counts=[0,0,0];
+  (periods||[]).forEach(p=>{
+    (p.recordSlots||[]).forEach((r,i)=>{
+      if(i<3) counts[i] += Number(r?.count || 0);
+    });
+  });
+  return counts;
+}
+
 async function computeMonthAgg(ym){
   const [year, mo] = ym.split('-').map(Number);
   const m = await loadMonth(ym);
@@ -3032,25 +3153,23 @@ async function computeMonthAgg(ym){
   const totalWeeks = weekOfMonth(year, mo, daysInMonth);
   const weeks = {};
   for(let w=1; w<=totalWeeks; w++){
-    weeks[w] = {study:0,pages:0,waste:0,days:0, ...weekRange(year, mo, w)};
+    weeks[w] = {counts:[0,0,0],days:0, ...weekRange(year, mo, w)};
   }
 
-  let monthStudy=0, monthPages=0, monthWaste=0;
+  const monthCounts=[0,0,0];
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
-    const dayData = m[dk];
-    const periods = dayData.periods||[];
-    let dStudy=0, dPages=0, dWaste=0;
-    periods.forEach((p, idx)=>{
-      dStudy += minutesBetween(p);
-      dPages += periodPages(p);
-      dWaste += wasteBefore(periods, idx);
-    });
+    const periods = m[dk]?.periods || [];
+    const counts = recordCountsFromPeriods(periods);
+    const total = counts.reduce((a,b)=>a+b,0);
     const w = weekOfMonth(year, mo, dayNum);
-    weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].days += 1;
-    monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste;
+    for(let i=0;i<3;i++){
+      weeks[w].counts[i] += counts[i];
+      monthCounts[i] += counts[i];
+    }
+    if(total>0) weeks[w].days += 1;
   });
-  return { weeks, monthStudy, monthPages, monthWaste };
+  return { weeks, monthCounts };
 }
 
 async function renderWeekView(){
@@ -3059,14 +3178,12 @@ async function renderWeekView(){
   const el = $('#weekView');
   const today = logicalToday();
   const weekNums = Object.keys(weeks).map(Number).sort((a,b)=>a-b)
-    .filter(w => weeks[w].start <= today); // 아직 시작되지 않은 주차는 나중에 표시
+    .filter(w => weeks[w].start <= today);
   if(weekNums.length===0){
     el.innerHTML = `<div class="empty-state">${cur.getMonth()+1}월에는 아직 시작된 주차가 없어요.</div>`;
     return;
   }
-  const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste}));
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${cur.getFullYear()}년 ${cur.getMonth()+1}월 · 주별 정리 (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>` +
-    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.') +
     weekNums.map(w => `
       <div class="agg-row">
         <div>
@@ -3074,7 +3191,9 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          강의시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b><br>강의횟수 <b>${weeks[w].pages}회</b>
+          기록1 <b>${weeks[w].counts[0]}회</b><br>
+          기록2 <b>${weeks[w].counts[1]}회</b><br>
+          기록3 <b>${weeks[w].counts[2]}회</b>
         </div>
       </div>
     `).join('');
@@ -3086,29 +3205,22 @@ async function renderMonthView(){
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div><div class="empty-state">불러오는 중…</div>`;
   let html = '';
   let any = false;
-  const chartPoints = [];
   for(let mo=1; mo<=12; mo++){
-    const ym = `${year}-${pad(mo)}`;
-    const { monthStudy, monthPages, monthWaste } = await computeMonthAgg(ym);
-    chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste});
-    if(monthStudy===0 && monthPages===0 && monthWaste===0) continue;
+    const { monthCounts } = await computeMonthAgg(`${year}-${pad(mo)}`);
+    const total = monthCounts.reduce((a,b)=>a+b,0);
+    if(total===0) continue;
     any = true;
     html += `
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          강의시간 <b class="study-color">${fmtDuration(monthStudy)}</b><br>강의횟수 <b>${monthPages}회</b>
+          기록1 <b>${monthCounts[0]}회</b><br>
+          기록2 <b>${monthCounts[1]}회</b><br>
+          기록3 <b>${monthCounts[2]}회</b>
         </div>
       </div>`;
   }
-  const currentStudyDay = logicalToday();
-  const averagePoints = chartPoints.filter((p, idx) => {
-    if(year < currentStudyDay.getFullYear()) return true;
-    if(year > currentStudyDay.getFullYear()) return false;
-    return (idx + 1) < (currentStudyDay.getMonth() + 1);
-  });
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div>` +
-    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.') +
     (any ? html : `<div class="empty-state">${year}년에 기록된 데이터가 없어요.</div>`);
 }
 
@@ -3120,20 +3232,17 @@ async function renderYearView(){
   const sorted = [...years].filter(y=>y<=currentYear).sort((a,b)=>a-b);
   let rows = '';
   let any = false;
-  const chartPoints = [];
   for(const year of sorted){
-    let study=0, pages=0, waste=0;
+    const counts=[0,0,0];
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
-      study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste;
+      for(let i=0;i<3;i++) counts[i] += a.monthCounts[i];
     }
-    chartPoints.push({label:`${year}`, study, pages, waste});
-    if(study===0 && pages===0 && waste===0) continue;
+    if(counts.every(v=>v===0)) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">강의시간 <b class="study-color">${fmtDuration(study)}</b><br>강의횟수 <b>${pages}회</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">기록1 <b>${counts[0]}회</b><br>기록2 <b>${counts[1]}회</b><br>기록3 <b>${counts[2]}회</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
-    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
 }
 
@@ -3531,7 +3640,7 @@ async function deleteAllStudyRecords(){
       return;
     }
     const {data:lecRows,error:readErr} = await sbClient.from('study_months')
-      .select('ym').eq('user_id', cloudUser.id).like('ym','L:%');
+      .select('ym').eq('user_id', cloudUser.id).like('ym','R:%');
     if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); return; }
     const lecYms=(lecRows||[]).map(r=>String(r.ym||''));
     const markerIso = new Date(Math.round(serverNowMs())).toISOString();
@@ -3565,7 +3674,7 @@ async function deleteAllStudyRecords(){
   }
   showToast('모든 강의 기록을 삭제했어요');
   if(window.parent !== window){
-    window.parent.postMessage({type:'journal-delete-done', kind:'lecture'}, location.origin);
+    window.parent.postMessage({type:'journal-delete-done', kind:'record'}, location.origin);
   }
 }
 
@@ -3575,7 +3684,7 @@ $('#deleteAllRecords').onclick = deleteAllStudyRecords;
 window.addEventListener('message', async (ev)=>{
   if(ev.origin !== location.origin) return;
   if(ev.data?.type !== 'journal-delete-request') return;
-  if(ev.data?.kind !== 'lecture') return;
+  if(ev.data?.kind !== 'record') return;
   await deleteAllStudyRecords();
 });
 
@@ -3622,8 +3731,8 @@ async function refreshCloudStatus(){
 }
 
 
-function lectureCloudYm(ym){ const s=String(ym||''); return s.startsWith('L:') ? s : `L:${s}`; }
-function lectureLocalYm(v){ return String(v||'').startsWith('L:') ? String(v).slice(2) : null; }
+function recordCloudYm(ym){ const s=String(ym||''); return s.startsWith('R:') ? s : `R:${s}`; }
+function recordLocalYm(v){ return String(v||'').startsWith('R:') ? String(v).slice(2) : null; }
 
 async function cloudSaveMonth(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
@@ -3633,7 +3742,7 @@ async function cloudSaveMonth(ym){
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym)).limit(1);
+      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',recordCloudYm(ym)).limit(1);
     if(readErr){
       console.error('클라우드 저장 전 읽기 실패:', readErr);
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
@@ -3647,10 +3756,10 @@ async function cloudSaveMonth(ym){
       }
       const nowIso2 = new Date(serverNowMs()).toISOString();
       let q2 = sbClient.from('study_months').update({data:local, deleted_at:null, updated_at:nowIso2})
-        .eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym));
+        .eq('user_id',cloudUser.id).eq('ym',recordCloudYm(ym));
       if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
       const {data:w2,error:wErr2} = await q2.select('updated_at');
-      if(!wErr2 && w2 && w2.length){
+      if(!wErr2 && w2 && w2.length){ monthCache[ym]=local; return; }
       lastSaveErr = wErr2 || new Error('삭제 후 재생성 실패');
       await new Promise(r=>setTimeout(r,120*(attempt+1)));
       continue;
@@ -3660,14 +3769,14 @@ async function cloudSaveMonth(ym){
     let writeOk=false;
     if(row){
       let q = sbClient.from('study_months').update({data:merged,updated_at:nowIso})
-        .eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym));
+        .eq('user_id',cloudUser.id).eq('ym',recordCloudYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
-      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:lectureCloudYm(ym),data:merged,updated_at:nowIso});
+      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:recordCloudYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
       else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
@@ -3705,16 +3814,16 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:'));
   // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 (L: 접두사)
   const serverYms = new Set(lectureRows.map(r=>String(r.ym||'')));
   Object.keys(monthCache).forEach(localYm => {
-    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has('L:'+localYm)){
+    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has('R:'+localYm)){
       delete monthCache[localYm];
     }
   });
   for(const row of lectureRows){
-    const ym=lectureLocalYm(row.ym);
+    const ym=recordLocalYm(row.ym);
     if(!ym) continue;
     if(row.deleted_at){
       delete monthCache[ym];
@@ -3742,12 +3851,12 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:'));
   if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!confirm('클라우드 기록으로 이 브라우저의 강의 기록을 교체할까요?')) return;
   monthCache={};
   lectureRows.forEach(row=>{
-    const ym=lectureLocalYm(row.ym);
+    const ym=recordLocalYm(row.ym);
     if(ym) monthCache[ym]=ensureMonthSync(deepClone(row.data||{}),ym);
   });
   enforceStudyDayLimit();
@@ -3965,82 +4074,32 @@ function activeTimerRowFingerprint(row){
 }
 
 async function cloudStartActiveTimer(ym, dayKey, p, idx){
-  if(!sbClient || !cloudUser) return null;
-  const {data,error} = await sbClient.rpc('start_active_timer',{
-    p_ym: lectureCloudYm(ym),
-    p_day_key: String(dayKey),
-    p_period_id: String(p._id || ''),
-    p_period_index: Number(idx || 0)
-  });
-  if(error){
-    console.error('서버 타이머 시작 실패:', error);
-    showToast('서버 타이머 시작 실패');
-    return null;
-  }
-  return data || null;
+  return null;
 }
 
 // [FIX2] 자신의 타이머만 종료하도록 파라미터 전달
 async function cloudStopActiveTimer(ym, dayKey, periodId){
-  if(!sbClient || !cloudUser) return null;
-  const {data,error} = await sbClient.rpc('stop_active_timer',{
-    p_ym: ym ? lectureCloudYm(ym) : null,
-    p_day_key: dayKey != null ? String(dayKey) : null,
-    p_period_id: periodId ? String(periodId) : null
-  });
-  if(error){
-    console.error('서버 타이머 종료 실패:', error);
-    showToast('서버 타이머 종료 실패');
-    return null;
-  }
-  return data || null;
+  return null;
 }
 
 async function cloudResumeActiveTimer(ym, dayKey, p, idx){
-  if(!sbClient || !cloudUser || !Number(p.timerStartedAt)) return null;
-  const {data,error} = await sbClient.rpc('resume_active_timer',{
-    p_ym: lectureCloudYm(ym),
-    p_day_key: String(dayKey),
-    p_period_id: String(p._id || ''),
-    p_period_index: Number(idx || 0),
-    p_started_at: new Date(Number(p.timerStartedAt)).toISOString()
-  });
-  if(error){
-    console.error('서버 타이머 재개 실패:', error);
-    return null;
-  }
-  return data || null;
+  return null;
 }
 
 async function cloudClearActiveTimer(){
-  if(!sbClient || !cloudUser) return;
-  const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
-  if(error) console.warn('서버 타이머 삭제 실패:', error);
-  else activeTimerLastFingerprint = '';
+  return;
 }
 
 // [DEL-FIX-3] 강의장 소유(ym = "L:YYYY-MM")인 경우에만 active_timer 삭제.
 //             공부(숫자) / 수면(S:) 타이머를 실수로 지우지 않도록 방어.
 async function cloudClearActiveTimerIfMine(){
-  if(!sbClient || !cloudUser) return;
-  try{
-    const {data,error:readErr} = await sbClient.from('active_timer')
-      .select('ym').eq('user_id',cloudUser.id).maybeSingle();
-    if(readErr){ console.warn('active_timer 조회 실패:', readErr); return; }
-    const ym = String(data?.ym || '');
-    if(!ym.startsWith('L:')) return;
-    const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
-    if(error) console.warn('서버 타이머 삭제 실패:', error);
-    else activeTimerLastFingerprint = '';
-  }catch(e){
-    console.warn('선택적 타이머 삭제 실패:', e);
-  }
+  return;
 }
 
 function findPeriodForActiveTimer(row){
   if(!row) return null;
   let ym = String(row.ym || '');
-  if(ym.startsWith('L:') || ym.startsWith('S:')) ym = ym.slice(2);
+  if(ym.startsWith('R:') || ym.startsWith('L:') || ym.startsWith('S:')) ym = ym.slice(2);
   const dk = String(row.day_key || '');
   const month = monthCache[ym];
   const day = month && month[dk];
@@ -4104,39 +4163,7 @@ async function applyActiveTimerRow(row){
 }
 
 async function syncActiveTimerFromCloud(force=false){
-  if(activeTimerSyncBusy || !sbClient || !cloudUser) return;
-  activeTimerSyncBusy = true;
-
-  try{
-    const {data,error} = await sbClient
-      .from('active_timer')
-      .select('*')
-      .eq('user_id',cloudUser.id)
-      .maybeSingle();
-
-    if(error) throw error;
-
-    const fp = activeTimerRowFingerprint(data);
-    if(!force && fp === activeTimerLastFingerprint) return;
-
-    if(data){
-      const applied = await applyActiveTimerRow(data);
-      // period가 아직 클라우드 월 데이터에 안 올라온 경우 다음 2초 poll에서 다시 시도한다.
-      if(applied) activeTimerLastFingerprint = fp;
-    }else{
-      const previouslyHadTimer = !!activeTimerLastFingerprint;
-      activeTimerLastFingerprint = '';
-      if(previouslyHadTimer){
-        await autoSyncFromCloud();
-        updateStudyTimer();
-        syncAndroidTimer();
-      }
-    }
-  }catch(e){
-    console.warn('서버 타이머 동기화 실패:', e);
-  }finally{
-    activeTimerSyncBusy = false;
-  }
+  return;
 }
 
 // Realtime이 활성화된 프로젝트에서는 즉시 반영.
@@ -4145,13 +4172,7 @@ function startActiveTimerRealtime(){
   if(!sbClient || !cloudUser || activeTimerRealtimeChannel) return;
   try{
     activeTimerRealtimeChannel = sbClient
-      .channel(`gongbujang-active-${cloudUser.id}`)
-      .on(
-        'postgres_changes',
-        {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${cloudUser.id}`},
-        ()=>syncActiveTimerFromCloud(true)
-      )
-      // [RT] study_months 변경도 서버가 즉시 밀어준다
+      .channel(`record-data-${cloudUser.id}`)
       .on(
         'postgres_changes',
         {event:'*',schema:'public',table:'study_months',filter:`user_id=eq.${cloudUser.id}`},
@@ -4193,7 +4214,7 @@ function collectBackupData(){
     if(/^\d{4}-\d{2}$/.test(ym)) months[ym]=monthCache[ym];
   });
   return {
-    app: 'lecture-log',
+    app: 'record-log',
     version: 1,
     exportedAt: new Date().toISOString(),
     settings: appSettings,
@@ -4201,21 +4222,13 @@ function collectBackupData(){
   };
 }
 
-/* [fix] 백업/복원 UI는 index가 소유. iframe 내부에는 요소가 없어
-   TypeError로 이후 초기화가 죽는 문제 방지. */
-(() => {
-  const _b = document.getElementById('backupData');
-  const _r = document.getElementById('restoreData');
-  const _f = document.getElementById('restoreFile');
-  if (!_b || !_r || !_f) { console.info('[lecture] 백업/복원 UI 없음 — skip'); return; }
-
 $('#backupData').onclick = () => {
   const data = collectBackupData();
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `lecture-log-backup-${ymd(new Date())}.json`;
+  a.download = `record-log-backup-${ymd(new Date())}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4229,7 +4242,6 @@ $('#restoreFile').addEventListener('change', async (e) => {
   alert('복원은 홈 화면의 데이터 복원 버튼을 사용해주세요.');
   e.target.value = '';
 });
-})();
 renderDay();
 </script>
 
@@ -4244,103 +4256,7 @@ if ('serviceWorker' in navigator) {
 </script>
 
 
-<script>
-(()=>{
- const KEY='lectureAlarm:device:v1', $=q=>document.querySelector(q);
- const LOCK_KEY='appAlarm:lock:v1', OWNER='lecture';
- let ac=null,osc=null,gain=null,to=null,watch=null,ringing=false,file=null,fileAudio=null,vibe=null,autoStop=null;
- const pad=n=>String(n).padStart(2,'0');
- function get(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
- function put(v){localStorage.setItem(KEY,JSON.stringify(v))}
- function readLock(){try{return JSON.parse(localStorage.getItem(LOCK_KEY)||'null')}catch(e){return null}}
- function writeLock(due){try{localStorage.setItem(LOCK_KEY,JSON.stringify({owner:OWNER,due}))}catch(e){}}
- function clearLockIfMine(){try{const l=readLock();if(l&&l.owner===OWNER)localStorage.removeItem(LOCK_KEY)}catch(e){}}
- function ownActive(){return ringing||!!get()?.enabled}
- function refreshLockUI(){
-   if(ownActive())return;
-   const lock=readLock(), btn=$('#studyAlarmStart'), d=$('#studyAlarmDue');
-   const blocked=!!(lock&&lock.owner!==OWNER);
-   if(btn)btn.disabled=blocked;
-   if(d)d.textContent=blocked?`다른 화면(${lock.owner==='study'?'공부장':lock.owner==='sleep'?'수면장':lock.owner})에서 알람이 진행 중입니다.`:'알람이 설정되지 않았습니다.';
- }
- function dur(){
-   const h=Math.max(0,Math.min(48,parseInt($('#studyAlarmHours')?.value||0,10)||0));
-   const m=Math.max(0,Math.min(59,parseInt($('#studyAlarmMinutes')?.value||0,10)||0));
-   return (h*60+m)*60000;
- }
- function due(ms){const d=new Date();d.setSeconds(0,0);return d.getTime()+ms}
- function fmt(t){const d=new Date(t);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad(d.getMinutes())}분 알람 예정`}
- async function prime(){
-   ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-   if(ac.state==='suspended')await ac.resume();
-   if(!osc){osc=ac.createOscillator();gain=ac.createGain();osc.frequency.value=880;gain.gain.value=.00001;osc.connect(gain);gain.connect(ac.destination);osc.start()}
- }
- function ui(a){
-   const b=$('#studyAlarmStart'),d=$('#studyAlarmDue');
-   if(a?.enabled){b.textContent='⏰ 알람 중';b.classList.add('running');d.textContent=fmt(a.due)}
-   else if(!ringing){b.textContent='알람 시작';b.classList.remove('running');d.textContent='알람이 설정되지 않았습니다.'}
- }
- function silence(){
-   ringing=false;
-   clearInterval(vibe);vibe=null;
-   clearTimeout(autoStop);autoStop=null;
-   try{navigator.vibrate?.(0)}catch(e){}
-   if(fileAudio){try{fileAudio.pause();fileAudio.currentTime=0}catch(e){}}
-   if(gain&&ac){try{gain.gain.cancelScheduledValues(ac.currentTime);gain.gain.setValueAtTime(.00001,ac.currentTime)}catch(e){}}
-   $('#studyAlarmStop')?.classList.remove('show');put({enabled:false});clearLockIfMine();ui(null);refreshLockUI();
- }
- async function fire(){
-   const a=get();if(!a?.enabled||ringing)return;
-   ringing=true;a.enabled=false;put(a);clearTimeout(to);clearInterval(watch);
-   $('#studyAlarmDue').textContent='⏰ 알람 시간입니다';
-   $('#studyAlarmStop').classList.add('show');
-   const buzz=()=>{try{navigator.vibrate?.([900,250,900,250,900])}catch(e){}};
-   buzz();
-   clearInterval(vibe);
-   vibe=setInterval(buzz,3400);
-   clearTimeout(autoStop);
-   autoStop=setTimeout(silence,10*60*1000);
-   if(fileAudio){
-     try{fileAudio.loop=true;fileAudio.currentTime=0;await fileAudio.play();return}catch(e){}
-   }
-   await prime();
-   const now=ac.currentTime;
-   gain.gain.cancelScheduledValues(now);
-   for(let i=0;i<600;i++){const t=now+i*.5;gain.gain.setValueAtTime(.00001,t);gain.gain.linearRampToValueAtTime(.3,t+.03);gain.gain.linearRampToValueAtTime(.00001,t+.34)}
- }
- function arm(a){
-   clearTimeout(to);clearInterval(watch);ui(a);
-   const left=a.due-Date.now();if(left<=0)return fire();
-   to=setTimeout(fire,left);watch=setInterval(()=>{const x=get();if(x?.enabled&&Date.now()>=x.due)fire()},250);
- }
- document.addEventListener('DOMContentLoaded',()=>{
-   $('#studyAlarmStart')?.addEventListener('click',async()=>{
-     const lock=readLock();
-     if(lock&&lock.owner!==OWNER){alert('다른 화면에서 이미 알람이 실행 중입니다. 그 알람을 먼저 해제해주세요.');return}
-     const ms=dur();if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
-     await prime();const a={enabled:true,due:due(ms),sound:$('#studyAlarmSound').value};put(a);writeLock(a.due);arm(a);
-   });
-   $('#studyAlarmCancel')?.addEventListener('click',()=>{
-     const a=get();if(!a?.enabled)return;
-     if(!confirm('설정한 알람을 정말 해제하시겠습니까?'))return;
-     clearTimeout(to);clearInterval(watch);silence();
-   });
-   $('#studyAlarmStop')?.addEventListener('click',silence);
-   $('#studyAlarmPreview')?.addEventListener('click',async()=>{
-     if(fileAudio){try{fileAudio.currentTime=0;await fileAudio.play();setTimeout(()=>fileAudio.pause(),2200);return}catch(e){}}
-     await prime();const n=ac.currentTime;
-     for(let i=0;i<5;i++){const t=n+i*.35;gain.gain.setValueAtTime(.00001,t);gain.gain.linearRampToValueAtTime(.2,t+.03);gain.gain.linearRampToValueAtTime(.00001,t+.25)}
-   });
-   $('#studyAlarmFilePick')?.addEventListener('click',()=>$('#studyAlarmFile').click());
-   $('#studyAlarmFile')?.addEventListener('change',e=>{
-     file=e.target.files?.[0]||null;
-     if(file)fileAudio=new Audio(URL.createObjectURL(file));
-   });
-   const a=get();if(a?.enabled){writeLock(a.due);arm(a)}else{ui(null);refreshLockUI()}
-   window.addEventListener('storage',e=>{if(e.key===LOCK_KEY)refreshLockUI()});
- });
-})();
-</script>
+
 
 
 
@@ -4362,10 +4278,229 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
   rewrite();
 });
+
+const recordTimerStarts = [null,null,null];
+let recordTimerTick = null;
+
+function recordHMS(ms){
+  const sec = Math.max(0, Math.floor(ms/1000));
+  const h = String(Math.floor(sec/3600)).padStart(2,'0');
+  const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+  const ss = String(sec%60).padStart(2,'0');
+  return `${h}:${m}:${ss}`;
+}
+function syncRecordTimerStarts(){
+  const day=getDayData();
+  for(let slot=0;slot<3;slot++){
+    let latest=0;
+    (day.periods||[]).forEach(p=>{
+      const st=Number(p.recordSlots?.[slot]?.timerStartedAt)||0;
+      if(st>latest) latest=st;
+    });
+    recordTimerStarts[slot]=latest||null;
+  }
+}
+function updateRecordSummary(){
+  const day = getDayData();
+  const counts=[0,0,0];
+  (day.periods||[]).forEach(p=>{
+    (p.recordSlots||[]).forEach((r,i)=>{ if(r?.count) counts[i]+=r.count; });
+  });
+  for(let i=0;i<3;i++){
+    const ce=document.getElementById(`recordCount${i+1}`);
+    if(ce) ce.textContent=`${counts[i]}회`;
+    const te=document.getElementById(`recordTimer${i+1}`);
+    if(te) te.textContent=recordTimerStarts[i] ? recordHMS(Date.now()-recordTimerStarts[i]) : '00:00:00';
+  }
+}
+function ensureRecordTimerTick(){
+  if(recordTimerTick) return;
+  recordTimerTick=setInterval(updateRecordSummary,1000);
+}
+
+/* Lecture 구조와 동일: 버튼 하나가 start / cancel-start 상태를 바꾸고,
+   취소는 Lecture의 askConfirm() 모달을 그대로 사용한다. */
+document.addEventListener('click', async (e)=>{
+  const btn=e.target.closest('.record-lecture-add[data-record-action]');
+  if(!btn) return;
+
+  const idx=Number(btn.dataset.idx), slot=Number(btn.dataset.slot);
+  const day=getDayData(), p=day.periods?.[idx];
+  if(!p) return;
+  if(!Array.isArray(p.recordSlots)) p.recordSlots=[null,null,null];
+  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null};
+  const r=p.recordSlots[slot];
+  const action=btn.dataset.recordAction;
+
+  if(action==='start'){
+    const input=document.querySelector(`.record-subject[data-idx="${idx}"][data-slot="${slot}"]`);
+    if(input) r.subject=input.value||'';
+
+    const now=new Date();
+    const hh=String(now.getHours()).padStart(2,'0');
+    const mm=String(now.getMinutes()).padStart(2,'0');
+    const month=String(now.getMonth()+1).padStart(2,'0');
+    const date=String(now.getDate()).padStart(2,'0');
+    r.count=(r.count||0)+1;
+    r.lastTime=`${month}/${date} ${hh}:${mm}`;
+    r.timerStartedAt=Date.now();
+    recordTimerStarts[slot]=r.timerStartedAt;
+
+    ensureRecordTimerTick();
+    await persistToday();
+    renderPeriods();
+    updateRecordSummary();
+    return;
+  }
+
+  if(action==='cancel-start'){
+    if(!(await askConfirm(`${idx+1}기록의 기록 ${slot+1}을 취소할까요?`, true))) return;
+
+    r.count=Math.max(0,(r.count||0)-1);
+    r.lastTime='';
+    r.timerStartedAt=null;
+
+    syncRecordTimerStarts();
+    await persistToday();
+    renderPeriods();
+    updateRecordSummary();
+    showToast('기록을 취소했어요');
+  }
+});
+
+document.addEventListener('input',(e)=>{
+  const input=e.target.closest('.record-subject');
+  if(!input) return;
+  const idx=Number(input.dataset.idx), slot=Number(input.dataset.slot);
+  const day=getDayData(), p=day.periods?.[idx];
+  if(!p) return;
+  if(!Array.isArray(p.recordSlots)) p.recordSlots=[null,null,null];
+  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null};
+  p.recordSlots[slot].subject=input.value||'';
+  persistToday();
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  syncRecordTimerStarts();
+  ensureRecordTimerTick();
+  updateRecordSummary();
+});
+
 </script>
 
 <!-- vibration-repeat-verified-v1 -->
 
 <div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
+
+<script id="record-independent-index-alarm">
+(()=>{
+ const KEY='recordAlarm:v1', LIST_KEY='githubAlarmSounds:v1', SELECT_KEY='recordGithubAlarmSelected:v1';
+ const API='https://api.github.com/repos/yanghw7/study/contents/sounds';
+ const CACHE='alarm-sounds-v1';
+ const $=q=>document.querySelector(q); let timer=null,watch=null,ring=null,ctx=null,gain=null,preparedURL=null,vibeTimer=null,wakeLock=null,swReg=null;
+ if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(r=>swReg=r).catch(()=>{})}
+ async function ensureNotifyPermission(){try{if(!('Notification' in window))return false;if(Notification.permission==='granted')return true;if(Notification.permission==='denied')return false;const p=await Notification.requestPermission();return p==='granted'}catch(e){return false}}
+ async function notifyRing(){try{const reg=swReg||(navigator.serviceWorker&&await navigator.serviceWorker.ready);if(!reg)return;await reg.showNotification('⏰ 알람이 울리고 있어요',{body:'설정한 알람 시간이 되었습니다. 앱을 열어 확인해주세요.',tag:'record-journal-alarm',renotify:true,requireInteraction:true,vibrate:[900,250,900,250,1200,300],icon:'./icon-192.png',badge:'./icon-192.png',silent:false})}catch(e){}}
+ async function requestWake(){try{if('wakeLock' in navigator && document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){wakeLock=null}}
+ function releaseWake(){try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null}
+ const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
+ const write=v=>localStorage.setItem(KEY,JSON.stringify(v)); const pad=n=>String(n).padStart(2,'0');
+ const audioExt=/\.(mp3|m4a|aac|wav|ogg|flac)$/i;
+ function title(name){return decodeURIComponent(name).replace(audioExt,'')}
+ function savedList(){try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]')}catch(e){return []}}
+ function render(list){const sel=$('#alarmSoundSelect');if(!list.length){sel.innerHTML='<option value="">알람음 없음</option>';return}sel.innerHTML=list.map(x=>`<option value="${x.url.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${title(x.name)}</option>`).join('');const old=localStorage.getItem(SELECT_KEY);if(old&&list.some(x=>x.url===old))sel.value=old;else{sel.value=list[0].url;localStorage.setItem(SELECT_KEY,sel.value)}}
+ async function refreshSounds(){let list=[];try{const r=await fetch(API,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});if(!r.ok)throw new Error('GitHub '+r.status);const j=await r.json();list=j.filter(x=>x.type==='file'&&audioExt.test(x.name)).map(x=>({name:x.name,url:x.download_url}));localStorage.setItem(LIST_KEY,JSON.stringify(list))}catch(e){list=savedList()}render(list)}
+ async function cacheSelected(){const u=$('#alarmSoundSelect').value;if(!u)return false;localStorage.setItem(SELECT_KEY,u);try{const c=await caches.open(CACHE);let r=await c.match(u);if(!r){r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error();await c.put(u,r.clone())}return true}catch(e){return false}}
+ async function audioURL(){const u=$('#alarmSoundSelect').value||localStorage.getItem(SELECT_KEY);if(!u)return null;try{const c=await caches.open(CACHE);const r=await c.match(u);if(r){const b=await r.blob();return URL.createObjectURL(b)}}catch(e){}return u}
+ async function beep(){ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const o=ctx.createOscillator();gain=ctx.createGain();o.frequency.value=880;gain.gain.value=.18;o.connect(gain);gain.connect(ctx.destination);o.start();o.stop(ctx.currentTime+1.2)}
+ async function play(loop=false){try{if(ring){ring.loop=loop;ring.currentTime=0;await ring.play();return true}}catch(e){}const u=await audioURL();if(u){try{ring=new Audio(u);preparedURL=u;ring.loop=loop;await ring.play();return true}catch(e){}}await beep();return false}
+ function stopRing(){clearInterval(vibeTimer);vibeTimer=null;try{ring?.pause();if(ring){ring.currentTime=0;ring.loop=false;ring.volume=1;ring.src='';ring.load()}}catch(e){};ring=null;try{navigator.vibrate?.(0)}catch(e){};releaseWake();try{swReg&&swReg.getNotifications({tag:'record-journal-alarm'}).then(ns=>ns.forEach(n=>n.close()))}catch(e){};const b=$('#alarmStop');if(b){b.classList.remove('show');b.hidden=true;b.style.display='none'}}
+ function resetAlarm(){clearTimeout(timer);clearInterval(watch);timer=null;watch=null;stopRing();write({enabled:false,ringing:false,due:null});$('#alarmHours').value='0';$('#alarmMinutes').value='0';$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='';}
+ function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${d.getMonth()+1}월 ${d.getDate()}일 ${ap} ${h}시 ${pad(d.getMinutes())}분에 울립니다`}
+ function ui(a){if(!a?.ringing){const b=$('#alarmStop');b.classList.remove('show');b.hidden=true;b.style.display='none';}if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmt(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
+ function alignedDue(ms){const n=new Date();n.setSeconds(0,0);return n.getTime()+ms}
+ function updatePreview(){const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;$('#alarmStatus').textContent=ms>=60000?fmt(alignedDue(ms)):''}
+ async function fire(){const a=read();if(!a?.enabled)return;clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent=fmt(a.due);let sounded=false;try{if(!ring){const u=await audioURL();if(u)ring=new Audio(u)}if(ring){ring.loop=true;ring.volume=1;ring.currentTime=0;await ring.play();sounded=!ring.paused}}catch(e){sounded=false}if(!sounded){try{await beep();sounded=true}catch(e){}}try{const buzz=()=>{navigator.vibrate?.([900,250,900,250,1200,300]);notifyRing()};buzz();clearInterval(vibeTimer);vibeTimer=setInterval(buzz,4000)}catch(e){};notifyRing();write({...a,enabled:false,ringing:true});const b=$('#alarmStop');b.hidden=false;b.classList.add('show');b.style.display='inline-block';if(!sounded){$('#alarmStatus').textContent='🔔 알람 시간! (소리 재생이 막혀 진동/알림으로 대신 울리는 중)'}}
+ function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500);requestWake()}
+ function catchUp(){const x=read();if(!x)return;if(x.enabled&&Date.now()>=x.due){fire()}else if(x.enabled){arm(x)}}
+ document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',updatePreview);$('#alarmMinutes').addEventListener('input',updatePreview);$('#alarmPreview').onclick=async()=>{await cacheSelected();const u=await audioURL();if(!u)return alert('알람음을 선택해주세요.');try{const preview=new Audio(u);preview.volume=1;await preview.play();setTimeout(()=>{try{preview.pause();preview.currentTime=0}catch(e){}},2500)}catch(e){alert('미리듣기를 재생할 수 없습니다.')}};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await ensureNotifyPermission();await cacheSelected();stopRing();try{const u=await audioURL();if(u){ring=new Audio(u);ring.loop=true;ring.volume=1;await ring.play();ring.pause();ring.currentTime=0}ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(e){}const a={enabled:true,ringing:false,due:alignedDue(ms),sound:$('#alarmSoundSelect').value};write(a);arm(a)};$('#alarmCancel').onclick=()=>{if(!confirm('알람을 정말 해제하시겠습니까?'))return;resetAlarm()};$('#alarmStop').onclick=()=>{resetAlarm()};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp();requestWake()}});window.addEventListener('pageshow',()=>{catchUp();requestWake()});window.addEventListener('focus',()=>{catchUp()})});
+})();
+
+function ensureFrameLoaded(kind){
+  return new Promise((resolve,reject)=>{
+    const frame=tabs[kind]?.frame;
+    if(!frame)return reject(new Error('frame not found'));
+    if(frame.contentWindow && frame.contentDocument?.readyState==='complete')return resolve(frame);
+    if(!frame.getAttribute('src') && frame.dataset.src) frame.src=frame.dataset.src;
+    const timer=setTimeout(()=>reject(new Error('load timeout')),8000);
+    frame.addEventListener('load',()=>{clearTimeout(timer);resolve(frame)},{once:true});
+  });
+}
+let sharedBackupDirectoryHandle=null;
+async function downloadJSON(data,name){
+  const text=JSON.stringify(data,null,2);
+  if(sharedBackupDirectoryHandle){
+    try{
+      const permission=await sharedBackupDirectoryHandle.queryPermission({mode:'readwrite'});
+      if(permission==='granted'||await sharedBackupDirectoryHandle.requestPermission({mode:'readwrite'})==='granted'){
+        const fileHandle=await sharedBackupDirectoryHandle.getFileHandle(name,{create:true});
+        const writable=await fileHandle.createWritable();
+        await writable.write(text);await writable.close();return;
+      }
+    }catch(e){}
+  }
+  const blob=new Blob([text],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function backupDate(){
+  const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+async function getJournalBackup(kind){
+  const frame=await ensureFrameLoaded(kind);
+  const fn=frame.contentWindow?.collectBackupData;
+  if(typeof fn!=='function')throw new Error('backup function unavailable');
+  return fn.call(frame.contentWindow);
+}
+function initSharedBackupUI(){
+  const main=document.getElementById('sharedBackupBtn'),choice=document.getElementById('sharedBackupChoice');
+  const restore=document.getElementById('sharedRestoreBtn'),file=document.getElementById('sharedRestoreFile');
+  const locationBtn=document.getElementById('sharedBackupLocationBtn'),locationStatus=document.getElementById('sharedBackupLocationStatus');
+  locationBtn.addEventListener('click',async()=>{
+    if(typeof window.showDirectoryPicker!=='function'){alert('이 브라우저에서는 저장 위치를 직접 지정할 수 없습니다. 백업 파일은 기본 다운로드 폴더에 저장됩니다.');return;}
+    try{
+      sharedBackupDirectoryHandle=await window.showDirectoryPicker({mode:'readwrite'});
+      locationStatus.textContent=`저장 위치: ${sharedBackupDirectoryHandle.name}`;
+    }catch(e){if(e?.name!=='AbortError')alert('저장 위치를 설정하지 못했습니다.');}
+  });
+  main.addEventListener('click',()=>{const open=!choice.classList.contains('open');choice.classList.toggle('open',open);choice.setAttribute('aria-hidden',String(!open));});
+  choice.querySelectorAll('[data-backup-kind]').forEach(btn=>btn.addEventListener('click',async()=>{
+    const kind=btn.dataset.backupKind;
+    try{
+      if(kind==='all'){
+        const [study,lecture,sleep]=await Promise.all(['study','lecture','sleep'].map(getJournalBackup));
+        downloadJSON({app:'journal-all',version:1,exportedAt:new Date().toISOString(),study,lecture,sleep},`journal-all-backup-${backupDate()}.json`);
+      }else{
+        const data=await getJournalBackup(kind);
+        const names={study:'study-log',lecture:'lecture-log',sleep:'sleep-log'};
+        downloadJSON(data,`${names[kind]}-backup-${backupDate()}.json`);
+      }
+      choice.classList.remove('open');choice.setAttribute('aria-hidden','true');
+    }catch(e){alert('백업 파일을 만들지 못했습니다. 잠시 후 다시 시도해주세요.');}
+  }));
+  restore.addEventListener('click',()=>file.click());
+  file.addEventListener('change',()=>{alert('복원 선택 메뉴는 다음 단계에서 연결할 수 있습니다.');file.value='';});
+}
+initSharedBackupUI();
+</script>
 </body>
 </html>
+
+<style id="record-v118-time-one-line">
+.record-start-value{
+  white-space:nowrap!important;
+  font-size:16px!important;
+  letter-spacing:0!important;
+}
+</style>

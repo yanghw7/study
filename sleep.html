@@ -2790,11 +2790,23 @@ $('#periodList').addEventListener('click', (e) => {
 // 강의 카드의 시작/종료/취소 버튼
 $('#periodList').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-lecture-action]');
-  if(!btn) return;
-  const idx = Number(btn.dataset.idx);
-  const day = getDayData();
-  const p = day.periods?.[idx];
-  if(!p) return;
+  if(!btn || btn.disabled) return;
+  userActionCount++;
+  const origLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try{
+    let idx = Number(btn.dataset.idx);
+    let day = getDayData();
+    let p = day.periods?.[idx];
+    if(!p) return;
+    const pid = p._id;
+    const refetch = () => {
+      day = getDayData();
+      idx = day.periods.findIndex(x => String(x._id||'') === String(pid));
+      p = idx >= 0 ? day.periods[idx] : null;
+      return !!p;
+    };
 
   const action = btn.dataset.lectureAction;
   const isCancel = action === 'cancel-start' || action === 'cancel-end';
@@ -2811,22 +2823,27 @@ $('#periodList').addEventListener('click', async (e) => {
 
   if(action === 'start'){
     if(!(await requestExclusiveSessionStart(now.getTime()))) return;
+    if(!refetch()) return;
     p.startDate = ymd(now);
     p.startTime = hm(now);
     p.endDate = '';
     p.endTime = '';
     p.timerEndedAt = null;
+    p.timerStartedAt = Math.round(now.getTime());
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
       try{
         const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
         const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
-        p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
+        if(Number.isFinite(ts) && ts > 0){
+          if(!refetch()) return;
+          p.timerStartedAt = ts;
+          markChangedPeriodFields(p, beforeSync);
+        }
         await calibrateServerClock(true);
-      }catch(_){
-        p.timerStartedAt = Math.round(now.getTime());
-      }
-    }else{
-      p.timerStartedAt = Math.round(now.getTime());
+        if(!refetch()) return;
+      }catch(_){}
     }
   }else if(action === 'end'){
     if(!p.startDate || !p.startTime){
@@ -2835,17 +2852,21 @@ $('#periodList').addEventListener('click', async (e) => {
     }
     p.endDate = ymd(now);
     p.endTime = hm(now);
-    if(cloudUser){
+    if(Number(p.timerStartedAt) > 0) p.timerEndedAt = Math.round(serverNowMs());
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
+    if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
         const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
         const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
-        p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+        if(Number.isFinite(ts) && ts > 0){
+          if(!refetch()) return;
+          p.timerEndedAt = ts;
+          markChangedPeriodFields(p, beforeSync);
+        }
         await calibrateServerClock(true);
-      }catch(_){
-        p.timerEndedAt = Math.round(serverNowMs());
-      }
-    }else{
-      p.timerEndedAt = Math.round(serverNowMs());
+        if(!refetch()) return;
+      }catch(_){}
     }
     if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
   }else if(action === 'cancel-start'){
@@ -2859,6 +2880,8 @@ $('#periodList').addEventListener('click', async (e) => {
     p.endTime = '';
     p.timerStartedAt = null;
     p.timerEndedAt = null;
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
       try{ await cloudClearActiveTimer(); }catch(_){}
     }
@@ -2871,10 +2894,13 @@ $('#periodList').addEventListener('click', async (e) => {
     p.endDate = '';
     p.endTime = '';
     p.timerEndedAt = null;
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
         await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
         await calibrateServerClock(true);
+        if(!refetch()) return;
       }catch(_){}
     }
     if(window.parent!==window){
@@ -2885,20 +2911,30 @@ $('#periodList').addEventListener('click', async (e) => {
     return;
   }
 
-  markChangedPeriodFields(p, beforeSync);
   p._updatedAt = syncNow();
   if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
   await persistToday();
   renderPeriods();
   updateStudyTimer();
   updateWasteTimer();
+  } finally {
+    userActionCount--;
+    if(btn.isConnected){
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+    await flushPendingRender();
+  }
 });
 
 // 자동 동기화 중 재렌더링이 보류됐으면, 입력칸을 완전히 벗어난 뒤 한 번만 반영한다.
-$('#periodList').addEventListener('focusout', () => {
+$('#periodList').addEventListener('focusout', (e) => {
   if(!periodRenderPending) return;
+  const next = e.relatedTarget;
+  if(next && next.closest && next.closest('#periodList')) return;
   setTimeout(async () => {
     if(isPeriodInputEditing()) return;
+    if(userActionCount > 0) return;
     periodRenderPending = false;
     await renderCurrentView();
   }, 80);
@@ -3692,7 +3728,12 @@ async function cloudSaveMonth(ym){
         .eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym));
       if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
       const {data:w2,error:wErr2} = await q2.select('updated_at');
-      if(!wErr2 && w2 && w2.length){ monthCache[ym]=local; return; }
+      if(!wErr2 && w2 && w2.length){
+        // 저장 왕복 중 유저가 캐시에 쓴 값을 보존
+        const current = ensureMonthSync(monthCache[ym] || {}, ym);
+        monthCache[ym] = mergeMonths(local, current, ym);
+        return;
+      }
       lastSaveErr = wErr2 || new Error('삭제 후 재생성 실패');
       await new Promise(r=>setTimeout(r,120*(attempt+1)));
       continue;
@@ -3714,7 +3755,9 @@ async function cloudSaveMonth(ym){
       else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
     if(writeOk){
-      monthCache[ym]=merged;
+      // ★ 저장 왕복 중 유저가 캐시에 쓴 값이 있으면 그쪽을 살린다
+      const current = ensureMonthSync(monthCache[ym] || {}, ym);
+      monthCache[ym] = mergeMonths(merged, current, ym);
       return;
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
@@ -4110,6 +4153,7 @@ async function applyActiveTimerRow(row){
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
   if(!Number.isFinite(started)) return false;
 
+  const beforeApply = deepClone(found.p);
   // [FIX1] 서버 타이머 값을 시작/기상 일시에 함께 반영
   const startDT = new Date(started);
   found.p.startDate = ymd(startDT);
@@ -4129,11 +4173,13 @@ async function applyActiveTimerRow(row){
     }
   }
 
+  markChangedPeriodFields(found.p, beforeApply);
   // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
     // [FIX7] 입력 중이면 재렌더 미룸 (입력 필드 파괴 방지)
-    if(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing()){
+    if(typeof isPeriodInputEditing === 'function'
+       && (isPeriodInputEditing() || (typeof userActionCount === 'number' && userActionCount > 0))){
       periodRenderPending = true;
     }else{
       await renderCurrentView();

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DeepSeek Smart Diff Patcher</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f6f8;margin:0;color:#222}.wrap{max-width:1100px;margin:28px auto;padding:0 20px}
+.card{background:#fff;border:1px solid #ddd;border-radius:14px;padding:22px;margin-bottom:16px}
+h1{margin-top:0}textarea{width:100%;height:430px;box-sizing:border-box;font:14px/1.45 Consolas,monospace;padding:12px}
+button,input{font-size:15px;padding:10px;margin:5px}.status{white-space:pre-wrap;font-weight:600;margin-top:12px}
+.log{white-space:pre-wrap;background:#f2f2f2;padding:12px;border-radius:8px;max-height:260px;overflow:auto;font:13px Consolas,monospace}
+</style></head><body><div class="wrap">
+<div class="card"><h1>DeepSeek Smart Diff Patcher</h1>
+<p>정식 unified diff의 <b>줄 번호 + 앞뒤 문맥</b>을 이용해 중복 코드가 있어도 목표 위치를 찾습니다. 줄 번호가 조금 달라도 주변에서 가장 가까운 일치를 찾습니다.</p>
+<input id="file" type="file" accept=".html,.htm,.js,.mjs,.cjs,.webmanifest,.json">
+<input id="name" type="text" value="patched.html"><div id="selectedFile" style="margin-top:14px;font-size:24px;font-weight:800;color:#1565c0;"></div>
+</div>
+<div class="card"><textarea id="diff" spellcheck="false" placeholder="DeepSeek의 unified diff 전체를 붙여넣으세요."></textarea><br>
+<button id="apply">스마트 Diff 적용</button><button id="download" disabled>수정 HTML 다운로드</button>
+<div id="status" class="status"></div><div id="log" class="log"></div></div></div>
+<script>
+let source="", result="";
+const $=id=>document.getElementById(id);
+$("file").onchange=async()=>{const f=$("file").files[0];if(!f)return;source=(await f.text()).replace(/\r\n/g,"\n");
+{
+ const dot=f.name.lastIndexOf(".");
+ const base=dot>0?f.name.slice(0,dot):f.name;
+ const ext=dot>0?f.name.slice(dot):"";
+ $("name").value=base+"_patched"+ext;
+}$("selectedFile").textContent="선택된 파일: "+f.name;result="";$("diff").value="";$("download").disabled=true;$("status").textContent="원본 로드 완료: "+f.name;$("log").textContent=""};
+
+function parseDiff(text){
+ const ls=text.replace(/\r\n/g,"\n").split("\n"), hs=[]; let h=null;
+ for(const l of ls){
+   let m=l.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
+   if(m){if(h)hs.push(h);h={oldStart:+m[1],newStart:+m[3],lines:[]};continue}
+   if(!h)continue;
+   if(l.startsWith("\\ No newline"))continue;
+   if(l[0]===" "||l[0]==="+"||l[0]==="-")h.lines.push([l[0],l.slice(1)]);
+ }
+ if(h)hs.push(h); return hs;
+}
+function oldBlock(h){return h.lines.filter(x=>x[0]!="+").map(x=>x[1]);}
+function newBlock(h){return h.lines.filter(x=>x[0]!="-").map(x=>x[1]);}
+function equalAt(lines,pos,block){
+ if(pos<0||pos+block.length>lines.length)return false;
+ for(let i=0;i<block.length;i++)if(lines[pos+i]!==block[i])return false; return true;
+}
+function findCandidates(lines,block){
+ let a=[];if(!block.length)return a;
+ for(let i=0;i<=lines.length-block.length;i++)if(equalAt(lines,i,block))a.push(i);return a;
+}
+$("apply").onclick=()=>{
+ if(!source){$("status").textContent="먼저 원본 HTML을 선택하세요.";return}
+ const hs=parseDiff($("diff").value);if(!hs.length){$("status").textContent="@@ 줄 번호가 포함된 unified diff를 찾지 못했습니다.";return}
+ let lines=source.split("\n"), offset=0, logs=[], ok=0, failed=[];
+ for(let k=0;k<hs.length;k++){
+   const h=hs[k], old=oldBlock(h), neu=newBlock(h);
+   let expected=Math.max(0,h.oldStart-1+offset), pos=-1, method="";
+   if(equalAt(lines,expected,old)){pos=expected;method="줄 번호 정확 일치";}
+   else{
+     let candidates=findCandidates(lines,old);
+     if(candidates.length){
+       candidates.sort((a,b)=>Math.abs(a-expected)-Math.abs(b-expected));
+       pos=candidates[0]; method=candidates.length>1?"중복 "+candidates.length+"곳 중 줄 번호에 가장 가까운 위치":"문맥 검색";
+     }
+   }
+   if(pos<0){failed.push(k+1);logs.push("❌ Hunk "+(k+1)+": 위치를 찾지 못함 (예상 "+(expected+1)+"줄)");continue}
+   lines.splice(pos,old.length,...neu); offset += neu.length-old.length; ok++;
+   logs.push("✅ Hunk "+(k+1)+": "+(pos+1)+"줄 적용 · "+method);
+ }
+ if(failed.length){
+   result="";$("download").disabled=true;
+   $("status").textContent="안전을 위해 파일 생성을 중단했습니다. 성공 "+ok+"개 / 실패 "+failed.length+"개\n실패 구간: "+failed.join(", ");
+ }else{
+   result=lines.join("\n");$("download").disabled=false;
+   $("status").textContent="완료: "+ok+"개 수정 구간을 모두 적용했습니다.";
+ }
+ $("log").textContent=logs.join("\n");
+};
+$("download").onclick=()=>{
+ if(!result)return;let name=$("name").value.trim()||"patched.txt";
+ const b=new Blob([result],{type:"text/html;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");
+ a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
+};
+</script></body></html>
