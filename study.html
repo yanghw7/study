@@ -459,6 +459,9 @@
 .lecture-confirm-yes.danger{background:transparent!important;color:#2563eb!important}
 .lecture-confirm-no{color:#6b7280!important}
 </style>
+<style id="locked-card-style">
+.period-card.locked-card{opacity:.5;pointer-events:none;}
+</style>
 </head>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
@@ -1863,6 +1866,7 @@ function renderPeriods(){
         ${idx>0 ? `<div class="stat">낭비시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
       </div>
     `;
+    if(idx < day.periods.length - 1) card.classList.add('locked-card');
     list.appendChild(card);
   });
 
@@ -1984,7 +1988,7 @@ $('#nextDay').onclick = async () => {
   const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()+1);
   const maxDate = logicalToday();
   if(next > maxDate){
-    alert('아직 시작되지 않은 공부일입니다.');
+    await askConfirm('아직 시작되지 않은 공부일입니다.', true);
     return;
   }
   cur = next;
@@ -2015,7 +2019,7 @@ $('#datePicker').onchange = async (e) => {
   const picked = new Date(y,m-1,d);
   const maxDate = logicalToday();
   if(picked > maxDate){
-    alert('아직 시작되지 않은 공부일입니다.');
+    await askConfirm('아직 시작되지 않은 공부일입니다.', true);
     e.target.value = ymd(cur);
     return;
   }
@@ -2050,7 +2054,7 @@ $('#addPeriod').onclick = async () => {
     const validEnd = /^[1-9][0-9]*$/.test(end);
 
     if(!validStart || !validEnd){
-      alert(`${periods.length}교시의 시작 페이지와 끝 페이지를 먼저 입력해주세요.`);
+      await askConfirm(`${periods.length}교시의 시작 페이지와 끝 페이지를 먼저 입력해주세요.`, true);
       return;
     }
   }
@@ -2217,7 +2221,7 @@ $('#periodList').addEventListener('click', async (e) => {
       return;
     }
 
-    if(!confirm(`${idx+1}교시를 정말 삭제하시겠습니까?`)) return;
+    if(!(await askConfirm(`${idx+1}교시를 정말 삭제하시겠습니까?`, true))) return;
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
     renderPeriods();
@@ -2478,7 +2482,7 @@ $('#periodList').addEventListener('input', async (e) => {
   if(k==='endPage' && String(t.value ?? '').trim() && !String(p.startPage ?? '').trim()){
     t.value = '';
     p.endPage = '';
-    alert('시작 페이지를 먼저 입력해주세요.');
+    await askConfirm('시작 페이지를 먼저 입력해주세요.', true);
     return;
   }
 
@@ -2499,7 +2503,7 @@ $('#periodList').addEventListener('input', async (e) => {
         return;
       }
       if(selected && selected.getTime() > serverNowMs()){
-        alert('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.');
+        await askConfirm('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.', true);
         t.value = prevDTVal;
         return;
       }
@@ -2563,7 +2567,7 @@ $('#periodList').addEventListener('input', async (e) => {
   }
   // 시작/종료가 모두 입력되면 다른 기록과 시간대가 겹치는지 먼저 확인한다.
   if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
-    alert('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.');
+    await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
     // 카드 자체는 유지하고, 겹침을 만든 직접 입력 시간만 초기화한다.
     p.startDate = '';
     p.startTime = '';
@@ -3287,7 +3291,7 @@ $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#setti
 
 async function deleteAllStudyRecords(){
   if(!window.__skipDeleteConfirm){
-    if(!confirm('정말 모든 공부 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.')) return;
+    if(!(await askConfirm('정말 모든 공부 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.', true))) return;
   }
   window.__skipDeleteConfirm = false;
 
@@ -4123,9 +4127,9 @@ if ('serviceWorker' in navigator) {
      const ms=dur();if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
      await prime();const a={enabled:true,due:due(ms),sound:$('#studyAlarmSound').value};put(a);writeLock(a.due);arm(a);
    });
-   $('#studyAlarmCancel')?.addEventListener('click',()=>{
+   $('#studyAlarmCancel')?.addEventListener('click',async()=>{
      const a=get();if(!a?.enabled)return;
-     if(!confirm('설정한 알람을 정말 해제하시겠습니까?'))return;
+     if(!(await askConfirm('설정한 알람을 정말 해제하시겠습니까?', true)))return;
      clearTimeout(to);clearInterval(watch);silence();
    });
    $('#studyAlarmStop')?.addEventListener('click',silence);

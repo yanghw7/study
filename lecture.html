@@ -710,6 +710,12 @@ body{background:#f7f5fb!important}
 .field.time.disabled{opacity:.55;cursor:not-allowed;}
 .field.time.disabled .ko-time-label{color:#746e82;font-weight:600;}
 </style>
+<style id="locked-card-style">
+.period-card.locked-card{opacity:.5;pointer-events:none;}
+</style>
+<style id="locked-card-style">
+.period-card.locked-card{opacity:.5;pointer-events:none;}
+</style>
 </head>
 
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
@@ -1615,7 +1621,7 @@ async function splitRunningPeriodAtBoundary(running){
   oldP.timerEndedAt = boundaryMs;
 
   markChangedPeriodFields(oldP, beforeOld);
-  await saveMonth(running.ym);
+  void saveMonth(running.ym);
 
   // B. 다음 강의일 1강의 생성/복구
   const next = nextStudyDayKey(running.ym, running.dk);
@@ -1698,7 +1704,7 @@ async function splitRunningPeriodAtBoundary(running){
     newIdx = 0;
   }
 
-  await saveMonth(next.ym);
+  void saveMonth(next.ym);
 
   // C. 서버 active_timer도 새 강의일 1강의로 이동.
   // resume_active_timer에 최초 timerStartedAt을 전달하므로 서버에서도 연속 타이머 유지.
@@ -2085,6 +2091,7 @@ function renderPeriods(){
         ${idx>0 ? `<div class="stat">강의 종료 후 시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
       </div>
     `;
+    if(idx < day.periods.length - 1) card.classList.add('locked-card');
     list.appendChild(card);
   });
 
@@ -2204,7 +2211,7 @@ $('#nextDay').onclick = async () => {
   const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()+1);
   const maxDate = logicalToday();
   if(next > maxDate){
-    alert('아직 시작되지 않은 강의일입니다.');
+    await askConfirm('아직 시작되지 않은 강의일입니다.', true);
     return;
   }
   cur = next;
@@ -2235,7 +2242,7 @@ $('#datePicker').onchange = async (e) => {
   const picked = new Date(y,m-1,d);
   const maxDate = logicalToday();
   if(picked > maxDate){
-    alert('아직 시작되지 않은 강의일입니다.');
+    await askConfirm('아직 시작되지 않은 강의일입니다.', true);
     e.target.value = ymd(cur);
     return;
   }
@@ -2254,13 +2261,13 @@ $('#addPeriod').onclick = async () => {
 
     // 마지막 강의가 아예 시작되지 않았어도 다음 강의 추가 금지
     if(!hasStarted){
-      alert(`${currentPeriods.length}강의를 먼저 시작해주세요.`);
+      await askConfirm(`${currentPeriods.length}강의를 먼저 시작해주세요.`, true);
       return;
     }
 
     // 시작했지만 아직 종료되지 않은 경우도 다음 강의 추가 금지
     if(!hasEnded){
-      alert(`${currentPeriods.length}강의가 진행 중입니다.\n강의를 종료한 후 다음 강의를 추가해주세요.`);
+      await askConfirm(`${currentPeriods.length}강의가 진행 중입니다.\n강의를 종료한 후 다음 강의를 추가해주세요.`, true);
       return;
     }
   }
@@ -2273,7 +2280,7 @@ $('#addPeriod').onclick = async () => {
       await renderCurrentView();
     }catch(e){
       console.error('강의 추가 전 최신 기록 확인 실패:', e);
-      alert('최신 강의 기록을 확인하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.');
+      await askConfirm('최신 강의 기록을 확인하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.', true);
       return;
     }
   }
@@ -2320,7 +2327,7 @@ $('#periodList').addEventListener('click', async (e) => {
     const lastIdx = day.periods.length - 1;
 
     if(idx !== lastIdx){
-      alert(`강의는 마지막 강의부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}강의를 삭제해주세요.`);
+      await askConfirm(`강의는 마지막 강의부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}강의를 삭제해주세요.`, true);
       return;
     }
 
@@ -2401,7 +2408,7 @@ $('#periodList').addEventListener('input', async (e) => {
         return;
       }
       if(selected && selected.getTime() > serverNowMs()){
-        alert('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.');
+        await askConfirm('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.', true);
         t.value = prevDTVal;
         return;
       }
@@ -2502,7 +2509,7 @@ $('#periodList').addEventListener('input', async (e) => {
       label.textContent = koDateTimeLabel(p[dateKey], p[timeKey]) || '시간을 눌러 수정';
     }
     if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
-      alert('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.');
+      await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
       p.startDate = '';
       p.startTime = '';
       p.endDate = '';
@@ -2530,7 +2537,7 @@ $('#periodList').addEventListener('input', async (e) => {
   }
   // 시작/종료가 모두 입력되면 다른 기록과 시간대가 겹치는지 먼저 확인한다.
   if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
-    alert('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.');
+    await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
     // 카드 자체는 유지하고, 겹침을 만든 직접 입력 시간만 초기화한다.
     p.startDate = '';
     p.startTime = '';

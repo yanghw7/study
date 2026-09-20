@@ -2454,7 +2454,7 @@ $('#nextDay').onclick = async () => {
   const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()+1);
   const maxDate = logicalToday();
   if(next > maxDate){
-    alert('아직 시작되지 않은 강의일입니다.');
+    await askConfirm('아직 시작되지 않은 기록일입니다.', true);
     return;
   }
   cur = next;
@@ -2485,7 +2485,7 @@ $('#datePicker').onchange = async (e) => {
   const picked = new Date(y,m-1,d);
   const maxDate = logicalToday();
   if(picked > maxDate){
-    alert('아직 시작되지 않은 강의일입니다.');
+    await askConfirm('아직 시작되지 않은 기록일입니다.', true);
     e.target.value = ymd(cur);
     return;
   }
@@ -2553,11 +2553,11 @@ $('#periodList').addEventListener('click', async (e) => {
     const lastIdx = day.periods.length - 1;
 
     if(idx !== lastIdx){
-      alert(`강의는 마지막 강의부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}강의를 삭제해주세요.`);
+      await askConfirm(`기록은 마지막 기록부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}기록을 삭제해주세요.`, true);
       return;
     }
 
-    if(!confirm(`${idx+1}강의를 정말 삭제하시겠습니까?`)) return;
+    if(!(await askConfirm(`${idx+1}기록을 정말 삭제하시겠습니까?`, true))) return;
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
     renderPeriods();
@@ -2634,7 +2634,7 @@ $('#periodList').addEventListener('input', async (e) => {
         return;
       }
       if(selected && selected.getTime() > serverNowMs()){
-        alert('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.');
+        await askConfirm('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.', true);
         t.value = prevDTVal;
         return;
       }
@@ -2735,7 +2735,7 @@ $('#periodList').addEventListener('input', async (e) => {
       label.textContent = koDateTimeLabel(p[dateKey], p[timeKey]) || '시간을 눌러 수정';
     }
     if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
-      alert('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.');
+      await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
       p.startDate = '';
       p.startTime = '';
       p.endDate = '';
@@ -2763,7 +2763,7 @@ $('#periodList').addEventListener('input', async (e) => {
   }
   // 시작/종료가 모두 입력되면 다른 기록과 시간대가 겹치는지 먼저 확인한다.
   if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
-    alert('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.');
+    await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
     // 카드 자체는 유지하고, 겹침을 만든 직접 입력 시간만 초기화한다.
     p.startDate = '';
     p.startTime = '';
@@ -3672,7 +3672,7 @@ $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#setti
 
 async function deleteAllStudyRecords(){
   if(!window.__skipDeleteConfirm){
-    if(!confirm('정말 모든 강의 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.')) return;
+    if(!(await askConfirm('정말 모든 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.', true))) return;
   }
   window.__skipDeleteConfirm = false;
 
@@ -3901,7 +3901,7 @@ async function downloadAllFromCloud(){
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
   const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:'));
   if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
-  if(!confirm('클라우드 기록으로 이 브라우저의 강의 기록을 교체할까요?')) return;
+  if(!(await askConfirm('클라우드 기록으로 이 브라우저의 기록을 교체할까요?', true))) return;
   monthCache={};
   lectureRows.forEach(row=>{
     const ym=recordLocalYm(row.ym);
