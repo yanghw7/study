@@ -578,7 +578,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
 <script>
 // BUILD: v9.9-waste-live-timer-red
 // BUILD: v9.3-cross-device-period-lock
@@ -2164,6 +2164,11 @@ $('#periodList').addEventListener('click', async (e) => {
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
   } finally {
     userActionCount--;
+    if(btn.isConnected){
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+    await flushPendingRender();
   }
 });
 
@@ -3305,13 +3310,19 @@ let sbClient = null;
 let cloudUser = null;
 
 function initSupabase(){
-  if(!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !window.supabase){ sbClient = null; return false; }
-  try{
-    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
-    });
-    return true;
-  }catch(e){ sbClient = null; return false; }
+  if(sbClient) return true;
+  // 부모 클라이언트만 쓴다. 자식이 createClient 호출하면 GoTrueClient 중복 → 무한 재귀.
+  if(window.parent !== window){
+    try{
+      const p = window.parent.getSupabaseClient;
+      if(typeof p === 'function'){
+        const client = p();
+        if(client){ sbClient = client; return true; }
+      }
+    }catch(e){}
+    return false;
+  }
+  return false;
 }
 
 async function refreshCloudStatus(){
@@ -3594,7 +3605,10 @@ initSupabase();
 
 // 로그인 세션을 계속 유지하고, 세션이 복원/갱신될 때 자동으로 상태와 데이터를 맞춘다.
 if(sbClient){
-  sbClient.auth.onAuthStateChange(async (event, session) => {
+  let __authBusy=false;
+  sbClient.auth.onAuthStateChange((event, session) => { setTimeout(async () => {
+    if(__authBusy) return; __authBusy=true; try{
+    if(event === 'TOKEN_REFRESHED') return;
     cloudUser = session?.user || null;
     const status = $('#cloudStatus');
     if(status){
@@ -3624,10 +3638,12 @@ if(sbClient){
     } else if(!cloudUser){
       stopActiveTimerRealtime();
     }
-  });
+    } finally { __authBusy=false; }
+  }, 0); });
 }
 
 (async () => {
+  try{
   await refreshCloudStatus();
   if(cloudUser){
     await calibrateServerClock(true);
@@ -3648,6 +3664,9 @@ if(sbClient){
 
   // v9.6: 초기화 완료 후 foreground 루프가 살아 있는지 보장
   startBackgroundSensitiveLoops();
+  }catch(e){ console.error('[init] 초기 동기화 실패:', e); }
+  enforceStudyDayLimit();
+  await renderCurrentView();
 })().finally(()=>{ try{ window.__journalReady = true; }catch(e){} });
 
 

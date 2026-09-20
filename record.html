@@ -1034,7 +1034,7 @@ body{background:#FCF6F7!important}
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
 <script>
 // BUILD: v9.9-waste-live-timer-red
 // BUILD: v9.3-cross-device-period-lock
@@ -2300,7 +2300,7 @@ function renderPeriods(){
   if($('#sumPages')) $('#sumPages').classList.toggle('stat-error', sumPagesErr);
   if($('#sumWaste')) $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
   renderDayCharts();
-  updateRecordSummary();
+  if(typeof updateRecordSummary === 'function') updateRecordSummary();
 
 }
 
@@ -3710,13 +3710,17 @@ let sbClient = null;
 let cloudUser = null;
 
 function initSupabase(){
-  if(!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !window.supabase){ sbClient = null; return false; }
-  try{
-    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
-    });
-    return true;
-  }catch(e){ sbClient = null; return false; }
+  if(sbClient) return true;
+  if(window.parent !== window){
+    try{
+      const p = window.parent.getSupabaseClient;
+      if(typeof p === 'function'){
+        sbClient = p();
+        if(sbClient) return true;
+      }
+    }catch(e){}
+  }
+  return false;
 }
 
 async function refreshCloudStatus(){
@@ -4222,27 +4226,30 @@ function collectBackupData(){
   };
 }
 
-$('#backupData').onclick = () => {
-  const data = collectBackupData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `record-log-backup-${ymd(new Date())}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-showToast('백업 파일을 저장했어요');
-};
-
-$('#restoreData').onclick = () => $('#restoreFile').click();
-
-$('#restoreFile').addEventListener('change', async (e) => {
-  alert('복원은 홈 화면의 데이터 복원 버튼을 사용해주세요.');
-  e.target.value = '';
+document.addEventListener('DOMContentLoaded', () => {
+  const bd = document.getElementById('backupData');
+  if(bd) bd.onclick = () => {
+    const data = collectBackupData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `record-log-backup-${ymd(new Date())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    showToast('백업 파일을 저장했어요');
+  };
+  const rd = document.getElementById('restoreData');
+  if(rd) rd.onclick = () => { const rf = document.getElementById('restoreFile'); if(rf) rf.click(); };
+  const rf = document.getElementById('restoreFile');
+  if(rf) rf.addEventListener('change', (e) => {
+    alert('복원은 홈 화면의 데이터 복원 버튼을 사용해주세요.');
+    e.target.value = '';
+  });
 });
-renderDay();
+setTimeout(()=>renderDay(), 0);
 </script>
 
 <script>
@@ -4331,6 +4338,7 @@ document.addEventListener('click', async (e)=>{
   if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null};
   const r=p.recordSlots[slot];
   const action=btn.dataset.recordAction;
+  const before = JSON.parse(JSON.stringify(p));
 
   if(action==='start'){
     const input=document.querySelector(`.record-subject[data-idx="${idx}"][data-slot="${slot}"]`);
@@ -4345,11 +4353,12 @@ document.addEventListener('click', async (e)=>{
     r.lastTime=`${month}/${date} ${hh}:${mm}`;
     r.timerStartedAt=Date.now();
     recordTimerStarts[slot]=r.timerStartedAt;
+    markChangedPeriodFields(p, before);
 
     ensureRecordTimerTick();
-    await persistToday();
     renderPeriods();
     updateRecordSummary();
+    void persistToday();
     return;
   }
 
@@ -4359,12 +4368,13 @@ document.addEventListener('click', async (e)=>{
     r.count=Math.max(0,(r.count||0)-1);
     r.lastTime='';
     r.timerStartedAt=null;
+    markChangedPeriodFields(p, before);
 
     syncRecordTimerStarts();
-    await persistToday();
     renderPeriods();
     updateRecordSummary();
     showToast('기록을 취소했어요');
+    void persistToday();
   }
 });
 
@@ -4464,6 +4474,7 @@ async function getJournalBackup(kind){
   return fn.call(frame.contentWindow);
 }
 function initSharedBackupUI(){
+  if(!document.getElementById('sharedBackupBtn')) return;
   const main=document.getElementById('sharedBackupBtn'),choice=document.getElementById('sharedBackupChoice');
   const restore=document.getElementById('sharedRestoreBtn'),file=document.getElementById('sharedRestoreFile');
   const locationBtn=document.getElementById('sharedBackupLocationBtn'),locationStatus=document.getElementById('sharedBackupLocationStatus');

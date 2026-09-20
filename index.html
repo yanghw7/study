@@ -58,7 +58,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
 <meta name="theme-color" content="#285f50">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script></head>
 <body><button id="pwaInstallBtn" type="button">앱 설치</button>
 <div class="shell" id="shell">
   <div class="tabs">
@@ -148,6 +148,7 @@ const SUPABASE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
 // ★ TDZ 방지: sbSettingsClient를 가장 먼저 선언해야
 //   그 아래 어디서든 initSettingsClient()를 안전하게 호출할 수 있다.
 let sbSettingsClient = null;
+let __sbCreating = false;
 
 const shell=document.getElementById('shell');
 const tabs={
@@ -177,8 +178,11 @@ restoreLastTabFromCloud().then(tab=>{ if(tab && tab!==first && tabs[tab]) openTa
 const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
 let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
 let sharedSettingsLoaded=false;
+window.getSupabaseClient = () => initSettingsClient();
 function initSettingsClient(){
-  if(sbSettingsClient) return sbSettingsClient;   // ★ 이미 있으면 재사용
+  if(sbSettingsClient) return sbSettingsClient;
+  if(__sbCreating) return null;
+  __sbCreating = true;
   try{
     sbSettingsClient = window.supabase.createClient(
       SUPABASE_URL,
@@ -187,6 +191,7 @@ function initSettingsClient(){
     );
     return sbSettingsClient;
   }catch(e){ return null; }
+  finally{ __sbCreating = false; }
 }
 async function loadSharedSettingsFromCloud(){
   const sb=initSettingsClient();
@@ -317,13 +322,17 @@ function initSharedSettingsUI(){
 
   const sb=initSettingsClient();
   if(sb){
+    let __authBusy=false;
     sb.auth.onAuthStateChange(async()=>{
+      if(__authBusy) return; __authBusy=true;
+      try{
       sharedSettingsLoaded=false;
       await loadSharedSettingsFromCloud();
       paint();
       notifySharedSettings(sharedSettingsCache);
       const t=await restoreLastTabFromCloud();
       if(t && tabs[t]) openTab(t, true);
+      } finally { __authBusy=false; }
     });
   }
 

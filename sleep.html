@@ -895,7 +895,7 @@ body{background:#EEF3F8!important}
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
 <script>
 // BUILD: v9.9-waste-live-timer-red
 // BUILD: v9.3-cross-device-period-lock
@@ -3679,10 +3679,22 @@ let sbClient = null;
 let cloudUser = null;
 
 function initSupabase(){
+  if(sbClient) return true;
+  // 부모 클라이언트만 쓴다. 자식이 createClient 호출하면 GoTrueClient 중복 → 무한 재귀.
+  if(window.parent !== window){
+    try{
+      const p = window.parent.getSupabaseClient;
+      if(typeof p === 'function'){
+        const client = p();
+        if(client){ sbClient = client; return true; }
+      }
+    }catch(e){}
+    return false;
+  }
   if(!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !window.supabase){ sbClient = null; return false; }
   try{
     sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
+      auth:{persistSession:true, autoRefreshToken:false, detectSessionInUrl:true}
     });
     return true;
   }catch(e){ sbClient = null; return false; }
