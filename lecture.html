@@ -3613,13 +3613,7 @@ function initSupabase(){
     }catch(e){}
     return false;
   }
-  if(!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !window.supabase){ sbClient = null; return false; }
-  try{
-    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth:{persistSession:true, autoRefreshToken:false, detectSessionInUrl:true}
-    });
-    return true;
-  }catch(e){ sbClient = null; return false; }
+  return false;
 }
 
 async function refreshCloudStatus(){
