@@ -225,6 +225,8 @@
   .chart-card{position:relative;}
   .chart-tooltip{position:absolute;z-index:20;pointer-events:none;background:#111827;color:#fff;border-radius:8px;padding:6px 9px;font-size:12px;font-weight:700;line-height:1.25;box-shadow:0 4px 12px rgba(0,0,0,.18);transform:translate(-50%,-115%);white-space:nowrap;display:none;}
   .chart-bar-study,.chart-bar-pages,.chart-bar-waste{cursor:pointer;}
+  .chart-bar-count{fill:#111827;cursor:pointer;}
+  .chart-bar-number{fill:#B86F7D;cursor:pointer;}
 
   /* settings */
   .settings-overlay{
@@ -358,6 +360,8 @@
   .chart-card{position:relative;}
   .chart-tooltip{position:absolute;z-index:20;pointer-events:none;background:#111827;color:#fff;border-radius:8px;padding:6px 9px;font-size:12px;font-weight:700;line-height:1.25;box-shadow:0 4px 12px rgba(0,0,0,.18);transform:translate(-50%,-115%);white-space:nowrap;display:none;}
   .chart-bar-study,.chart-bar-pages,.chart-bar-waste{cursor:pointer;}
+  .chart-bar-count{fill:#111827;cursor:pointer;}
+  .chart-bar-number{fill:#B86F7D;cursor:pointer;}
 
   /* settings */
   .settings-overlay{
@@ -802,6 +806,14 @@ body{background:#FCF6F7!important}
 }
 </style>
 
+<style id="record-fixed-subject-style">
+.record-slot .record-subject-fixed{
+  text-align:center!important;
+  cursor:default!important;
+  caret-color:transparent!important;
+}
+</style>
+
 <style id="record-v122-count-spacing">
 .record-count-grid .summary-item span{
   line-height:1.15!important;
@@ -947,11 +959,11 @@ body{background:#FCF6F7!important}
       <div class="summary-title today-summary-title">합계</div>
       <div class="record-top-timers">
         <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
-          <span class="study-timer-label">기록1 경과시간</span>
+          <span class="study-timer-label">카페인 경과시간</span>
           <span class="study-timer-time" id="recordTimer1">00:00:00</span>
         </div>
         <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
-          <span class="study-timer-label">기록2 경과시간</span>
+          <span class="study-timer-label">Vita C 경과시간</span>
           <span class="study-timer-time" id="recordTimer2">00:00:00</span>
         </div>
         <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
@@ -962,9 +974,9 @@ body{background:#FCF6F7!important}
       <div id="studyTimer" style="display:none"><span id="studyTimerLabel"></span><span id="studyTimerTime">00:00:00</span></div>
       <div id="wasteTimer" style="display:none"><span id="wasteTimerLabel"></span><span id="wasteTimerTime">00:00:00</span></div>
       <div class="record-count-grid record-count-paired">
-        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount1">0회</b></div><div class="summary-item"><span>숫자</span><b id="recordNumber1" style="color:#B86F7D;">0</b></div></div>
-        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount2">0회</b></div><div class="summary-item"><span>숫자</span><b id="recordNumber2" style="color:#B86F7D;">0</b></div></div>
-        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount3">0회</b></div><div class="summary-item"><span>숫자</span><b id="recordNumber3" style="color:#B86F7D;">0</b></div></div>
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount1">0회</b></div><div class="summary-item"><span>용량</span><b id="recordNumber1" style="color:#B86F7D;">0</b></div></div>
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount2">0회</b></div><div class="summary-item"><span>용량</span><b id="recordNumber2" style="color:#B86F7D;">0</b></div></div>
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount3">0회</b></div><div class="summary-item"><span>용량</span><b id="recordNumber3" style="color:#B86F7D;">0</b></div></div>
       </div>
     </div>
 
@@ -2241,9 +2253,16 @@ function createRecordCard(p, idx){
     subject.className = 'subject-input record-subject';
     subject.dataset.idx = idx;
     subject.dataset.slot = slot;
-    subject.placeholder = `기록 ${slot + 1}`;
+    subject.placeholder = slot === 0 ? '카페인' : (slot === 1 ? 'Vita C' : `기록 ${slot + 1}`);
 
     const slotData = (p.recordSlots && p.recordSlots[slot]) || null;
+    // 카페인/Vita C는 고정 항목: 가운데 정렬 + 사용자 수정 불가
+    if(slot === 0 || slot === 1){
+      subject.value = slot === 0 ? '카페인' : 'Vita C';
+      subject.readOnly = true;
+      subject.tabIndex = -1;
+      subject.classList.add('record-subject-fixed');
+    }
 
     const countInput = document.createElement('input');
     countInput.type = 'number';
@@ -2263,7 +2282,7 @@ function createRecordCard(p, idx){
     lectureAdd.dataset.slot = slot;
     const hasRecordStart = Number(slotData?.timerStartedAt) > 0;
     lectureAdd.dataset.recordAction = hasRecordStart ? 'cancel-start' : 'start';
-    lectureAdd.textContent = hasRecordStart ? `기록 ${slot + 1} 취소` : `기록 ${slot + 1} 입력`;
+    lectureAdd.textContent = hasRecordStart ? (slot === 0 ? '카페인 취소' : (slot === 1 ? 'Vita C 취소' : `기록 ${slot + 1} 취소`)) : (slot === 0 ? '카페인 입력' : (slot === 1 ? 'Vita C 입력' : `기록 ${slot + 1} 입력`));
     if(hasRecordStart) lectureAdd.classList.add('cancel-start');
 
     const startBox = document.createElement('div');
@@ -2272,10 +2291,20 @@ function createRecordCard(p, idx){
     const label = document.createElement('label');
     label.textContent = '기록 시간';
 
-    const value = document.createElement('div');
+    const value = document.createElement('input');
+    value.type = 'text';
     value.className = 'record-start-value';
-    value.textContent = slotData?.lastTime || '--:--';
-    subject.value = slotData?.subject || '';
+    value.readOnly = true;
+    value.inputMode = 'none';
+    value.dataset.idx = idx;
+    value.dataset.slot = slot;
+    value.disabled = !slotData?.lastTime;
+    if(slotData?.lastTime){
+      const text = String(slotData.lastTime);
+      const m = text.match(/(\d{2}):(\d{2})$/);
+      if(m) value.value = `${m[1]}:${m[2]}`;
+    }
+    if(slot > 1) subject.value = slotData?.subject || '';
 
     startBox.append(label, value);
     col.append(subject, countInput, lectureAdd, startBox);
@@ -2354,11 +2383,9 @@ function renderPeriods(){
     }
 
     const card = createRecordCard(p, idx);
-    // 이 카드가 잠겨야 하는지: 앞 카드일수록 뒤 카드가 채워져 있으면 잠김
-    let thisLocked = false;
-    for(let j = day.periods.length - 1; j > idx; j--){
-      if(isCardFilled(day.periods[j])){ thisLocked = true; break; }
-    }
+    // 새 기록 카드가 추가되면 이전 카드는 즉시 잠금.
+    // 마지막(가장 최근) 카드만 입력/수정할 수 있다.
+    const thisLocked = idx < day.periods.length - 1;
     if(thisLocked){
       card.style.opacity = '0.45';
       card.style.pointerEvents = 'none';
@@ -3090,7 +3117,7 @@ function chartSvg(points, valueKey, kind, unit){
     const x=L+i*slot+(slot-barW)/2;
     const yy=y(v);
     const h=Math.max(v>0?2:0,T+innerH-yy);
-    const displayValue = valueKey==='pages' ? `${Math.round(v)}쪽` : formatTooltipTime(v);
+    const displayValue = valueKey==='count' ? `${Math.round(v)}회` : (valueKey==='number' ? `${Math.round(v)}` : (valueKey==='pages' ? `${Math.round(v)}쪽` : formatTooltipTime(v)));
     return `<rect class="chart-bar-${kind}" data-chart-label="${escHtml(p.label)}" data-chart-value="${escHtml(displayValue)}" tabindex="0" x="${x}" y="${yy}" width="${barW}" height="${h}" rx="2"><title>${escHtml(p.label)}: ${escHtml(displayValue)}</title></rect>`;
   }).join('');
   const labels=points.map((p,i)=>{
@@ -3127,22 +3154,20 @@ function chartTotalTime(points,key){
   const mins=points.reduce((sum,p)=>sum+(Number(p[key])||0),0);
   return formatAvgTime(mins);
 }
-function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote=""){
+function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote="", title="기록"){
   if(!chartsVisible) return '';
-  if(!points.length || points.every(p=>!p.study && !p.pages)) return '';
+  if(!points.length || points.every(p=>!p.count && !p.number)) return '';
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
   const hasAverage = avgBase.length > 0;
-  const avgStudy = hasAverage ? formatAvgTime(chartAverage(avgBase,'study')) : '—';
-  const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))}회` : '—';
-  const activeBase = avgBase.filter(p => (Number(p.study)||0) > 0);
-  const restAvgStudy = activeBase.length ? formatAvgTime(chartAverage(activeBase,'study')) : '—';
-  const restAvgPages = activeBase.length ? `${Math.round(chartAverage(activeBase,'pages'))}회` : '—';
-  const totalStudy = chartTotalTime(points,'study');
-  const totalPages = Math.round(points.reduce((sum,p)=>sum+(Number(p.pages)||0),0));
+  const avgCount = hasAverage ? `${(chartAverage(avgBase,'count')).toFixed(1)}회` : '—';
+  const avgNumber = hasAverage ? `${(chartAverage(avgBase,'number')).toFixed(1)}` : '—';
+  const totalCount = Math.round(points.reduce((sum,p)=>sum+(Number(p.count)||0),0));
+  const totalNumber = Math.round(points.reduce((sum,p)=>sum+(Number(p.number)||0),0));
   const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">강의시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy}<br>총 ${totalStudy}<br>쉬는 날 제외 평균 ${restAvgStudy}</div></div>${note}${chartSvg(points,'study','study','시간')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 강의 횟수 추이</div><div class="chart-unit">${averageLabel} ${avgPages}<br>총 ${totalPages}회<br>쉬는 날 제외 평균 ${restAvgPages}</div></div>${note}${chartSvg(points,'pages','pages','회')}</div>
+    <div class="summary-title" style="margin:6px 4px 0;text-align:center;">${escHtml(title)}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">횟수 추이</div><div class="chart-unit" style="color:#111827">${averageLabel} ${avgCount}<br>총 ${totalCount}회</div></div>${note}${chartSvg(points,'count','count','회')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title" style="color:#B86F7D">용량 추이</div><div class="chart-unit" style="color:#B86F7D">${averageLabel} ${avgNumber}<br>총 ${totalNumber}</div></div>${note}${chartSvg(points,'number','number','')}</div>
   </div>`;
 }
 
@@ -3166,15 +3191,21 @@ async function renderDayCharts(){
     const m = await loadMonth(ym);
     const day = m[dk] || {periods:[]};
     const periods = day.periods || [];
-    let study=0, pages=0, waste=0;
-    periods.forEach((p, idx)=>{
-      study += minutesBetween(p);
-      pages += periodPages(p);
-      waste += wasteBefore(periods, idx);
+    const slots = [
+      {count:0, number:0},
+      {count:0, number:0},
+      {count:0, number:0}
+    ];
+    periods.forEach((p)=>{
+      (p.recordSlots||[]).forEach((r,slot)=>{
+        if(!r || slot>2) return;
+        slots[slot].count += Number(r.count)||0;
+        slots[slot].number += Number(r.numberInput)||0;
+      });
     });
     points.push({
       label:`${d.getMonth()+1}/${d.getDate()}(${dayKeys[d.getDay()]})`,
-      study, pages, waste,
+      slots,
       date:new Date(d)
     });
   }
@@ -3182,7 +3213,7 @@ async function renderDayCharts(){
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate()+6);
   const heading = `<div class="summary-title" style="margin:4px 0 8px;color:var(--ink-soft);font-size:12px;">일자별 · ${fmtMD(weekStart)} ~ ${fmtMD(weekEnd)} (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>`;
-  if(points.every(p=>!p.study && !p.pages && !p.waste)){
+  if(points.every(p=>p.slots.every(v=>!v.count && !v.number))){
     el.innerHTML = heading + '<div class="chart-empty" style="margin-bottom:10px;">이 주에 기록된 그래프 데이터가 없어요.</div>';
     return;
   }
@@ -3195,7 +3226,13 @@ async function renderDayCharts(){
     d.setHours(0,0,0,0);
     return d <= currentStudyDay;
   });
-  el.innerHTML = heading + chartsHtml(points, averagePoints, '일 평균');
+  const names = ['카페인','Vita C','기록 3'];
+  const sections = names.map((name,slot)=>{
+    const slotPoints = points.map(p=>({label:p.label,date:p.date,count:p.slots[slot].count,number:p.slots[slot].number}));
+    const slotAveragePoints = averagePoints.map(p=>({label:p.label,date:p.date,count:p.slots[slot].count,number:p.slots[slot].number}));
+    return chartsHtml(slotPoints, slotAveragePoints, '일 평균', '', name);
+  }).join('');
+  el.innerHTML = heading + sections;
 }
 
 // ---------- 주별/월별 집계 ----------
@@ -3232,23 +3269,30 @@ async function computeMonthAgg(ym){
   const totalWeeks = weekOfMonth(year, mo, daysInMonth);
   const weeks = {};
   for(let w=1; w<=totalWeeks; w++){
-    weeks[w] = {counts:[0,0,0],days:0, ...weekRange(year, mo, w)};
+    weeks[w] = {counts:[0,0,0],numbers:[0,0,0],days:0, ...weekRange(year, mo, w)};
   }
 
   const monthCounts=[0,0,0];
+  const monthNumbers=[0,0,0];
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
     const periods = m[dk]?.periods || [];
     const counts = recordCountsFromPeriods(periods);
+    const numbers = [0,0,0];
+    periods.forEach(p => (p.recordSlots || []).forEach((r,i) => {
+      if(r && i < 3) numbers[i] += Number(r.numberInput) || 0;
+    }));
     const total = counts.reduce((a,b)=>a+b,0);
     const w = weekOfMonth(year, mo, dayNum);
     for(let i=0;i<3;i++){
       weeks[w].counts[i] += counts[i];
+      weeks[w].numbers[i] += numbers[i];
       monthCounts[i] += counts[i];
+      monthNumbers[i] += numbers[i];
     }
-    if(total>0) weeks[w].days += 1;
+    if(total>0 || numbers.some(v=>v!==0)) weeks[w].days += 1;
   });
-  return { weeks, monthCounts };
+  return { weeks, monthCounts, monthNumbers };
 }
 
 async function renderWeekView(){
@@ -3270,9 +3314,9 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          기록1 <b>${weeks[w].counts[0]}회</b><br>
-          기록2 <b>${weeks[w].counts[1]}회</b><br>
-          기록3 <b>${weeks[w].counts[2]}회</b>
+          카페인 <b>${weeks[w].counts[0]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[0]}</b><br>
+          Vita C <b>${weeks[w].counts[1]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[1]}</b><br>
+          기록3 <b>${weeks[w].counts[2]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[2]}</b>
         </div>
       </div>
     `).join('');
@@ -3285,17 +3329,17 @@ async function renderMonthView(){
   let html = '';
   let any = false;
   for(let mo=1; mo<=12; mo++){
-    const { monthCounts } = await computeMonthAgg(`${year}-${pad(mo)}`);
-    const total = monthCounts.reduce((a,b)=>a+b,0);
+    const { monthCounts, monthNumbers } = await computeMonthAgg(`${year}-${pad(mo)}`);
+    const total = monthCounts.reduce((a,b)=>a+b,0) + monthNumbers.reduce((a,b)=>a+b,0);
     if(total===0) continue;
     any = true;
     html += `
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          기록1 <b>${monthCounts[0]}회</b><br>
-          기록2 <b>${monthCounts[1]}회</b><br>
-          기록3 <b>${monthCounts[2]}회</b>
+          카페인 <b>${monthCounts[0]}회</b> · <b style="color:#B86F7D;">${monthNumbers[0]}</b><br>
+          Vita C <b>${monthCounts[1]}회</b> · <b style="color:#B86F7D;">${monthNumbers[1]}</b><br>
+          기록3 <b>${monthCounts[2]}회</b> · <b style="color:#B86F7D;">${monthNumbers[2]}</b>
         </div>
       </div>`;
   }
@@ -3312,14 +3356,14 @@ async function renderYearView(){
   let rows = '';
   let any = false;
   for(const year of sorted){
-    const counts=[0,0,0];
+    const counts=[0,0,0], numbers=[0,0,0];
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
-      for(let i=0;i<3;i++) counts[i] += a.monthCounts[i];
+      for(let i=0;i<3;i++){ counts[i] += a.monthCounts[i]; numbers[i] += a.monthNumbers[i]; }
     }
-    if(counts.every(v=>v===0)) continue;
+    if(counts.every(v=>v===0) && numbers.every(v=>v===0)) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">기록1 <b>${counts[0]}회</b><br>기록2 <b>${counts[1]}회</b><br>기록3 <b>${counts[2]}회</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">카페인 <b>${counts[0]}회</b> · <b style="color:#B86F7D;">${numbers[0]}</b><br>Vita C <b>${counts[1]}회</b> · <b style="color:#B86F7D;">${numbers[1]}</b><br>기록3 <b>${counts[2]}회</b> · <b style="color:#B86F7D;">${numbers[2]}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
@@ -4376,6 +4420,9 @@ function recordHMS(ms){
   return `${h}:${m}:${ss}`;
 }
 function syncRecordTimerStarts(){
+  // 과거 날짜의 기록은 현재 진행 중인 상단 경과 타이머에 영향을 주지 않는다.
+  // 오늘 날짜에서만 타이머 시작값을 다시 동기화한다.
+  if(ymd(cur) !== ymd(logicalToday())) return;
   const day=getDayData();
   for(let slot=0;slot<3;slot++){
     let latest=0;
@@ -4429,17 +4476,16 @@ document.addEventListener('click', async (e)=>{
 
   if(action==='start'){
     const input=document.querySelector(`.record-subject[data-idx="${idx}"][data-slot="${slot}"]`);
-    if(input) r.subject=input.value||'';
+    if(input && slot > 1) r.subject=input.value||'';
 
     const now=new Date();
     const hh=String(now.getHours()).padStart(2,'0');
     const mm=String(now.getMinutes()).padStart(2,'0');
-    const month=String(now.getMonth()+1).padStart(2,'0');
-    const date=String(now.getDate()).padStart(2,'0');
     r.count=(r.count||0)+1;
-    r.lastTime=`${month}/${date} ${hh}:${mm}`;
+    r.lastTime=`${hh}:${mm}`;
     r.timerStartedAt=Date.now();
-    recordTimerStarts[slot]=r.timerStartedAt;
+    // 과거 날짜에 입력한 기록은 상단의 현재 경과 타이머와 완전히 분리한다.
+    if(ymd(cur) === ymd(logicalToday())) recordTimerStarts[slot]=r.timerStartedAt;
     markChangedPeriodFields(p, before);
 
     ensureRecordTimerTick();
@@ -4466,6 +4512,22 @@ document.addEventListener('click', async (e)=>{
 });
 
 document.addEventListener('input',(e)=>{
+  const timeInput=e.target.closest('.record-start-value[data-idx][data-slot]');
+  if(timeInput){
+    const tIdx=Number(timeInput.dataset.idx), tSlot=Number(timeInput.dataset.slot);
+    const tDay=getDayData(), tP=tDay.periods?.[tIdx];
+    if(tP){
+      if(!Array.isArray(tP.recordSlots)) tP.recordSlots=[null,null,null];
+      if(!tP.recordSlots[tSlot]) tP.recordSlots[tSlot]={count:0,subject:'',lastTime:'',timerStartedAt:null,numberInput:0};
+      const tBefore=JSON.parse(JSON.stringify(tP));
+      if(timeInput.value){
+        tP.recordSlots[tSlot].lastTime = timeInput.value;
+      }
+      markChangedPeriodFields(tP,tBefore);
+      void persistToday();
+    }
+    return;
+  }
   const cntInput=e.target.closest('.record-count-input');
   if(cntInput){
     const cIdx=Number(cntInput.dataset.idx), cSlot=Number(cntInput.dataset.slot);
@@ -4486,6 +4548,7 @@ document.addEventListener('input',(e)=>{
   const input=e.target.closest('.record-subject');
   if(!input) return;
   const idx=Number(input.dataset.idx), slot=Number(input.dataset.slot);
+  if(slot === 0 || slot === 1) return;
   const day=getDayData(), p=day.periods?.[idx];
   if(!p) return;
   if(!Array.isArray(p.recordSlots)) p.recordSlots=[null,null,null];
@@ -4609,6 +4672,88 @@ function initSharedBackupUI(){
 }
 initSharedBackupUI();
 </script>
+
+<style id="record-native-datetime-picker-style">
+.record-start-value[type="time"]{
+  width:100%!important;
+  min-height:28px!important;
+  cursor:pointer!important;
+  color:#463437!important;
+  background:transparent!important;
+}
+.record-start-value[type="time"]::-webkit-calendar-picker-indicator{
+  opacity:1!important;
+  cursor:pointer!important;
+}
+.record-start-value[type="time"]:disabled{
+  opacity:.55!important;
+  cursor:default!important;
+}
+</style>
+
+<script id="record-24hour-time-picker">
+// 기록 시간 선택기는 시/분만 사용하며 값은 항상 24시간 HH:MM 형식으로 저장한다.
+document.documentElement.setAttribute('lang', 'en-GB');
+</script>
+
+<style id="record-custom-24h-picker-style">
+#recordTimePickerBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:99990;display:none;align-items:flex-end;justify-content:center}
+#recordTimePickerBackdrop.open{display:flex}
+#recordTimePicker{width:min(100%,520px);background:#fff;border-radius:28px 28px 0 0;padding:24px 22px calc(20px + env(safe-area-inset-bottom));box-sizing:border-box;box-shadow:0 -8px 30px rgba(0,0,0,.12)}
+#recordTimePickerTitle{font-size:20px;font-weight:800;margin:2px 0 24px;color:#222}
+.record-time-columns{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:0 auto 26px;max-width:330px}
+.record-time-columns select{width:100%;height:150px;border:1px solid #ddd;border-radius:14px;background:#fff;font-size:30px;font-weight:700;text-align:center;text-align-last:center;color:#222;outline:none}
+.record-time-colon{font-size:30px;font-weight:700;color:#777}
+.record-time-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.record-time-actions button{height:54px;border:0;border-radius:15px;font-size:18px;font-weight:800}
+#recordTimeCancel{background:#f3f3f3;color:#333} #recordTimeSet{background:#bd7180;color:#fff}
+.record-start-value{cursor:pointer!important}
+.record-start-value:disabled{cursor:default!important}
+</style>
+<div id="recordTimePickerBackdrop" aria-hidden="true">
+  <div id="recordTimePicker" role="dialog" aria-modal="true" aria-label="기록 시간 설정">
+    <div id="recordTimePickerTitle">기록 시간 설정</div>
+    <div class="record-time-columns">
+      <select id="recordTimeHour" size="5" aria-label="시"></select>
+      <div class="record-time-colon">:</div>
+      <select id="recordTimeMinute" size="5" aria-label="분"></select>
+    </div>
+    <div class="record-time-actions"><button type="button" id="recordTimeCancel">취소</button><button type="button" id="recordTimeSet">설정</button></div>
+  </div>
+</div>
+<script id="record-custom-24h-picker-script">
+(()=>{
+  const back=document.getElementById('recordTimePickerBackdrop');
+  const hour=document.getElementById('recordTimeHour');
+  const minute=document.getElementById('recordTimeMinute');
+  const cancel=document.getElementById('recordTimeCancel');
+  const set=document.getElementById('recordTimeSet');
+  if(!back||!hour||!minute) return;
+  for(let h=0;h<24;h++){const o=document.createElement('option');o.value=String(h).padStart(2,'0');o.textContent=o.value;hour.appendChild(o)}
+  for(let m=0;m<60;m++){const o=document.createElement('option');o.value=String(m).padStart(2,'0');o.textContent=o.value;minute.appendChild(o)}
+  let target=null;
+  function close(){back.classList.remove('open');back.setAttribute('aria-hidden','true');target=null}
+  document.addEventListener('click',(e)=>{
+    const input=e.target.closest('.record-start-value[data-idx][data-slot]');
+    if(!input||input.disabled) return;
+    e.preventDefault();
+    target=input;
+    const m=String(input.value||'').match(/^(\d{2}):(\d{2})$/);
+    const now=new Date();
+    hour.value=m?m[1]:String(now.getHours()).padStart(2,'0');
+    minute.value=m?m[2]:String(now.getMinutes()).padStart(2,'0');
+    back.classList.add('open');back.setAttribute('aria-hidden','false');
+  });
+  cancel.addEventListener('click',close);
+  back.addEventListener('click',(e)=>{if(e.target===back) close()});
+  set.addEventListener('click',()=>{
+    if(!target) return close();
+    target.value=`${hour.value}:${minute.value}`;
+    target.dispatchEvent(new Event('input',{bubbles:true}));
+    close();
+  });
+})();
+</script>
 </body>
 </html>
 
@@ -4674,4 +4819,24 @@ initSharedBackupUI();
 @media(max-width:760px){
   .record-count-input{height:38px!important;min-height:38px!important;font-size:14px!important;padding:0 6px!important;}
 }
+</style>
+
+<style id="record-time-editable-style">
+.record-start-value{
+  width:100%!important;
+  box-sizing:border-box!important;
+  border:0!important;
+  outline:0!important;
+  background:transparent!important;
+  padding:0!important;
+  font:inherit!important;
+  font-size:16px!important;
+  font-weight:900!important;
+  text-align:right!important;
+  color:#463437!important;
+}
+</style>
+
+<style>
+#periodList input[data-k="subject"]{text-align:center!important;}
 </style>
