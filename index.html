@@ -534,7 +534,13 @@ let exclusiveQueue=Promise.resolve();
       }
       return;
     }
-    // stopped 이거나 null(삭제) → 원복
+    // stopped 이거나 null(삭제) 처리.
+    // 같은 기기에서 시작 요청으로 이미 진행 중인 탭은 RPC 처리 중 active_timer가
+    // 잠깐 null/stopped로 보이더라도 탭 표시를 지우지 않는다.
+    // 실제 종료는 자식 화면의 exclusive-session-ended 메시지로 즉시 반영된다.
+    if(exclusiveActive){
+      return;
+    }
     exclusiveActive = null;
     setExclusiveTabStatus(null);
   }
