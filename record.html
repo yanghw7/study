@@ -830,11 +830,11 @@ body{background:#FCF6F7!important}
 
 <style id="record-alarm-summary-harmony">
 .record-fixed-top{
-  padding:8px 0 6px!important;
+  padding:2px 0 2px!important;
 }
 .record-fixed-top #recordAlarmBar{
-  margin:0 0 8px!important;
-  padding:10px 12px!important;
+  margin:0 0 3px!important;
+  padding:4px 6px!important;
   border:1px solid var(--line)!important;
   border-radius:14px!important;
   background:var(--card)!important;
@@ -860,10 +860,13 @@ body{background:#FCF6F7!important}
   color:var(--ink)!important;
 }
 .record-fixed-top #recordAlarmBar .alarmstatusline{
-  margin-top:7px!important;
+  margin-top:2px!important;
+  min-height:22px!important;
 }
 .record-fixed-top .summary-card{
   margin-top:0!important;
+  padding-top:6px!important;
+  padding-bottom:6px!important;
 }
 </style>
 
@@ -877,6 +880,43 @@ body{background:#FCF6F7!important}
   padding-right:10px!important;
   white-space:nowrap!important;
   flex-shrink:0!important;
+}
+</style>
+
+
+<style id="record-count-side-by-side">
+.record-count-paired{gap:6px!important;}
+.record-count-paired .record-pair{display:grid;grid-template-columns:1fr 1fr;gap:4px;min-width:0;}
+.record-count-paired .summary-item{display:flex!important;align-items:center!important;justify-content:center!important;gap:4px!important;min-width:0;white-space:nowrap;}
+.record-count-paired .summary-item span{font-size:9px!important;line-height:1!important;}
+.record-count-paired .summary-item b{display:inline!important;font-size:15px!important;line-height:1!important;}
+</style>
+
+<style id="record-count-nowrap-fix">
+.record-pair .summary-item{white-space:nowrap!important;}
+.record-pair .summary-item span,.record-pair .summary-item b{white-space:nowrap!important;}
+</style>
+
+<style id="record-alarm-mobile-fit-v1">
+@media(max-width:560px){
+  .record-fixed-top #recordAlarmBar{padding:4px 3px!important;}
+  .record-fixed-top #recordAlarmBar .alarmline{
+    width:100%!important;max-width:100%!important;gap:2px!important;flex-wrap:nowrap!important;overflow:hidden!important;
+  }
+  #recordAlarmBar .alarmline strong{font-size:10px!important;flex:0 0 auto!important;}
+  #recordAlarmBar .alarmline input{
+    width:30px!important;min-width:30px!important;height:28px!important;padding:0 2px!important;font-size:12px!important;flex:0 0 30px!important;
+  }
+  #recordAlarmBar .alarmline .unit{font-size:9px!important;margin-left:0!important;flex:0 0 auto!important;}
+  #recordAlarmBar #alarmSoundSelect{
+    width:64px!important;min-width:0!important;max-width:64px!important;height:28px!important;padding:0 2px!important;font-size:9px!important;flex:1 1 52px!important;
+  }
+  #recordAlarmBar #alarmPreview{
+    height:28px!important;min-width:56px!important;width:56px!important;padding:0 2px!important;font-size:9px!important;flex:0 0 56px!important;
+  }
+  #recordAlarmBar #alarmStart,#recordAlarmBar #alarmCancel{
+    height:28px!important;min-width:40px!important;width:40px!important;padding:0 2px!important;font-size:10px!important;flex:0 0 40px!important;
+  }
 }
 </style>
 
@@ -921,15 +961,10 @@ body{background:#FCF6F7!important}
       </div>
       <div id="studyTimer" style="display:none"><span id="studyTimerLabel"></span><span id="studyTimerTime">00:00:00</span></div>
       <div id="wasteTimer" style="display:none"><span id="wasteTimerLabel"></span><span id="wasteTimerTime">00:00:00</span></div>
-      <div class="record-count-grid">
-        <div class="summary-item"><b id="recordCount1">0회</b><span>기록1<br>기록횟수</span></div>
-        <div class="summary-item"><b id="recordCount2">0회</b><span>기록2<br>기록횟수</span></div>
-        <div class="summary-item"><b id="recordCount3">0회</b><span>기록3<br>기록횟수</span></div>
-      </div>
-      <div class="record-count-grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed #EEDDE1;">
-        <div class="summary-item"><b id="recordNumber1" style="color:#B86F7D;">0</b><span>기록1<br>숫자 합계</span></div>
-        <div class="summary-item"><b id="recordNumber2" style="color:#B86F7D;">0</b><span>기록2<br>숫자 합계</span></div>
-        <div class="summary-item"><b id="recordNumber3" style="color:#B86F7D;">0</b><span>기록3<br>숫자 합계</span></div>
+      <div class="record-count-grid record-count-paired">
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount1">0회</b></div><div class="summary-item"><span>숫자</span><b id="recordNumber1" style="color:#B86F7D;">0</b></div></div>
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount2">0회</b></div><div class="summary-item"><span>숫자</span><b id="recordNumber2" style="color:#B86F7D;">0</b></div></div>
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount3">0회</b></div><div class="summary-item"><span>숫자</span><b id="recordNumber3" style="color:#B86F7D;">0</b></div></div>
       </div>
     </div>
 
@@ -2454,7 +2489,7 @@ $('#nextDay').onclick = async () => {
   const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()+1);
   const maxDate = logicalToday();
   if(next > maxDate){
-    await askConfirm('아직 시작되지 않은 기록일입니다.', true);
+    if(window.NativeUi?.showToast) window.NativeUi.showToast('아직 시작되지 않은 기록일입니다.'); else showToast('아직 시작되지 않은 기록일입니다.');
     return;
   }
   cur = next;
@@ -2485,7 +2520,7 @@ $('#datePicker').onchange = async (e) => {
   const picked = new Date(y,m-1,d);
   const maxDate = logicalToday();
   if(picked > maxDate){
-    await askConfirm('아직 시작되지 않은 기록일입니다.', true);
+    if(window.NativeUi?.showToast) window.NativeUi.showToast('아직 시작되지 않은 기록일입니다.'); else showToast('아직 시작되지 않은 기록일입니다.');
     e.target.value = ymd(cur);
     return;
   }
