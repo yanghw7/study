@@ -1816,8 +1816,12 @@ function renderPeriods(){
     const endPageBlank   = String(p.endPage   ?? '').trim() === '';
     const hasStart = !!(p.startDate && p.startTime);
     const hasEnd   = !!(p.endDate && p.endTime);
-    const startTimeDisabled = !hasStart;
-    const endTimeDisabled   = !hasStart || !hasEnd;
+    // 지난 공부일은 시작/종료 버튼을 누르지 않아도 시간을 직접 추가·수정할 수 있다.
+    const logical = logicalToday();
+    const selectedDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
+    const isPastDay = selectedDay < logical;
+    const startTimeDisabled = isPastDay ? false : !hasStart;
+    const endTimeDisabled   = isPastDay ? false : (!hasStart || !hasEnd);
     const startAction = hasStart ? 'cancel-start' : 'start';
     const startActionLabel = hasStart ? '시작 취소' : '▶ 시작';
     const startActionDisabled = hasStart ? false : startPageBlank;
@@ -1827,12 +1831,10 @@ function renderPeriods(){
 
     const startTimePlaceholder = hasStart
       ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
-      : '시작을 누르면 자동기록';
-    const endTimePlaceholder = !hasStart
-      ? '시작을 누르면 자동기록'
-      : (hasEnd
-          ? (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정')
-          : '종료를 누르면 자동기록');
+      : (isPastDay ? '시간을 눌러 입력' : '시작을 누르면 자동기록');
+    const endTimePlaceholder = hasEnd
+      ? (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정')
+      : (isPastDay ? '시간을 눌러 입력' : (!hasStart ? '시작을 누르면 자동기록' : '종료를 누르면 자동기록'));
 
     const card = document.createElement('div');
     card.className = 'period-card';
@@ -1866,7 +1868,6 @@ function renderPeriods(){
         ${idx>0 ? `<div class="stat">낭비시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
       </div>
     `;
-    if(idx < day.periods.length - 1) card.classList.add('locked-card');
     list.appendChild(card);
   });
 
@@ -1933,16 +1934,19 @@ function refreshTimeFieldDisabled(idx){
   const endPageBlank = String(p.endPage ?? '').trim() === '';
   const hasStart = !!(p.startDate && p.startTime);
   const hasEnd = !!(p.endDate && p.endTime);
+  const logical = logicalToday();
+  const selectedDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
+  const isPastDay = selectedDay < logical;
   const startInput = document.querySelector(`#periodList input[data-k="start"][data-idx="${idx}"]`);
   const endInput = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
   const endPageInput = document.querySelector(`#periodList input[data-k="endPage"][data-idx="${idx}"]`);
   const startField = startInput?.closest('.field.time');
   const endField = endInput?.closest('.field.time');
-  if(startInput) startInput.disabled = !hasStart;
-  if(endInput) endInput.disabled = !hasStart || !hasEnd;
+  if(startInput) startInput.disabled = isPastDay ? false : !hasStart;
+  if(endInput) endInput.disabled = isPastDay ? false : (!hasStart || !hasEnd);
   if(endPageInput) endPageInput.disabled = !hasStart;
-  if(startField) startField.classList.toggle('disabled', !hasStart);
-  if(endField) endField.classList.toggle('disabled', !hasStart || !hasEnd);
+  if(startField) startField.classList.toggle('disabled', isPastDay ? false : !hasStart);
+  if(endField) endField.classList.toggle('disabled', isPastDay ? false : (!hasStart || !hasEnd));
   const startBtn=document.querySelector(`#periodList button[data-idx="${idx}"][data-study-action="start"],#periodList button[data-idx="${idx}"][data-study-action="cancel-start"]`);
   const endBtn=document.querySelector(`#periodList button[data-idx="${idx}"][data-study-action="end"],#periodList button[data-idx="${idx}"][data-study-action="cancel-end"]`);
   if(startBtn){
@@ -1959,8 +1963,8 @@ function refreshTimeFieldDisabled(idx){
   }
   const startLabel=startField?.querySelector('.ko-time-label');
   const endLabel=endField?.querySelector('.ko-time-label');
-  if(startLabel) startLabel.textContent=hasStart?(koDateTimeLabel(p.startDate,p.startTime)||'시간을 눌러 수정'):'시작을 누르면 자동기록';
-  if(endLabel) endLabel.textContent=!hasStart?'시작을 누르면 자동기록':(hasEnd?(koDateTimeLabel(p.endDate,p.endTime)||'시간을 눌러 수정'):'종료를 누르면 자동기록');
+  if(startLabel) startLabel.textContent=hasStart?(koDateTimeLabel(p.startDate,p.startTime)||'시간을 눌러 수정'):(isPastDay?'시간을 눌러 입력':'시작을 누르면 자동기록');
+  if(endLabel) endLabel.textContent=hasEnd?(koDateTimeLabel(p.endDate,p.endTime)||'시간을 눌러 수정'):(isPastDay?'시간을 눌러 입력':(!hasStart?'시작을 누르면 자동기록':'종료를 누르면 자동기록'));
 }
 
 async function renderDay(){
@@ -2215,8 +2219,13 @@ $('#periodList').addEventListener('click', async (e) => {
     const idx = Number(e.target.dataset.idx);
     const day = getDayData();
     const lastIdx = day.periods.length - 1;
+    // 과거 공부일은 원하는 교시를 바로 삭제할 수 있다.
+    // 당일 기록은 기존처럼 마지막 교시부터만 삭제한다.
+    const logical = logicalToday();
+    const selectedDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
+    const isPastDay = selectedDay < logical;
 
-    if(idx !== lastIdx){
+    if(!isPastDay && idx !== lastIdx){
       alert(`교시는 마지막 교시부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}교시를 삭제해주세요.`);
       return;
     }

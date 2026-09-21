@@ -2081,17 +2081,18 @@ function renderPeriods(){
     const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
     const hasStart = !!(p.startDate && p.startTime);
     const hasEnd = !!(p.endDate && p.endTime);
-    // 수면 시작 전: 시작·기상 시간 모두 잠금 / 진행 중: 기상 시간만 잠금
-    const startTimeDisabled = !hasStart;
-    const endTimeDisabled   = !hasStart || !hasEnd;
+    // 과거 수면일은 타이머 상태와 관계없이 시작/기상 시간을 직접 추가·수정 가능.
+    const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+    const startTimeDisabled = isPastDay ? false : !hasStart;
+    const endTimeDisabled   = isPastDay ? false : (!hasStart || !hasEnd);
 
     const startTimePlaceholder = hasStart
       ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
-      : '수면 시작을 누르면 자동 기록';
+      : (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록');
     const endTimePlaceholder = !hasStart
-      ? '수면 시작을 누르면 자동 기록'
+      ? (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록')
       : (!hasEnd
-          ? '깨어남을 누르면 자동 기록'
+          ? (isPastDay ? '시간을 눌러 입력' : '깨어남을 누르면 자동 기록')
           : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
 
     let startAction = 'start', startLabel = '☾ 수면 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
@@ -2139,8 +2140,6 @@ function renderPeriods(){
         ${idx>0 ? `<div class="stat">기상 후 경과시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
       </div>
     `;
-    if(idx < day.periods.length - 1) card.classList.add('locked-card');
-    if(idx < day.periods.length - 1) card.classList.add('locked-card');
     list.appendChild(card);
   });
 
@@ -2206,8 +2205,9 @@ function refreshSleepTimeFieldDisabled(idx){
 
   const hasStart = !!(p.startDate && p.startTime);
   const hasEnd   = !!(p.endDate && p.endTime);
-  const startDisabled = !hasStart;
-  const endDisabled   = !hasStart || !hasEnd;
+  const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+  const startDisabled = isPastDay ? false : !hasStart;
+  const endDisabled   = isPastDay ? false : (!hasStart || !hasEnd);
 
   const startInput = document.querySelector(`#periodList input[data-k="start"][data-idx="${idx}"]`);
   const endInput   = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
@@ -2223,14 +2223,14 @@ function refreshSleepTimeFieldDisabled(idx){
   if(startLabel){
     startLabel.textContent = hasStart
       ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
-      : '수면 시작을 누르면 자동 기록';
+      : (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록');
   }
   const endLabel = endField?.querySelector('.ko-time-label');
   if(endLabel){
     endLabel.textContent = !hasStart
-      ? '수면 시작을 누르면 자동 기록'
+      ? (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록')
       : (!hasEnd
-          ? '깨어남을 누르면 자동 기록'
+          ? (isPastDay ? '시간을 눌러 입력' : '깨어남을 누르면 자동 기록')
           : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
   }
 }
@@ -2303,7 +2303,8 @@ $('#addPeriod').onclick = async () => {
   // 새 강의 제한: 마지막 수면이 진행 중이면 다음 수면을 추가할 수 없음.
   const currentDay = getDayData();
   const currentPeriods = currentDay.periods || [];
-  if(currentPeriods.length > 0){
+  const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+  if(!isPastDay && currentPeriods.length > 0){
     const last = currentPeriods[currentPeriods.length - 1];
     const hasStarted = !!(last.startDate && last.startTime);
     const hasEnded = !!(last.endDate && last.endTime);
@@ -2375,7 +2376,8 @@ $('#periodList').addEventListener('click', async (e) => {
     const day = getDayData();
     const lastIdx = day.periods.length - 1;
 
-    if(idx !== lastIdx){
+    const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+    if(!isPastDay && idx !== lastIdx){
       await askConfirm(`수면은 마지막 수면부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}회 수면을 삭제해주세요.`, true);
       return;
     }
@@ -2574,7 +2576,12 @@ $('#periodList').addEventListener('input', async (e) => {
     refreshStats();
     updateStudyTimer();
     updateWasteTimer();
+
+    // 시작시간을 직접 추가/수정한 경우에도 즉시 시간순으로 자동 정렬한다.
+    // 예: 3번째 카드 시간이 1번과 2번 사이면 자동으로 2번째 카드로 이동한다.
+    const reorderedByTime = (p.startDate && p.startTime) ? autoSortPeriodsByStart(day) : false;
     void persistToday();
+    if(reorderedByTime) renderPeriods();
     return;
   }
   if(k !== 'subject') refreshStats();

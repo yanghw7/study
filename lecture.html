@@ -2033,31 +2033,35 @@ function renderPeriods(){
     const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
     const hasStart = !!(p.startDate && p.startTime);
     const hasEnd = !!(p.endDate && p.endTime);
-    // 시작 전: 시작·종료 시간 모두 잠금 / 진행 중: 종료 시간만 잠금
-    const startTimeDisabled = !hasStart;
-    const endTimeDisabled   = !hasStart || !hasEnd;
+    // 오늘 기록은 기존 타이머 흐름에 따라 잠금. 과거 기록은 타이머 상태와 무관하게 직접 수정 가능.
+    const startTimeDisabled = isCurrentLectureDay && !hasStart;
+    const endTimeDisabled   = isCurrentLectureDay && (!hasStart || !hasEnd);
 
-    const startTimePlaceholder = hasStart
-      ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
-      : '강의 시작을 누르면 자동 기록';
-    const endTimePlaceholder = !hasStart
-      ? '강의 시작을 누르면 자동 기록'
-      : (!hasEnd
-          ? '강의 종료를 누르면 자동 기록'
-          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
+    const startTimePlaceholder = !isCurrentLectureDay
+      ? (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
+      : (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '강의 시작을 누르면 자동 기록');
+    const endTimePlaceholder = !isCurrentLectureDay
+      ? (hasEnd ? (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
+      : (!hasStart
+          ? '강의 시작을 누르면 자동 기록'
+          : (!hasEnd
+              ? '강의 종료를 누르면 자동 기록'
+              : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정')));
 
     let startAction = 'start', startLabel = '▶ 강의 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
     if(hasStart){
       startAction = 'cancel-start';
       startLabel = '시작 취소';
-      startDisabled = false;
+      // 과거 기록은 시간을 직접 입력해도 타이머 버튼 비활성화를 유지한다.
+      startDisabled = !isCurrentLectureDay;
       startClass = 'start cancel-start';
     }
     let endAction = 'end', endLabel = '■ 강의 종료', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
     if(hasEnd){
       endAction = 'cancel-end';
       endLabel = '종료 취소';
-      endDisabled = false;
+      // 과거 기록은 시간을 직접 입력해도 타이머 버튼 비활성화를 유지한다.
+      endDisabled = !isCurrentLectureDay;
       endClass = 'end cancel-end';
     }
 
@@ -2091,7 +2095,6 @@ function renderPeriods(){
         ${idx>0 ? `<div class="stat">강의 종료 후 시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
       </div>
     `;
-    if(idx < day.periods.length - 1) card.classList.add('locked-card');
     list.appendChild(card);
   });
 
@@ -2157,8 +2160,9 @@ function refreshLectureTimeFieldDisabled(idx){
 
   const hasStart = !!(p.startDate && p.startTime);
   const hasEnd   = !!(p.endDate && p.endTime);
-  const startDisabled = !hasStart;
-  const endDisabled   = !hasStart || !hasEnd;
+  const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
+  const startDisabled = isCurrentLectureDay && !hasStart;
+  const endDisabled   = isCurrentLectureDay && (!hasStart || !hasEnd);
 
   const startInput = document.querySelector(`#periodList input[data-k="start"][data-idx="${idx}"]`);
   const endInput   = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
@@ -2172,17 +2176,19 @@ function refreshLectureTimeFieldDisabled(idx){
 
   const startLabel = startField?.querySelector('.ko-time-label');
   if(startLabel){
-    startLabel.textContent = hasStart
-      ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
-      : '강의 시작을 누르면 자동 기록';
+    startLabel.textContent = !isCurrentLectureDay
+      ? (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
+      : (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '강의 시작을 누르면 자동 기록');
   }
   const endLabel = endField?.querySelector('.ko-time-label');
   if(endLabel){
-    endLabel.textContent = !hasStart
-      ? '강의 시작을 누르면 자동 기록'
-      : (!hasEnd
-          ? '강의 종료를 누르면 자동 기록'
-          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
+    endLabel.textContent = !isCurrentLectureDay
+      ? (hasEnd ? (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
+      : (!hasStart
+          ? '강의 시작을 누르면 자동 기록'
+          : (!hasEnd
+              ? '강의 종료를 누르면 자동 기록'
+              : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정')));
   }
 }
 
@@ -2254,7 +2260,8 @@ $('#addPeriod').onclick = async () => {
   // 새 강의 제한: 마지막 강의가 진행 중이면 다음 강의를 추가할 수 없음.
   const currentDay = getDayData();
   const currentPeriods = currentDay.periods || [];
-  if(currentPeriods.length > 0){
+  const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
+  if(isCurrentLectureDay && currentPeriods.length > 0){
     const last = currentPeriods[currentPeriods.length - 1];
     const hasStarted = !!(last.startDate && last.startTime);
     const hasEnded = !!(last.endDate && last.endTime);
@@ -2326,7 +2333,8 @@ $('#periodList').addEventListener('click', async (e) => {
     const day = getDayData();
     const lastIdx = day.periods.length - 1;
 
-    if(idx !== lastIdx){
+    const isPastLectureDay = ymd(cur) < ymd(logicalToday());
+    if(!isPastLectureDay && idx !== lastIdx){
       await askConfirm(`강의는 마지막 강의부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}강의를 삭제해주세요.`, true);
       return;
     }
@@ -2525,7 +2533,12 @@ $('#periodList').addEventListener('input', async (e) => {
     refreshStats();
     updateStudyTimer();
     updateWasteTimer();
-    void persistToday();
+    // 시작시간을 직접 입력/수정한 경우에도 즉시 시간순으로 카드 위치를 다시 정렬한다.
+    // 종료시간이 아직 없어도 시작시간만 있으면 정렬 대상이 된다.
+    const reordered = (k === 'start' && p.startDate && p.startTime)
+      ? autoSortPeriodsByStart(day) : false;
+    await persistToday();
+    if(reordered) renderPeriods();
     return;
   }
   if(k !== 'subject') refreshStats();
