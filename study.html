@@ -998,7 +998,7 @@ async function persistToday(){
   clearTimeout(saveTimers[ym]);
   return new Promise(resolve => {
     saveTimers[ym] = setTimeout(async () => {
-      void saveMonth(ym);
+      await saveMonth(ym);
       resolve();
     }, 400);
   });
@@ -1399,7 +1399,7 @@ async function splitRunningPeriodAtBoundary(running){
   oldP.timerEndedAt = boundaryMs;
 
   markChangedPeriodFields(oldP, beforeOld);
-  void saveMonth(running.ym);
+  await saveMonth(running.ym);
 
   // B. 다음 공부일 1교시 생성/복구
   const next = nextStudyDayKey(running.ym, running.dk);
@@ -1485,7 +1485,7 @@ async function splitRunningPeriodAtBoundary(running){
     newIdx = 0;
   }
 
-  void saveMonth(next.ym);
+  await saveMonth(next.ym);
 
   // C. 서버 active_timer도 새 공부일 1교시로 이동.
   // resume_active_timer에 최초 timerStartedAt을 전달하므로 서버에서도 연속 타이머 유지.
@@ -2382,7 +2382,7 @@ window.addEventListener('message',async ev=>{
       if(cloudUser){
         void cloudStopActiveTimer(ym, dk, p._id).then(row=>{
           const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-          if(Number.isFinite(ts)){ p.timerEndedAt=ts; p._updatedAt=syncNow(); void saveMonth(ym); }
+          if(Number.isFinite(ts)){ p.timerEndedAt=ts; p._updatedAt=syncNow(); await saveMonth(ym); }
         }).catch(()=>{});
       }
       markChangedPeriodFields(p, before);
@@ -2395,7 +2395,7 @@ window.addEventListener('message',async ev=>{
           renderPeriods();updateStudyTimer();updateWasteTimer();
         }
       }
-      void saveMonth(ym);
+      await saveMonth(ym);
       try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(e){console.log('렌더에러:',e);}
       stopped=true;
     }
@@ -2432,7 +2432,7 @@ window.addEventListener('message',async ev=>{
     if(cloudUser) await cloudResumeActiveTimer(ym, dk, p, idx);
     markChangedPeriodFields(p, before);
     autoSortPeriodsByStart(day);
-    void saveMonth(ym);
+    await saveMonth(ym);
     if(ym===ymKey(cur) && dk===dKey(cur)){
       renderPeriods();updateStudyTimer();updateWasteTimer();
     }
@@ -3648,7 +3648,7 @@ async function runManualCloudSync(fromSwipe=false){
   fullCloudSyncRunning = true;
   if(btn){ btn.disabled = true; btn.textContent = '↻ 동기화 중…'; }
   try{
-    void saveMonth(ymKey(cur));
+    await saveMonth(ymKey(cur));
     await refreshCloudStatus();
     if(!cloudUser){
       if(!fromSwipe) showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
