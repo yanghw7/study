@@ -3684,9 +3684,9 @@ $('#cloudSync').onclick = runManualCloudSync;
 initSupabase();
 
 // [FIX] 자식 iframe은 부모의 journal-auth-changed 알림만 받는다 (재귀 방지)
-if(false && sbClient){
+if(sbClient){
   let __authBusy=false;
-  false && sbClient.auth.onAuthStateChange((event, session) => { setTimeout(async () => {
+  sbClient.auth.onAuthStateChange((event, session) => { setTimeout(async () => {
     if(__authBusy) return; __authBusy=true; try{
     if(event === 'TOKEN_REFRESHED') return;
     cloudUser = session?.user || null;
