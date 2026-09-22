@@ -95,8 +95,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isAuthCallback(uri: Uri): Boolean =
-        (uri.scheme == "diary" && uri.host == "login") ||
-        (uri.scheme == "yangstudy" && uri.host == "auth" && uri.path == "/callback")
+        uri.scheme == "diary" && uri.host == "login"
 
     private fun deliverAuthCallback(uri: Uri) {
         // IMPORTANT: Supabase PKCE stores the code verifier in the WebView/frame that

@@ -4035,12 +4035,12 @@ $('#cloudGoogle').onclick = async () => {
     return;
   }
 
-  // Android APK: 외부 브라우저 Google OAuth -> yangstudy://auth/callback -> WebView 세션 교환
+  // Android APK: 외부 브라우저 Google OAuth -> diary://login -> WebView 세션 교환
   if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
     const {data,error} = await sbClient.auth.signInWithOAuth({
       provider:'google',
       options:{
-        redirectTo:'yangstudy://auth/callback',
+        redirectTo:'diary://login',
         skipBrowserRedirect:true
       }
     });

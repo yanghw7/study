@@ -43,12 +43,6 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="diary" android:host="login"/>
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="yangstudy" android:host="auth" android:path="/callback"/>
-            </intent-filter>
         </activity>
         <receiver android:name=".AlarmReceiver" android:exported="false"/>
         <receiver android:name=".PersistentNotificationReceiver" android:exported="false"/>
