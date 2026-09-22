@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>공부장</title>
+<title>기타 기록장</title>
 
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
-<meta name="theme-color" content="#3B6E5C">
+<meta name="theme-color" content="#B86F7D">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="공부장">
+<meta name="apple-mobile-web-app-title" content="기타 기록장">
 <link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>
@@ -180,10 +180,10 @@
   .summary-item span{font-size:11.5px;color:var(--ink-soft);}
   .summary-item.warn b{color:var(--waste);}
   .summary-item.ok b{color:var(--study);}
-  /* 합계: 공부 페이지와 낭비시간을 오른쪽으로 정돈 */
+  /* 합계: 강의 횟수와 강의 종료 후 시간을 오른쪽으로 정돈 */
   .summary-grid .summary-item:nth-child(2){text-align:center;transform:translateX(10px);}
   .summary-grid .summary-item:nth-child(3){text-align:right;}
-  /* 교시별 통계: 세 항목 사이 간격을 넓혀 보기 쉽게 배치 */
+  /* 강의별 통계: 세 항목 사이 간격을 넓혀 보기 쉽게 배치 */
   .period-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
   .period-stats .stat:nth-child(2){text-align:center;}
   .period-stats .stat:nth-child(3){text-align:right;}
@@ -208,8 +208,7 @@
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
   .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
-  .chart-avg-note{font-size:12px;font-weight:800;color:#2563eb;margin:-2px 4px 7px;text-align:right;line-height:1.35;}
-  .chart-period-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
+  .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
   .chart-axis-label{font-size:9.5px;fill:var(--ink-soft);font-family:inherit;}
@@ -219,13 +218,150 @@
   .chart-dot-study{fill:var(--study);}
   .chart-dot-pages{fill:var(--accent);}
   .chart-dot-waste{fill:var(--waste);}
-  .chart-bar-study{fill:var(--study);}
-  .chart-bar-pages{fill:#111111;}
+  .chart-bar-study{fill:var(--accent);}
+  .chart-bar-pages{fill:#111827;}
   .chart-bar-waste{fill:#dc2626;}
   .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
   .chart-card{position:relative;}
   .chart-tooltip{position:absolute;z-index:20;pointer-events:none;background:#111827;color:#fff;border-radius:8px;padding:6px 9px;font-size:12px;font-weight:700;line-height:1.25;box-shadow:0 4px 12px rgba(0,0,0,.18);transform:translate(-50%,-115%);white-space:nowrap;display:none;}
   .chart-bar-study,.chart-bar-pages,.chart-bar-waste{cursor:pointer;}
+  .chart-bar-count{fill:#111827;cursor:pointer;}
+  .chart-bar-number{fill:#B86F7D;cursor:pointer;}
+
+  /* settings */
+  .settings-overlay{
+    position:fixed;inset:0;background:rgba(31,42,36,.38);z-index:100;
+    display:none;align-items:flex-end;justify-content:center;padding:16px;
+  }
+  .settings-overlay.show{display:flex;}
+  .settings-panel{
+    width:min(520px,100%);background:var(--surface);border:1px solid var(--line);
+    border-radius:18px;padding:18px;box-shadow:0 14px 45px rgba(0,0,0,.16);
+  }
+  .settings-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .settings-title{font-size:17px;font-weight:700;}
+  .settings-close{border:none;background:none;font-size:22px;color:var(--ink-soft);cursor:pointer;padding:2px 6px;}
+  .setting-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid var(--line);}
+  .setting-row:first-of-type{border-top:none;}
+  .setting-label{font-size:13.5px;font-weight:700;}
+  .setting-desc{font-size:11.5px;color:var(--ink-soft);margin-top:3px;line-height:1.4;}
+  .setting-status{font-size:11.5px;color:var(--accent);margin-top:6px;line-height:1.45;font-weight:600;}
+  .setting-select{min-width:132px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:9px 10px;font-size:13px;font-weight:600;}
+  .settings-actions{display:flex;gap:8px;margin-top:14px;}
+  .settings-actions button{flex:1;border-radius:10px;padding:10px 12px;font-size:13.5px;font-weight:700;cursor:pointer;}
+  .settings-cancel{border:1px solid var(--line);background:var(--surface);color:var(--ink);}
+  .settings-save{border:none;background:var(--accent);color:#fff;}
+  .settings-danger-wrap{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
+  .settings-danger{width:100%;border:1px solid #dc2626;background:#fff;color:#dc2626;border-radius:10px;padding:11px 12px;font-size:13.5px;font-weight:800;cursor:pointer;}
+  .settings-danger:active{transform:translateY(1px);}
+  .settings-danger-note{margin-top:6px;font-size:11px;line-height:1.4;color:var(--ink-soft);}
+
+  .toast{
+    position:fixed;top:max(8px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+    z-index:10020;
+    background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;
+    font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  .toast.show{opacity:1;}
+
+  /* pull-to-refresh: original design + full-screen blur; text only enlarged */
+  .pull-refresh-blur{
+    position:fixed;inset:0;z-index:9997;pointer-events:none;opacity:0;
+    background:rgba(255,255,255,.08);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    transition:opacity .14s ease,-webkit-backdrop-filter .14s ease,backdrop-filter .14s ease;
+  }
+  .pull-refresh-blur.show{opacity:1;}
+  .pull-refresh{
+    position:fixed;top:max(8px, env(safe-area-inset-top));left:50%;z-index:9999;
+    transform:translate(-50%,-70px);opacity:0;pointer-events:none;
+    background:var(--surface);color:var(--ink);border:1px solid var(--line);
+    border-radius:999px;padding:8px 13px;font-size:15.5px;font-weight:700;
+    box-shadow:0 4px 16px rgba(31,42,36,.14);
+    transition:transform .16s ease,opacity .16s ease;
+  }
+  .pull-refresh.show{opacity:1;}
+  .pull-refresh.ready{color:var(--accent);border-color:var(--accent);}
+
+  /* 1.0: bottom pull-up sync indicator */
+  .pull-sync-up{
+    position:fixed;top:max(8px, env(safe-area-inset-top));left:50%;z-index:9999;
+    transform:translate(-50%,-70px);opacity:0;pointer-events:none;
+    background:var(--surface);color:var(--ink);border:1px solid var(--line);
+    border-radius:999px;padding:8px 13px;font-size:15.5px;font-weight:700;
+    box-shadow:0 4px 16px rgba(31,42,36,.14);
+    transition:transform .16s ease,opacity .16s ease;
+  }
+  .pull-sync-up.show{opacity:1;}
+  .pull-sync-up.ready{color:var(--accent);border-color:var(--accent);}
+
+  .study-alarm-card{
+    border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);
+    padding:10px 12px;margin:0 0 7px;box-shadow:0 1px 4px rgba(0,0,0,.04);
+    width:100%;box-sizing:border-box;
+  }
+  .study-alarm-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .study-alarm-row+.study-alarm-row{margin-top:7px}
+  .study-alarm-row strong{font-size:14px;white-space:nowrap}
+  .study-alarm-row select,.study-alarm-row input,.study-alarm-row button{
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    border-radius:9px;padding:7px 9px;font-size:12px;font-weight:700;box-sizing:border-box
+  }
+  .study-alarm-row select{flex:1;min-width:120px}
+  .study-alarm-row input{width:58px;text-align:center;font-size:15px;font-weight:800}
+  .study-alarm-row span{font-size:12px;font-weight:700;white-space:nowrap}
+  .study-alarm-row .alarm-start{background:var(--accent);color:#fff;border-color:var(--accent);margin-left:auto}
+  .study-alarm-row .alarm-start.running{background:#244f43}
+  .study-alarm-due{text-align:center;font-size:12px;font-weight:800;color:var(--accent);margin-top:6px}
+  .study-alarm-stop{display:none;width:100%;margin-top:6px;border:0;border-radius:9px;padding:8px;background:#b42318;color:#fff;font-weight:800}
+  .study-alarm-stop.show{display:block}
+  @media(max-width:520px){
+    .study-alarm-card{padding:8px 10px}
+    .study-alarm-row:first-child{
+      display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px;
+    }
+    .study-alarm-row:first-child strong{grid-column:1}
+    .study-alarm-row:first-child select{grid-column:2;min-width:0;width:100%}
+    .study-alarm-row:first-child button{white-space:nowrap;padding:7px 8px}
+    .alarm-time-row{
+      display:grid;grid-template-columns:52px auto 52px auto minmax(76px,1fr) minmax(76px,1fr);
+      gap:5px;
+    }
+    .alarm-time-row input{width:52px}
+    .alarm-time-row .alarm-start{margin-left:0}
+  }
+/* v1.0 stable: alarm immediately above Today Total, both sticky */
+  #dayView > .study-alarm-card{position:sticky;top:8px;z-index:22}
+  #dayView > .summary-card{position:static;top:auto;z-index:auto}
+  @media(max-width:520px){
+    #dayView > .summary-card{top:auto}
+  }
+
+/* 통계 꺾은선 그래프 */
+  .charts-wrap{display:grid;gap:10px;margin:10px 0 14px;}
+  .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px 9px;}
+  .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
+  .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
+  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
+  .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
+  .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
+  .chart-grid{stroke:var(--line);stroke-width:1;}
+  .chart-axis-label{font-size:9.5px;fill:var(--ink-soft);font-family:inherit;}
+  .chart-line-study{fill:none;stroke:var(--study);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+  .chart-line-pages{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+  .chart-line-waste{fill:none;stroke:var(--waste);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+  .chart-dot-study{fill:var(--study);}
+  .chart-dot-pages{fill:var(--accent);}
+  .chart-dot-waste{fill:var(--waste);}
+  .chart-bar-study{fill:var(--accent);}
+  .chart-bar-pages{fill:#111827;}
+  .chart-bar-waste{fill:#dc2626;}
+  .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
+  .chart-card{position:relative;}
+  .chart-tooltip{position:absolute;z-index:20;pointer-events:none;background:#111827;color:#fff;border-radius:8px;padding:6px 9px;font-size:12px;font-weight:700;line-height:1.25;box-shadow:0 4px 12px rgba(0,0,0,.18);transform:translate(-50%,-115%);white-space:nowrap;display:none;}
+  .chart-bar-study,.chart-bar-pages,.chart-bar-waste{cursor:pointer;}
+  .chart-bar-count{fill:#111827;cursor:pointer;}
+  .chart-bar-number{fill:#B86F7D;cursor:pointer;}
 
   /* settings */
   .settings-overlay{
@@ -337,95 +473,86 @@
   }
 
 
-/* v1.08: 기존 틀고정 복구 — 알람 + 오늘 공부 합계만 고정 */
+
+/* v1.08: 기존 틀고정 복구 — 알람 + 오늘 합계만 고정 */
 #dayView > .study-alarm-card{position:sticky!important;top:8px!important;z-index:22!important}
 #dayView > .summary-card{position:static!important;top:auto!important;z-index:auto!important}
 
 .field.time{position:relative;min-height:45px}.field.time input[type="datetime-local"]{color:transparent;caret-color:transparent;min-height:20px}.field.time input[type="datetime-local"]::-webkit-calendar-picker-indicator{opacity:1;cursor:pointer}.ko-time-label{position:absolute;left:10px;right:34px;bottom:7px;z-index:2;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:700;color:var(--ink);background:var(--bg);line-height:20px}
 
-/* v1.34: 페이지 입력칸 유지 + 일시 한 줄 표시 */
-.field-grid .field input[data-k="startPage"],.field-grid .field input[data-k="endPage"]{display:block!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;padding-right:42px!important;}
-.field-grid .field:has(input[data-k="startPage"]),.field-grid .field:has(input[data-k="endPage"]){position:relative!important;}
-.field-grid .field:has(input[data-k="startPage"])::after,.field-grid .field:has(input[data-k="endPage"])::after{content:"";position:absolute;right:12px;bottom:13px;font-size:11px;font-weight:800;color:var(--muted);pointer-events:none;}
-.page-action-row{display:grid;grid-template-columns:minmax(0,1fr) 56px;gap:6px;align-items:end;}
-.field-grid .field .page-action-row input[data-k="startPage"],.field-grid .field .page-action-row input[data-k="endPage"]{padding-right:0!important;min-width:0!important;text-align:left!important;}
-.field-grid .field:has(.page-action-row)::after{right:68px;bottom:13px;}
-.page-action-btn{height:34px;min-width:56px;padding:0 4px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:#fff;font-weight:800;font-size:11.5px;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:none;letter-spacing:-.5px;overflow:hidden;text-align:center;display:flex;align-items:center;justify-content:center;}
-.page-action-btn:active{transform:translateY(1px);filter:brightness(.9);}
-.page-action-btn:disabled{opacity:.32;cursor:not-allowed;}
-.page-action-btn.end{background:#a43c31;border-color:#a43c31;}
-.page-action-btn.cancel-end{background:#f8ece9!important;color:#a43c31!important;border-color:#c45a4c!important;}
-.page-action-btn.cancel-start{background:#e8f3ef!important;color:#315f50!important;border-color:var(--accent)!important;}
-.page-action-row input[data-k="endPage"]:disabled{opacity:.45!important;cursor:not-allowed!important;}
-.field-grid .field:has(.page-action-row)>label{white-space:nowrap;display:block;}
+/* shared alarm lives in index */
+.study-alarm-card,.alarm-card{display:none!important}
 
-.field-grid .ko-time-label{font-size:11.5px!important;letter-spacing:-.25px!important;}
+/* Cloud account/storage UI is owned by index */
+.cloud-card{display:none!important}
 </style>
 
-<style id="v123-header-cloud-unify">
-/* v1.23: exact cross-page control sizing */
-.top-actions{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:8px!important;margin-bottom:10px!important}
-.top-right-actions{display:flex!important;align-items:center!important;gap:8px!important;margin-left:auto!important}
-.sync-top-btn,.settings-top-btn,.top-chart-btn{box-sizing:border-box!important;margin:0!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;min-height:42px!important;height:42px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:13px!important;font-weight:700!important;line-height:1!important;white-space:nowrap!important;box-shadow:0 1px 4px rgba(0,0,0,.05)!important}
-.sync-top-btn,.settings-top-btn{padding:8px 7px!important}
-.top-chart-btn{padding:8px 11px!important;width:auto!important}
-/* Cloud layout follows the sleep-page layout */
-.cloud-card{display:block!important;background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:12px!important;margin:-6px 0 14px!important}
-.cloud-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;margin-top:8px!important}
-.cloud-actions .data-btn{box-sizing:border-box!important;width:100%!important;min-width:0!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;padding:9px 6px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:12px!important;font-weight:700!important;line-height:1.2!important;white-space:nowrap!important}
-.cloud-actions .data-btn[style*="display:none"]{display:none!important}
-@media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
-</style>
-<style id="v126-index-alarm-only">.study-alarm-card{display:none!important}.index-alarm-note{font:700 10px Inter,system-ui,sans-serif;color:#7b8783;text-align:center;margin:4px 0 6px}</style><style id="v128-index-cloud-only">.cloud-card{display:none!important}</style>
-<style id="v133-study-field-layout">
-/* v1.33: page field 35%, date/time field 65%; keep lower-left cell blank */
-.field-grid{grid-template-columns:minmax(0,38fr) minmax(0,62fr)!important;}
-.field-grid .field.time{min-width:0!important;}
-.field-grid .field.time input{font-size:12px!important;}
-.field-grid .ko-time-label{font-size:12px!important;left:10px!important;right:10px!important;text-overflow:clip!important;}
-.field-grid .field-empty{background:transparent!important;min-height:52px!important;padding:0!important;}
+<style>
+:root{--accent:#B86F7D;--bg:#FCF6F7;--surface:#fff;--ink:#463437;--muted:#8A7378;--line:#EEDDE1}
+body{background:#f7f5fb!important}
+.add-btn,.primary,.study-alarm-row .alarm-start{background:#67538b!important;border-color:#67538b!important}
+.study-alarm-due{color:#67538b!important}
 </style>
 
-<style id="v136-datetime-value-center">
-.field-grid .ko-time-label{left:34px!important;right:34px!important;text-align:center!important;display:block!important;}
-</style>
 
-<style id="v137-wide-time-columns">
-.field-grid{grid-template-columns:minmax(0,44fr) minmax(0,56fr)!important;}
-.field-grid .ko-time-label{left:8px!important;right:8px!important;text-align:center!important;font-size:11.5px!important;letter-spacing:-.45px!important;text-overflow:clip!important;}
-</style>
-<style id="study-time-field-v2">
-.field.time{position:relative;min-height:52px!important;overflow:hidden}
-.field.time label{position:relative;z-index:1}
-.field.time input[type="datetime-local"]{
-  position:absolute!important;inset:0!important;
-  width:100%!important;height:100%!important;min-height:0!important;
-  opacity:0!important;color:transparent!important;
-  z-index:4!important;cursor:pointer!important;
-  font-size:16px!important;
-}
-.field.time .ko-time-label{
-  left:10px!important;right:10px!important;bottom:8px!important;
-  pointer-events:none!important;z-index:3!important;
-  text-align:right!important;font-size:12.5px!important;
-  letter-spacing:-.2px!important;color:#302b3d!important;
-}
-</style>
-<style id="study-add-btn-filled">
+<style id="lecture-visibility-fix">
+.lecture-page-fix{}
 .add-btn{
-  background:#3B6E5C !important;
-  border:1.5px solid #3B6E5C !important;
+  background:#67538b !important;
+  border:1.5px solid #67538b !important;
   color:#fff !important;
-  box-shadow:0 2px 7px rgba(59,110,92,.16);
+  box-shadow:0 2px 7px rgba(103,83,139,.16);
 }
 .add-btn:active{transform:translateY(1px)}
+.empty-state{color:#746e82!important}
 </style>
-<style id="time-field-lock">
-/* 시간 입력 잠금 상태 */
-.field.time.disabled{opacity:.55;cursor:not-allowed;}
-.field.time.disabled .ko-time-label{color:var(--ink-soft);font-weight:600;}
+
+
+<style id="lecture-card-actions-v12">
+.lecture-action-field{display:flex!important;align-items:stretch!important}
+.lecture-card-action{
+ width:100%;min-height:76px;border:0;border-radius:14px;
+ font-size:17px;font-weight:900;color:#fff;background:#6d5596;
+}
+.lecture-card-action.end{background:#a43c31}
+.lecture-card-action.cancel-start{
+  background:#efeaf6!important;
+  color:#5c487d!important;
+  border:1.5px solid #67538b!important;
+  box-shadow:none!important;
+}
+.lecture-card-action.cancel-end{
+  background:#f8ece9!important;
+  color:#a43c31!important;
+  border:1.5px solid #c45a4c!important;
+  box-shadow:none!important;
+}
+.lecture-card-action:disabled{opacity:.42}
+
+.lecture-confirm-overlay{
+  position:fixed;inset:0;z-index:10050;
+  background:rgba(48,43,61,.38);
+  display:flex;align-items:center;justify-content:center;
+  padding:16px;
+}
+.lecture-confirm-panel{
+  width:min(520px,100%);
+  background:#fff;border:1px solid #e2ddea;border-radius:18px;
+  padding:18px;box-shadow:0 14px 45px rgba(0,0,0,.16);
+}
+.lecture-confirm-msg{margin:0 0 14px;font-size:15px;font-weight:700;line-height:1.45;color:#302b3d}
+.lecture-confirm-actions{display:flex;gap:8px}
+.lecture-confirm-actions button{
+  flex:1;border-radius:10px;padding:11px 12px;font-size:14px;font-weight:800;cursor:pointer
+}
+.lecture-confirm-no{border:1px solid #e2ddea;background:#fff;color:#302b3d}
+.lecture-confirm-yes{border:0;background:#67538b;color:#fff}
+.lecture-confirm-yes.danger{background:#a43c31}
 </style>
-<style id="cancel-alert-android-style">
+
+
+<style id="lecture-cancel-alert-android-style">
+/* 시작 취소 / 종료 취소 확인창: Android alert 느낌, 화면 중앙 */
 .lecture-confirm-overlay{
   position:fixed!important;inset:0!important;z-index:10050!important;
   background:rgba(0,0,0,.58)!important;
@@ -459,34 +586,402 @@
 .lecture-confirm-yes.danger{background:transparent!important;color:#2563eb!important}
 .lecture-confirm-no{color:#6b7280!important}
 </style>
-<style id="locked-card-style">
-.period-card.locked-card{opacity:.5;pointer-events:none;}
+
+<style id="lecture-card-actions-normal-size">
+.lecture-action-field{
+  display:flex!important;
+  align-items:stretch!important;
+  min-height:0!important;
+}
+.lecture-card-action{
+  width:100%!important;
+  min-height:0!important;
+  height:100%!important;
+  padding:12px 10px!important;
+  border-radius:12px!important;
+  font-size:15px!important;
+  line-height:1.25!important;
+  font-weight:800!important;
+}
 </style>
+
+
+<style id="lecture-graph-purple-only">
+/* Same study-journal graph; only lecture accent is purple. */
+.charts-wrap,.chart-card{--accent:#67538b;--ink:#302b3d;--line:#e2ddea;--surface:#fff}
+.chart-toggle-btn.active{background:#67538b!important;border-color:#67538b!important;color:#fff!important}
+</style>
+
+
+<style id="lecture-final-colors">
+/* Lecture metrics = purple */
+#totalStudy, #todayStudy, .study-total, .study-value,
+.lecture-time-value, [data-metric="study"], [data-metric="lecture"] {
+  color:#72539b!important;
+}
+.chart-card svg rect.bar-study,
+.chart-card svg rect.bar-lecture,
+.chart-card .bar-study,
+.chart-card .bar-lecture {
+  fill:#72539b!important;
+}
+.chart-card svg path.line-study,
+.chart-card svg path.line-lecture {
+  stroke:#72539b!important;
+}
+/* Post-lecture time stays red */
+#totalWaste, #todayWaste, .waste-total, .waste-value,
+.after-lecture-value, [data-metric="waste"], [data-metric="after-lecture"] {
+  color:#b23a2e!important;
+}
+.chart-card svg rect.bar-waste,
+.chart-card svg rect.bar-after-lecture,
+.chart-card .bar-waste,
+.chart-card .bar-after-lecture {
+  fill:#b23a2e!important;
+}
+.chart-card svg path.line-waste,
+.chart-card svg path.line-after-lecture {
+  stroke:#b23a2e!important;
+}
+</style>
+
+
+<style id="v123-header-cloud-unify">
+/* v1.23: exact cross-page control sizing */
+.top-actions{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:8px!important;margin-bottom:10px!important}
+.top-right-actions{display:flex!important;align-items:center!important;gap:8px!important;margin-left:auto!important}
+.sync-top-btn,.settings-top-btn,.top-chart-btn{box-sizing:border-box!important;margin:0!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;min-height:42px!important;height:42px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:13px!important;font-weight:700!important;line-height:1!important;white-space:nowrap!important;box-shadow:0 1px 4px rgba(0,0,0,.05)!important}
+.sync-top-btn,.settings-top-btn{padding:8px 7px!important}
+.top-chart-btn{padding:8px 11px!important;width:auto!important}
+/* Cloud layout follows the sleep-page layout */
+.cloud-card{display:block!important;background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:12px!important;margin:-6px 0 14px!important}
+.cloud-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;margin-top:8px!important}
+.cloud-actions .data-btn{box-sizing:border-box!important;width:100%!important;min-width:0!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:10px!important;padding:9px 6px!important;font-family:'Inter',system-ui,-apple-system,sans-serif!important;font-size:12px!important;font-weight:700!important;line-height:1.2!important;white-space:nowrap!important}
+.cloud-actions .data-btn[style*="display:none"]{display:none!important}
+@media(max-width:390px){.cloud-actions .data-btn{font-size:11px!important;padding-left:3px!important;padding-right:3px!important}}
+</style>
+
+<style id="v136-datetime-value-center">
+.field-grid .ko-time-label{left:34px!important;right:34px!important;text-align:center!important;display:block!important;}
+</style>
+
+<style id="v137-wide-time-columns">
+.field-grid{grid-template-columns:minmax(0,27fr) minmax(0,73fr)!important;}
+.field-grid .ko-time-label{left:8px!important;right:8px!important;text-align:center!important;font-size:11.5px!important;letter-spacing:-.45px!important;text-overflow:clip!important;}
+.lecture-card-action{padding:10px 4px!important;font-size:14px!important;}
+</style>
+
+<style id="v144-lecture-action-single-line">
+/* Keep lecture action buttons on one line while preserving room for date/time. */
+.field-grid{grid-template-columns:minmax(0,34fr) minmax(0,66fr)!important;}
+.lecture-card-action{
+  white-space:nowrap!important;
+  word-break:keep-all!important;
+  padding:10px 5px!important;
+  font-size:13.5px!important;
+  letter-spacing:-.5px!important;
+}
+.field-grid .ko-time-label{
+  left:5px!important;right:5px!important;
+  font-size:11px!important;letter-spacing:-.65px!important;
+  white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;
+}
+</style>
+<style id="final-child-ui-ownership">.cloud-card{display:none!important}.study-alarm-card,.alarm-card{display:none!important}</style>
+<style id="lecture-edit-cancel-v2">
+.field.time{position:relative;min-height:52px!important;overflow:hidden}
+.field.time label{position:relative;z-index:1}
+.field.time input[type="datetime-local"]{
+  position:absolute!important;inset:0!important;
+  width:100%!important;height:100%!important;min-height:0!important;
+  opacity:0!important;color:transparent!important;
+  z-index:4!important;cursor:pointer!important;
+  font-size:16px!important;
+}
+.field.time .ko-time-label{
+  left:10px!important;right:10px!important;bottom:8px!important;
+  pointer-events:none!important;z-index:3!important;
+  text-align:right!important;font-size:12.5px!important;
+  letter-spacing:-.2px!important;color:#302b3d!important;
+}
+.lecture-card-action.cancel-start,.lecture-card-action.cancel-end{
+  font-size:13px!important;letter-spacing:-.3px!important;
+}
+</style>
+<style id="time-field-lock">
+/* 시간 입력 잠금 상태 */
+.field.time.disabled{opacity:.55;cursor:not-allowed;}
+.field.time.disabled .ko-time-label{color:#746e82;font-weight:600;}
+</style>
+
+<style id="record-dynamic-card-style">
+body{background:#FCF6F7!important}
+.add-btn,.primary{background:#B86F7D!important;border-color:#B86F7D!important}
+#periodList{display:block!important}
+.period-card{border-color:#EEDDE1!important;background:#fff!important}
+.record-triple-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.record-slot{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.record-slot .record-subject{
+  width:100%!important;
+  box-sizing:border-box;
+  margin:0!important;
+  height:46px;
+  border:1px solid #EEDDE1!important;
+  border-radius:14px!important;
+  padding:0 10px!important;
+}
+.record-lecture-add{
+  width:100%;
+  min-width:0;
+  height:48px;
+  border:0;
+  border-radius:14px;
+  background:#F3DADD;
+  color:#9A5866;
+  font:inherit;
+  font-weight:900;
+}
+.record-start-box{
+  min-height:58px;
+  box-sizing:border-box;
+  padding:8px 10px;
+  border:1px solid #EEDDE1;
+  border-radius:14px;
+  background:#fff;
+}
+.record-start-box label{
+  display:block;
+  color:#8A7378;
+  font-size:12px;
+  font-weight:800;
+}
+.record-start-value{
+  margin-top:5px;
+  text-align:right;
+  color:#463437;
+  font-size:16px;
+  font-weight:900;
+}
+@media(max-width:760px){
+  .record-triple-grid{gap:7px}
+  .record-slot .record-subject{padding:0 8px!important;font-size:13px!important}
+  .record-lecture-add{font-size:13px;padding:0 3px}
+  .record-start-box{padding:7px}
+}
+</style>
+
+<style id="record-v103-style">
+.record-top-timers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px;}
+.record-top-timers .study-timer{border-color:#D9AAB3!important;background:#FCF6F7!important;}
+.record-top-timers .study-timer-label{color:#8A7378!important;}
+.record-top-timers .study-timer-time{color:#B86F7D!important;}
+.record-count-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+</style>
+
+<style id="record-v104-style">
+.record-count-grid{gap:8px!important;}
+.record-count-grid .summary-item{text-align:center!important;align-items:center!important;}
+
+@media(max-width:760px){
+  .record-slot .record-subject{font-size:14px!important;}
+}
+</style>
+
+
+<style id="record-v113-subject-height">
+.record-slot .record-subject{
+  height:42px!important;
+  min-height:42px!important;
+  box-sizing:border-box!important;
+}
+</style>
+
+<style id="record-fixed-subject-style">
+.record-slot .record-subject-fixed{
+  text-align:center!important;
+  cursor:default!important;
+  caret-color:transparent!important;
+}
+</style>
+
+<style id="record-v122-count-spacing">
+.record-count-grid .summary-item span{
+  line-height:1.15!important;
+}
+</style>
+
+<style id="record-index-alarm-style">
+.alarmbar{flex:0 0 auto;margin:6px 8px 0;padding:6px 8px;border:1px solid #dbe4e0;border-radius:11px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font-size:12px}
+.alarmline{display:flex;align-items:center;gap:5px;min-width:0}
+.alarmline strong{font-size:16px;line-height:1;white-space:nowrap;color:#26332f}
+.alarmline input{width:36px;height:30px;border:1px solid #dbe4e0;border-radius:8px;text-align:center;font-weight:800;font-size:13px;background:#f8faf9}
+.alarmline .unit{font-size:11px;font-weight:700;color:#6b7773;margin-left:-3px}
+.alarmline select{height:30px;width:92px;min-width:72px;max-width:92px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 5px;font-size:10.5px;font-weight:800;color:#34423d}
+.alarmline button{height:30px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 6px;font-size:10.5px;font-weight:800;white-space:nowrap;color:#34423d}
+#alarmStart{margin-left:auto}
+#alarmStart,#alarmCancel{width:54px;min-width:0;flex:0 1 54px;padding:0 5px}
+#alarmCancel{margin-right:0}
+.alarmline button.primary{background:#285f50;border-color:#285f50;color:#fff}
+.alarmline button.danger{display:none!important;background:#b42318;border-color:#b42318;color:#fff}
+.alarmline button.danger.show{display:inline-block!important}
+#alarmFileName{min-width:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#77827e}
+.alarmstatusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;min-height:30px}.alarmstatusline:has(#alarmStatus:empty){display:none}#alarmStatus{display:block;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}.alarmstatusline #alarmStop{display:none;height:27px;padding:0 8px;border:1px solid #b42318;border-radius:8px;background:#b42318;color:#fff;font-size:10.5px;font-weight:800;white-space:nowrap}.alarmstatusline #alarmStop.show{display:inline-block}
+@media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{font-size:13px}}
+.record-fixed-top{position:sticky!important;top:0!important;z-index:50!important;background:var(--bg);padding-top:1px;padding-bottom:1px}
+</style>
+
+<style id="record-alarm-summary-harmony">
+.record-fixed-top{
+  padding:2px 0 2px!important;
+}
+.record-fixed-top #recordAlarmBar{
+  margin:0 0 3px!important;
+  padding:4px 6px!important;
+  border:1px solid var(--line)!important;
+  border-radius:14px!important;
+  background:var(--card)!important;
+  box-shadow:none!important;
+}
+.record-fixed-top #recordAlarmBar .alarmline{
+  gap:7px!important;
+}
+.record-fixed-top #recordAlarmBar input,
+.record-fixed-top #recordAlarmBar select,
+.record-fixed-top #recordAlarmBar button{
+  border-color:var(--line)!important;
+  border-radius:10px!important;
+}
+.record-fixed-top #recordAlarmBar #alarmStart{
+  background:var(--accent)!important;
+  border-color:var(--accent)!important;
+  color:#fff!important;
+}
+.record-fixed-top #recordAlarmBar #alarmCancel,
+.record-fixed-top #recordAlarmBar #alarmPreview{
+  background:var(--card)!important;
+  color:var(--ink)!important;
+}
+.record-fixed-top #recordAlarmBar .alarmstatusline{
+  margin-top:2px!important;
+  min-height:22px!important;
+}
+.record-fixed-top .summary-card{
+  margin-top:0!important;
+  padding-top:6px!important;
+  padding-bottom:6px!important;
+}
+</style>
+
+
+<style id="record-alarm-button-size-fix">
+#recordAlarmBar #alarmStart,
+#recordAlarmBar #alarmCancel{
+  min-width:52px!important;
+  width:auto!important;
+  padding-left:10px!important;
+  padding-right:10px!important;
+  white-space:nowrap!important;
+  flex-shrink:0!important;
+}
+</style>
+
+
+<style id="record-count-side-by-side">
+.record-count-paired{gap:6px!important;}
+.record-count-paired .record-pair{display:grid;grid-template-columns:1fr 1fr;gap:4px;min-width:0;}
+.record-count-paired .summary-item{display:flex!important;align-items:center!important;justify-content:center!important;gap:4px!important;min-width:0;white-space:nowrap;}
+.record-count-paired .summary-item span{font-size:9px!important;line-height:1!important;}
+.record-count-paired .summary-item b{display:inline!important;font-size:15px!important;line-height:1!important;}
+</style>
+
+<style id="record-count-nowrap-fix">
+.record-pair .summary-item{white-space:nowrap!important;}
+.record-pair .summary-item span,.record-pair .summary-item b{white-space:nowrap!important;}
+</style>
+
+<style id="record-alarm-mobile-fit-v1">
+@media(max-width:560px){
+  .record-fixed-top #recordAlarmBar{padding:4px 3px!important;}
+  .record-fixed-top #recordAlarmBar .alarmline{
+    width:100%!important;max-width:100%!important;gap:2px!important;flex-wrap:nowrap!important;overflow:hidden!important;
+  }
+  #recordAlarmBar .alarmline strong{font-size:10px!important;flex:0 0 auto!important;}
+  #recordAlarmBar .alarmline input{
+    width:30px!important;min-width:30px!important;height:28px!important;padding:0 2px!important;font-size:12px!important;flex:0 0 30px!important;
+  }
+  #recordAlarmBar .alarmline .unit{font-size:9px!important;margin-left:0!important;flex:0 0 auto!important;}
+  #recordAlarmBar #alarmSoundSelect{
+    width:64px!important;min-width:0!important;max-width:64px!important;height:28px!important;padding:0 2px!important;font-size:9px!important;flex:1 1 52px!important;
+  }
+  #recordAlarmBar #alarmPreview{
+    height:28px!important;min-width:56px!important;width:56px!important;padding:0 2px!important;font-size:9px!important;flex:0 0 56px!important;
+  }
+  #recordAlarmBar #alarmStart,#recordAlarmBar #alarmCancel{
+    height:28px!important;min-width:40px!important;width:40px!important;padding:0 2px!important;font-size:10px!important;flex:0 0 40px!important;
+  }
+}
+</style>
+
 </head>
+
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
 <div class="wrap">
 
-  <div class="summary-card">
-      <div class="summary-head">
-        <div class="summary-title today-summary-title">오늘 공부 합계</div>
-        <div class="study-timer" id="studyTimer" aria-live="polite" title="시작/종료 버튼으로 공부시간 기록">
-          <span class="study-timer-label" id="studyTimerLabel">타이머</span>
-          <span class="study-timer-time" id="studyTimerTime">00:00:00</span>
+  <div class="record-fixed-top">
+  <div class="alarmbar" id="recordAlarmBar">
+    <div class="alarmline">
+      <strong aria-label="알람">⏰</strong>
+      <input id="alarmHours" type="number" min="0" max="48" value="" placeholder="" aria-label="시간"><span class="unit">시간</span>
+      <input id="alarmMinutes" type="number" min="0" max="59" value="" placeholder="" aria-label="분"><span class="unit">분</span>
+      <span class="unit afterAlarm">후</span>
+      <select id="alarmSoundSelect" aria-label="알람음"><option value="">불러오는 중...</option></select>
+      <span id="alarmFileName" hidden></span>
+      <button id="alarmPreview" type="button">▶ 미리듣기</button>
+      <button id="alarmStart" class="primary" type="button">시작</button>
+      <button id="alarmCancel" type="button">해제</button>
+    </div>
+    <div class="alarmstatusline"><div id="alarmStatus"></div><button id="alarmStop" class="danger" type="button" hidden style="display:none">🔕 끄기</button></div>
+  </div>
+
+<div class="summary-card">
+      <div class="summary-title today-summary-title">합계</div>
+      <div class="record-top-timers">
+        <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
+          <span class="study-timer-label">카페인 경과시간</span>
+          <span class="study-timer-time" id="recordTimer1">00:00:00</span>
         </div>
-        <div class="study-timer waste-timer" id="wasteTimer" aria-live="polite" title="교시 종료부터 다음 교시 시작까지 자동 측정">
-          <span class="study-timer-label" id="wasteTimerLabel">낭비시간</span>
-          <span class="study-timer-time" id="wasteTimerTime">00:00:00</span>
+        <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
+          <span class="study-timer-label">Vita C 경과시간</span>
+          <span class="study-timer-time" id="recordTimer2">00:00:00</span>
+        </div>
+        <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
+          <span class="study-timer-label">기록3 경과시간</span>
+          <span class="study-timer-time" id="recordTimer3">00:00:00</span>
         </div>
       </div>
-      <div class="summary-grid">
-        <div class="summary-item ok"><b id="sumStudy">0분</b><span>공부시간</span></div>
-        <div class="summary-item"><b id="sumPages">0 Page</b><span>공부 페이지</span></div>
-        <div class="summary-item warn"><b id="sumWaste">0분</b><span>낭비시간</span></div>
+      <div id="studyTimer" style="display:none"><span id="studyTimerLabel"></span><span id="studyTimerTime">00:00:00</span></div>
+      <div id="wasteTimer" style="display:none"><span id="wasteTimerLabel"></span><span id="wasteTimerTime">00:00:00</span></div>
+      <div class="record-count-grid record-count-paired">
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount1">0회</b></div><div class="summary-item"><span>용량</span><b id="recordNumber1" style="color:#B86F7D;">0</b></div></div>
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount2">0회</b></div><div class="summary-item"><span>용량</span><b id="recordNumber2" style="color:#B86F7D;">0</b></div></div>
+        <div class="record-pair"><div class="summary-item"><span>횟수</span><b id="recordCount3">0회</b></div><div class="summary-item"><span>용량</span><b id="recordNumber3" style="color:#B86F7D;">0</b></div></div>
       </div>
     </div>
 
+
+  </div>
 
   <div class="top-actions">
     <button class="chart-toggle-btn top-chart-btn" id="chartToggle" aria-pressed="false">📈 그래프 보기</button>
@@ -541,38 +1036,14 @@
         <button class="data-btn" id="cloudLogin">로그인</button>
         <button class="data-btn" id="cloudGoogle">Google로 로그인</button>
       </div>
-      <div class="cloud-note">Supabase 연결 정보는 이미 설정되어 있습니다. 로그인 후에는 공부 기록이 브라우저와 클라우드에 함께 자동 저장됩니다.</div>
+      <div class="cloud-note">Supabase 연결 정보는 이미 설정되어 있습니다. 로그인 후에는 강의 기록이 브라우저와 클라우드에 함께 자동 저장됩니다.</div>
     </div>
   </div>
 
   <div id="dayView">
-  <div class="study-alarm-card">
-    <div class="study-alarm-row">
-      <strong>⏰ 알람</strong>
-      <select id="studyAlarmSound" aria-label="알람 소리">
-        <option value="bright">밝은 알람</option>
-        <option value="classic">기본 알람</option>
-        <option value="gentle">부드러운 알람</option>
-      </select>
-      <button id="studyAlarmPreview" type="button">미리듣기</button>
-      <button id="studyAlarmFilePick" type="button">파일 선택</button>
-      <input id="studyAlarmFile" type="file" accept="audio/*" hidden>
-    </div>
-    <div class="study-alarm-row alarm-time-row">
-      <input id="studyAlarmHours" type="number" inputmode="numeric" min="0" max="48" value=""><span>시간</span>
-      <input id="studyAlarmMinutes" type="number" inputmode="numeric" min="0" max="59" value=""><span>분 뒤</span>
-      <button class="alarm-start" id="studyAlarmStart" type="button">알람 시작</button>
-      <button id="studyAlarmCancel" type="button">알람 해제</button>
-    </div>
-    <div class="study-alarm-due" id="studyAlarmDue">알람이 설정되지 않았습니다.</div>
-    <button class="study-alarm-stop" id="studyAlarmStop" type="button">🔕 알람 끄기</button>
-  </div>
-
-    
-
     <div id="dayCharts"></div>
     <div id="periodList"></div>
-    <button class="add-btn" id="addPeriod">+ 공부 기록 추가</button>
+    <button class="add-btn" id="addPeriod">+ 기록 추가</button>
   </div>
 
   <div id="weekView" style="display:none;"></div>
@@ -590,7 +1061,7 @@
     <div class="setting-row">
       <div>
         <div class="setting-label">하루 집계 기준시간</div>
-        <div class="setting-desc">00:00~11:00 중 1시간 단위로 선택합니다. 변경한 시간은 현재 공부일을 건드리지 않고 다음 적용 시점부터 사용됩니다.</div>
+        <div class="setting-desc">00:00~11:00 중 1시간 단위로 선택합니다. 변경한 시간은 현재 강의일을 건드리지 않고 다음 적용 시점부터 사용됩니다.</div>
         <div class="setting-status" id="dayStartStatus"></div>
       </div>
       <select class="setting-select" id="dayStartSelect" aria-label="하루 집계 기준시간"></select>
@@ -608,7 +1079,7 @@
     </div>
     <div class="settings-danger-wrap">
       <button class="settings-danger" id="deleteAllRecords">모든 기록 삭제</button>
-      <div class="settings-danger-note">공부 기록만 삭제하며 설정과 로그인 정보는 유지됩니다.</div>
+      <div class="settings-danger-note">강의 기록만 삭제하며 설정과 로그인 정보는 유지됩니다.</div>
     </div>
   </div>
 </div>
@@ -685,7 +1156,6 @@ function maybeActivatePending(){
   if(new Date() < when) return false;
   appSettings.dayStartHour = p.hour;
   appSettings.pendingDayStart = null;
-  // v2: 활성화된 값을 부모(index)에게 알려 Supabase 에 반영
   if(window.parent!==window){
     try{ window.parent.postMessage({type:'journal-activate-pending-day-start',hour:p.hour}, location.origin); }catch(e){}
   }
@@ -809,24 +1279,6 @@ function markChangedPeriodFields(p, before){
   });
   if(changed) p._updatedAt=ts;
 }
-// 월 데이터에서 가장 최신 timestamp 찾기 (ym 삭제 마커 비교용)
-function getLatestTs(monthData){
-  let max = 0;
-  if(!monthData || typeof monthData !== 'object') return max;
-  for(const dk of Object.keys(monthData)){
-    if(!/^\d{1,2}$/.test(dk)) continue;
-    const day = monthData[dk];
-    if(!day || typeof day !== 'object') continue;
-    max = Math.max(max, Number(day._metaUpdatedAt) || 0);
-    for(const p of (day.periods || [])){
-      if(!p || typeof p !== 'object') continue;
-      max = Math.max(max, Number(p._updatedAt) || 0);
-      const fu = p._fieldUpdatedAt || {};
-      for(const k of Object.keys(fu)) max = Math.max(max, Number(fu[k]) || 0);
-    }
-  }
-  return max;
-}
 function hasPeriodCreatedAfter(monthData, ts){
   if(!monthData || typeof monthData !== 'object') return false;
   for(const dk of Object.keys(monthData)){
@@ -932,7 +1384,7 @@ async function loadMonth(ym){
   }
   try{
     const {data, error} = await sbClient.from('study_months')
-      .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
+      .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', recordCloudYm(ym)).maybeSingle();
     if(error) throw error;
     if(data?.deleted_at){ monthCache[ym] = {}; return monthCache[ym]; }
     const m = data?.data || {};
@@ -1117,7 +1569,7 @@ async function calibrateServerClock(force=false){
 // v9.6: visibility handling centralized below
 
 
-// 시작 페이지 입력부터 끝 페이지 입력까지 초 단위로 보여주는 상단 타이머
+// 강의 시작 입력부터 끝 강의 횟수 입력까지 초 단위로 보여주는 상단 타이머
 function timerElapsedMs(p, nowMs = serverNowMs()){
   const start = Number(p?.timerStartedAt);
   if(!Number.isFinite(start) || start <= 0) return 0;
@@ -1150,8 +1602,8 @@ function timerPeriodForCurrentDay(){
   return best;
 }
 
-// v9.9: 1교시가 끝난 뒤부터 다음 교시가 시작될 때까지 실시간 낭비시간 타이머.
-// 저장/통계의 낭비시간(wasteBefore)은 기존 방식 그대로 유지한다.
+// v9.9: 1강의가 끝난 뒤부터 다음 교시가 시작될 때까지 실시간 강의 종료 후 시간 타이머.
+// 저장/통계의 강의 종료 후 시간(wasteBefore)은 기존 방식 그대로 유지한다.
 function wasteTimerForCurrentDay(){
   const logical = logicalToday();
   if(ymd(cur) !== ymd(logical)) return null;
@@ -1159,34 +1611,23 @@ function wasteTimerForCurrentDay(){
   const day = getDayData();
   if(!day.periods.length) return null;
 
-  const getStart = p => {
-    const ts = Number(p.timerStartedAt);
-    if(ts > 0) return ts;
-    const dt = periodStartDT(p);
-    return dt ? dt.getTime() : 0;
-  };
-  const getEnd = p => {
-    const te = Number(p.timerEndedAt);
-    const dt = periodEndDT(p);
-    const dtMs = dt ? dt.getTime() : 0;
-    return Math.max(te || 0, dtMs);
-  };
-
-  // 진행 중인 교시(시작 있고 끝 없음)가 있으면 낭비시간은 멈춘다.
-  const running = day.periods.some(p => {
-    const s = getStart(p);
-    const e = getEnd(p);
-    return s > 0 && (!e || e < s);
-  });
+  // 공부 중에는 강의 종료 후 시간 타이머를 멈춘다.
+  const running = day.periods.some(p =>
+    Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
+  );
   if(running) return null;
 
-  // 가장 최근에 "시작+끝"이 모두 있는 교시의 끝 시각부터 낭비시간이 흐른다.
+  // 가장 최근에 끝난 교시 이후, 아직 다음 교시가 시작되지 않았을 때만 흐른다.
   for(let i=day.periods.length-1; i>=0; i--){
     const p = day.periods[i];
-    const s = getStart(p);
-    const e = getEnd(p);
-    if(s > 0 && e >= s){
-      return {p, idx:i, startedAt:e};
+    const started = Number(p.timerStartedAt);
+    const ended = Number(p.timerEndedAt);
+    if(started > 0 && ended >= started){
+      const laterStarted = day.periods.slice(i+1).some(x =>
+        Number(x.timerStartedAt) > 0 || !!periodStartDT(x)
+      );
+      if(laterStarted) return null;
+      return {p, idx:i, startedAt:ended};
     }
   }
   return null;
@@ -1198,12 +1639,12 @@ function updateStudyTimer(){
   const info = timerPeriodForCurrentDay();
   if(!info){
     timeEl.textContent = '00:00:00';
-    labelEl.textContent = '공부시간';
+    labelEl.textContent = '강의시간';
     box.classList.remove('running');
     return;
   }
   timeEl.textContent = formatTimer(timerElapsedMs(info.p));
-  labelEl.textContent = info.running ? `${info.idx+1}교시 · 진행 중` : `${info.idx+1}교시 · 종료`;
+  labelEl.textContent = info.running ? `${info.idx+1}강의 · 진행 중` : `${info.idx+1}강의 · 종료`;
   box.classList.toggle('running', !!info.running);
 }
 
@@ -1213,11 +1654,11 @@ function updateWasteTimer(){
   const info = wasteTimerForCurrentDay();
   if(!info){
     timeEl.textContent = '00:00:00';
-    labelEl.textContent = '낭비시간';
+    labelEl.textContent = '강의 종료 후 시간';
     return;
   }
   timeEl.textContent = formatTimer(Math.max(0, serverNowMs() - info.startedAt));
-  labelEl.textContent = `${info.idx+1}교시 후 · 낭비시간`;
+  labelEl.textContent = `${info.idx+1}강의 후 · 강의 종료 후 시간`;
 }
 
 setInterval(()=>{
@@ -1228,19 +1669,19 @@ setInterval(()=>{
 
 // ---------- v9.5: 기준시점 횡단 + 소급 분할 복구 ----------
 // 기본 원칙:
-// - 시작페이지 입력 -> 시작일시/타이머 시작
-// - 끝페이지 입력 -> 종료일시/타이머 종료
+// - 시작강의 횟수 입력 -> 시작일시/타이머 시작
+// - 끝강의 횟수 입력 -> 종료일시/타이머 종료
 //
 // 예외:
-// 기준시점 이전에 시작페이지가 입력된 '미완료 진행 교시'가
+// 기준시점 이전에 시작강의 횟수가 입력된 '미완료 진행 교시'가
 // 기준시점을 넘어간 경우에만 자동 분할한다.
 //
-// 이전 공부일:
-//   끝페이지 = 시작페이지
+// 이전 강의일:
+//   끝강의 횟수 = 시작강의 횟수
 //   종료일시 = 기준시점 1분 전
 //
-// 다음 공부일 1교시:
-//   시작페이지 = 같은 페이지
+// 다음 강의일 1강의:
+//   시작강의 횟수 = 같은 강의 횟수
 //   시작일시 = 기준시점
 //
 // 타이머:
@@ -1258,8 +1699,8 @@ function studyDayBoundaryMs(ym, dk, day){
   const d = new Date(y, m-1, Number(dk), 12, 0, 0, 0);
   d.setDate(d.getDate() + 1);
 
-  // 이 공부일에 실제 저장된 cutoffHour가 최우선.
-  // 기준시점 설정을 바꾸더라도 과거 공부일의 경계는 바뀌지 않는다.
+  // 이 강의일에 실제 저장된 cutoffHour가 최우선.
+  // 기준시점 설정을 바꾸더라도 과거 강의일의 경계는 바뀌지 않는다.
   const cutoff = Number.isInteger(day?.cutoffHour)
     ? day.cutoffHour
     : Number(appSettings.dayStartHour || 0);
@@ -1283,19 +1724,18 @@ function rolloverPeriodId(oldPeriodId, newYm, newDk){
 function isBoundaryEligiblePeriod(p, boundaryMs=null){
   if(!p) return false;
 
-  const startPage = String(p.startPage ?? '').trim();
-  const endPage = String(p.endPage ?? '').trim();
   const started = Number(p.timerStartedAt);
   const ended = Number(p.timerEndedAt);
 
-  // 사용자가 말한 안전조건:
-  // 시작페이지가 있고, 끝페이지가 없고, 실제 타이머가 진행 중일 때만.
-  if(!/^[1-9][0-9]*$/.test(startPage)) return false;
-  if(endPage !== '') return false;
+  // 사용자가 말한 안전조건 (v10: 강의 횟수 입력칸이 사라지고 시작/종료 버튼 방식으로
+  // UI가 바뀌었으므로, 더 이상 존재하지 않는 startPage/endPage 대신
+  // 시작일시가 있고, 종료일시가 없고, 실제 타이머가 진행 중일 때만으로 판별한다.
+  if(!p.startDate || !p.startTime) return false;
+  if(p.endDate || p.endTime) return false;
   if(!Number.isFinite(started) || started <= 0) return false;
   if(Number.isFinite(ended) && ended >= started) return false;
 
-  // 최초 공부 시작이 경계 이전이어야 '경계 횡단'이다.
+  // 최초 강의 시작이 경계 이전이어야 '경계 횡단'이다.
   if(Number.isFinite(boundaryMs) && started >= boundaryMs) return false;
 
   return true;
@@ -1386,14 +1826,12 @@ async function splitRunningPeriodAtBoundary(running){
     return false;
   }
 
-  const page = String(oldP.startPage).trim();
   const originalTimerStartedAt = Number(oldP.timerStartedAt);
   const displayEnd = new Date(boundaryMs - 60000);
 
-  // A. 이전 공부일 자동 마감
+  // A. 이전 강의일 자동 마감
   const beforeOld = deepClone(oldP);
 
-  oldP.endPage = page;
   oldP.endDate = ymd(displayEnd);
   oldP.endTime = hm(displayEnd);
   oldP.timerEndedAt = boundaryMs;
@@ -1401,7 +1839,7 @@ async function splitRunningPeriodAtBoundary(running){
   markChangedPeriodFields(oldP, beforeOld);
   await saveMonth(running.ym);
 
-  // B. 다음 공부일 1교시 생성/복구
+  // B. 다음 강의일 1강의 생성/복구
   const next = nextStudyDayKey(running.ym, running.dk);
   await loadMonth(next.ym);
 
@@ -1434,8 +1872,6 @@ async function splitRunningPeriodAtBoundary(running){
     const beforeNew = deepClone(nextP);
 
     nextP.subject = oldP.subject || '';
-    nextP.startPage = page;
-    nextP.endPage = '';
     nextP.startDate = ymd(new Date(boundaryMs));
     nextP.startTime = hm(new Date(boundaryMs));
     nextP.endDate = '';
@@ -1449,7 +1885,7 @@ async function splitRunningPeriodAtBoundary(running){
 
     markChangedPeriodFields(nextP, beforeNew);
   }else{
-    // 자동 이어쓰기 교시는 다음 공부일의 1교시.
+    // 자동 이어쓰기 교시는 다음 강의일의 1강의.
     newDay.periods.forEach(p=>{
       const n = Number(p._order||0);
       if(Number.isFinite(n) && n > 0) p._order = n + 1;
@@ -1457,7 +1893,7 @@ async function splitRunningPeriodAtBoundary(running){
 
     nextP = {
       subject:oldP.subject || '',
-      startPage:page,
+      startPage:'',
       endPage:'',
       startDate:ymd(new Date(boundaryMs)),
       startTime:hm(new Date(boundaryMs)),
@@ -1474,7 +1910,6 @@ async function splitRunningPeriodAtBoundary(running){
       _updatedAt:ts,
       _fieldUpdatedAt:{
         subject:ts,
-        startPage:ts,
         startDate:ts,
         startTime:ts,
         timerStartedAt:ts
@@ -1487,7 +1922,7 @@ async function splitRunningPeriodAtBoundary(running){
 
   await saveMonth(next.ym);
 
-  // C. 서버 active_timer도 새 공부일 1교시로 이동.
+  // C. 서버 active_timer도 새 강의일 1강의로 이동.
   // resume_active_timer에 최초 timerStartedAt을 전달하므로 서버에서도 연속 타이머 유지.
   if(cloudUser){
     try{
@@ -1503,7 +1938,7 @@ async function splitRunningPeriodAtBoundary(running){
   }
 
   // D. 첫 화면은 logicalToday() 규칙을 따르되,
-  // 사용자가 자동 마감된 공부일을 보고 있었다면 새 공부일로 자연스럽게 이동.
+  // 사용자가 자동 마감된 강의일을 보고 있었다면 새 강의일로 자연스럽게 이동.
   if(ymKey(cur) === running.ym && dKey(cur) === running.dk){
     cur = new Date(
       next.date.getFullYear(),
@@ -1610,7 +2045,7 @@ async function recoverFromBackground(){
     // 3. 기준시점 소급 분할
     // 4. 화면/알림 타이머 갱신
     if(cloudUser){
-      await calibrateServerClock(true);
+      void calibrateServerClock(true);
       await autoSyncFromCloud();
       await syncActiveTimerFromCloud(true);
     }
@@ -1669,7 +2104,7 @@ function syncAndroidTimer(){
       const localWasteStarted = Math.round(
         (Number(wasteInfo.startedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
       ) * 1000;
-      const wasteLabel = `${wasteInfo.idx+1}교시 종료 · 낭비시간`;
+      const wasteLabel = `${wasteInfo.idx+1}강의 종료 · 강의 종료 후 시간`;
       const key = `waste:${localWasteStarted}:${wasteLabel}`;
       if(key !== lastAndroidTimerKey){
         window.AndroidTimer.startTimer(localWasteStarted, wasteLabel);
@@ -1679,7 +2114,7 @@ function syncAndroidTimer(){
     }
 
     const p = info.p;
-    const label = `${info.idx+1}교시`;
+    const label = `${info.idx+1}강의`;
 
     if(info.running && Number(p.timerStartedAt) > 0){
       // 서버 epoch를 이 Android 기기의 wall clock epoch로 변환한다.
@@ -1707,14 +2142,14 @@ function syncAndroidTimer(){
 setInterval(syncAndroidTimer, 1000);
 
 
-// 각 공부일은 생성 당시의 집계 기준시간을 보존한다. 설정을 바꿔도 과거 기록 범위는 변하지 않는다.
+// 각 강의일은 생성 당시의 집계 기준시간을 보존한다. 설정을 바꿔도 과거 기록 범위는 변하지 않는다.
 function cutoffForDate(date = cur){
   const ym = ymKey(date), dk = dKey(date);
   const day = monthCache[ym] && monthCache[ym][dk];
   return day && Number.isInteger(day.cutoffHour) ? day.cutoffHour : appSettings.dayStartHour;
 }
-// 현재 선택한 공부일(cur)에 기록할 수 있는 실제 시간 범위.
-// 예: 기준 11:00이면 9/13 공부일 = 9/13 11:00 ~ 9/14 10:59.
+// 현재 선택한 강의일(cur)에 기록할 수 있는 실제 시간 범위.
+// 예: 기준 11:00이면 9/13 강의일 = 9/13 11:00 ~ 9/14 10:59.
 function studyDayBounds(date = cur){
   const cutoff = cutoffForDate(date);
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), cutoff, 0, 0, 0);
@@ -1740,7 +2175,7 @@ function maxAllowedRecordDT(){
   return now < endLastMinute ? now : endLastMinute;
 }
 function recordRangeAlert(){
-  alert(`이 공부일의 기록 가능 시간은 ${studyDayRangeText(cur)}입니다.`);
+  alert(`이 강의일의 기록 가능 시간은 ${studyDayRangeText(cur)}입니다.`);
 }
 
 function minutesBetween(p){
@@ -1755,7 +2190,7 @@ function periodPages(p){
     ? Math.max(0, Number(p.endPage)-Number(p.startPage)+1) : 0;
 }
 
-// 끝 페이지가 시작 페이지보다 작으면 물리적으로 모순
+// 끝 강의 횟수가 강의 시작보다 작으면 물리적으로 모순
 function pagesInvalid(p){
   return (p.startPage!=='' && p.endPage!=='' && p.startPage!=null && p.endPage!=null &&
           !isNaN(p.startPage) && !isNaN(p.endPage) && Number(p.endPage) < Number(p.startPage));
@@ -1768,7 +2203,7 @@ function studyInvalid(p){
   return (e - s) < 0;
 }
 
-// 낭비시간 = 이전 교시 종료 일시와 현재 교시 시작 일시의 차이 (자동 계산, 입력 없음)
+// 강의 종료 후 시간 = 이전 교시 종료 일시와 현재 교시 시작 일시의 차이 (자동 계산, 입력 없음)
 function wasteBefore(periods, idx){
   if(idx===0) return 0;
   const prevEnd = periodEndDT(periods[idx-1]);
@@ -1785,6 +2220,111 @@ function wasteInvalid(periods, idx){
   const curStart = periodStartDT(periods[idx]);
   if(!prevEnd || !curStart) return false;
   return (curStart - prevEnd) < 0;
+}
+
+
+function createRecordCard(p, idx){
+  const card = document.createElement('div');
+  card.className = 'period-card';
+
+  const head = document.createElement('div');
+  head.className = 'period-head';
+
+  const num = document.createElement('div');
+  num.className = 'period-num';
+  num.textContent = `${idx+1}기록`;
+
+  const del = document.createElement('button');
+  del.className = 'period-del';
+  del.dataset.idx = idx;
+  del.textContent = '✕';
+
+  head.append(num, del);
+
+  const grid = document.createElement('div');
+  grid.className = 'record-triple-grid';
+
+  for(let slot=0; slot<3; slot++){
+    const col = document.createElement('div');
+    col.className = 'record-slot';
+
+    const subject = document.createElement('input');
+    subject.type = 'text';
+    subject.className = 'subject-input record-subject';
+    subject.dataset.idx = idx;
+    subject.dataset.slot = slot;
+    subject.placeholder = slot === 0 ? '카페인' : (slot === 1 ? 'Vita C' : `기록 ${slot + 1}`);
+
+    const slotData = (p.recordSlots && p.recordSlots[slot]) || null;
+    // 카페인/Vita C는 고정 항목: 가운데 정렬 + 사용자 수정 불가
+    if(slot === 0 || slot === 1){
+      subject.value = slot === 0 ? '카페인' : 'Vita C';
+      subject.readOnly = true;
+      subject.tabIndex = -1;
+      subject.classList.add('record-subject-fixed');
+    }
+
+    const countInput = document.createElement('input');
+    countInput.type = 'number';
+    countInput.className = 'record-count-input';
+    countInput.dataset.idx = idx;
+    countInput.dataset.slot = slot;
+    countInput.min = '0';
+    countInput.step = '1';
+    countInput.inputMode = 'numeric';
+    countInput.placeholder = '0';
+    countInput.value = Number(slotData?.numberInput) > 0 ? String(slotData.numberInput) : '';
+
+    const lectureAdd = document.createElement('button');
+    lectureAdd.type = 'button';
+    lectureAdd.className = 'record-lecture-add';
+    lectureAdd.dataset.idx = idx;
+    lectureAdd.dataset.slot = slot;
+    const hasRecordStart = Number(slotData?.timerStartedAt) > 0;
+    lectureAdd.dataset.recordAction = hasRecordStart ? 'cancel-start' : 'start';
+    lectureAdd.textContent = hasRecordStart ? (slot === 0 ? '카페인 취소' : (slot === 1 ? 'Vita C 취소' : `기록 ${slot + 1} 취소`)) : (slot === 0 ? '카페인 입력' : (slot === 1 ? 'Vita C 입력' : `기록 ${slot + 1} 입력`));
+    if(hasRecordStart) lectureAdd.classList.add('cancel-start');
+
+    const startBox = document.createElement('div');
+    startBox.className = 'record-start-box';
+
+    const label = document.createElement('label');
+    label.textContent = '기록 시간';
+
+    const value = document.createElement('input');
+    value.type = 'text';
+    value.className = 'record-start-value';
+    value.readOnly = true;
+    value.inputMode = 'none';
+    value.dataset.idx = idx;
+    value.dataset.slot = slot;
+    value.disabled = !slotData?.lastTime;
+    if(slotData?.lastTime){
+      const text = String(slotData.lastTime);
+      const m = text.match(/(\d{2}):(\d{2})$/);
+      if(m) value.value = `${m[1]}:${m[2]}`;
+    }
+    if(slot > 1) subject.value = slotData?.subject || '';
+
+    startBox.append(label, value);
+    col.append(subject, countInput, lectureAdd, startBox);
+    grid.appendChild(col);
+  }
+
+  card.append(head, grid);
+  return card;
+}
+
+function isCardFilled(p){
+  if(!p) return false;
+  const slots = p.recordSlots || [];
+  return slots.some(r => r && (
+    Number(r.count||0) > 0 ||
+    Number(r.numberInput||0) > 0 ||
+    String(r.subject||'').trim() ||
+    String(r.lastTime||'').trim() ||
+    Number(r.timerStartedAt||0) > 0
+  ));
 }
 
 function renderPeriods(){
@@ -1811,73 +2351,61 @@ function renderPeriods(){
     const minDT = dtLocalValue(dayStart);
     const maxDT = dtLocalValue(maxRecord);
 
-    // 페이지를 입력한 뒤 버튼을 눌러야 시작/종료 시간이 기록된다.
-    const startPageBlank = String(p.startPage ?? '').trim() === '';
-    const endPageBlank   = String(p.endPage   ?? '').trim() === '';
+    const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
     const hasStart = !!(p.startDate && p.startTime);
-    const hasEnd   = !!(p.endDate && p.endTime);
-    // 지난 공부일은 시작/종료 버튼을 누르지 않아도 시간을 직접 추가·수정할 수 있다.
-    const logical = logicalToday();
-    const selectedDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
-    const isPastDay = selectedDay < logical;
-    const startTimeDisabled = isPastDay ? false : !hasStart;
-    const endTimeDisabled   = isPastDay ? false : (!hasStart || !hasEnd);
-    const startAction = hasStart ? 'cancel-start' : 'start';
-    const startActionLabel = hasStart ? '시작 취소' : '▶ 시작';
-    const startActionDisabled = hasStart ? false : startPageBlank;
-    const endAction = hasEnd ? 'cancel-end' : 'end';
-    const endActionLabel = hasEnd ? '종료 취소' : '■ 종료';
-    const endActionDisabled = hasEnd ? false : (!hasStart || endPageBlank);
+    const hasEnd = !!(p.endDate && p.endTime);
+    // 시작 전: 시작·종료 시간 모두 잠금 / 진행 중: 종료 시간만 잠금
+    const startTimeDisabled = !hasStart;
+    const endTimeDisabled   = !hasStart || !hasEnd;
 
     const startTimePlaceholder = hasStart
       ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
-      : (isPastDay ? '시간을 눌러 입력' : '시작을 누르면 자동기록');
-    const endTimePlaceholder = hasEnd
-      ? (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정')
-      : (isPastDay ? '시간을 눌러 입력' : (!hasStart ? '시작을 누르면 자동기록' : '종료를 누르면 자동기록'));
+      : '강의 시작을 누르면 자동 기록';
+    const endTimePlaceholder = !hasStart
+      ? '강의 시작을 누르면 자동 기록'
+      : (!hasEnd
+          ? '강의 종료를 누르면 자동 기록'
+          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
 
-    const card = document.createElement('div');
-    card.className = 'period-card';
-    card.innerHTML = `
-      <div class="period-head">
-        <div class="period-num">${idx+1}교시</div>
-        <input type="text" class="subject-input" data-idx="${idx}" data-k="subject" value="${p.subject || ''}" placeholder="과목">
-        <button class="period-del" data-idx="${idx}">✕</button>
-      </div>
-      <div class="field-grid">
-        <div class="field">
-          <label>시작 페이지</label>
-          <div class="page-action-row"><input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="startPage" maxlength="5" value="${p.startPage ?? ''}"><button type="button" class="page-action-btn${hasStart ? ' cancel-start' : ''}" data-study-action="${startAction}" data-idx="${idx}" ${startActionDisabled ? 'disabled' : ''}>${startActionLabel}</button></div>
-        </div>
-        <div class="field time${startTimeDisabled ? ' disabled' : ''}">
-          <label>시작 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" ${startTimeDisabled ? 'disabled' : ''} value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${startTimePlaceholder}</div>
-        </div>
-        <div class="field">
-          <label>종료 페이지</label>
-          <div class="page-action-row"><input type="text" inputmode="numeric" pattern="[1-9][0-9]*" autocomplete="off" data-page-positive-int="1" data-idx="${idx}" data-k="endPage" maxlength="5" min="${String(p.startPage||'').trim() || 1}" ${hasStart ? '' : 'disabled'} value="${p.endPage ?? ''}"><button type="button" class="page-action-btn end${hasEnd ? ' cancel-end' : ''}" data-study-action="${endAction}" data-idx="${idx}" ${endActionDisabled ? 'disabled' : ''}>${endActionLabel}</button></div>
-        </div>
-        <div class="field time${endTimeDisabled ? ' disabled' : ''}">
-          <label>종료 시간</label>
-          <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" ${endTimeDisabled ? 'disabled' : ''} value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${endTimePlaceholder}</div>
-        </div>
-      </div>
-      <div class="period-stats">
-        <div class="stat">공부시간<b id="study-${idx}" class="${sErr ? 'stat-error' : 'study-color'}">${sErr ? '오류!' : fmtDuration(study)}</b></div>
-        <div class="stat">공부 페이지<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : pages + ' Page'}</b></div>
-        ${idx>0 ? `<div class="stat">낭비시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
-      </div>
-    `;
+    let startAction = 'start', startLabel = '▶ 강의 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
+    if(hasStart){
+      startAction = 'cancel-start';
+      startLabel = '시작 취소';
+      startDisabled = false;
+      startClass = 'start cancel-start';
+    }
+    let endAction = 'end', endLabel = '■ 강의 종료', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
+    if(hasEnd){
+      endAction = 'cancel-end';
+      endLabel = '종료 취소';
+      endDisabled = false;
+      endClass = 'end cancel-end';
+    }
+
+    const card = createRecordCard(p, idx);
+    // 새 기록 카드가 추가되면 이전 카드는 즉시 잠금.
+    // 마지막(가장 최근) 카드만 입력/수정할 수 있다.
+    const thisLocked = idx < day.periods.length - 1;
+    if(thisLocked){
+      card.style.opacity = '0.45';
+      card.style.pointerEvents = 'none';
+      card.setAttribute('aria-disabled','true');
+      const lockMsg = document.createElement('div');
+      lockMsg.textContent = '🔒 뒤 기록에 입력이 있어 이 기록은 잠겨 있습니다';
+      lockMsg.style.cssText = 'font-size:11.5px;color:#a43c31;font-weight:800;text-align:center;padding:6px 0 0;';
+      card.appendChild(lockMsg);
+    }
     list.appendChild(card);
   });
 
-  $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
-  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${sumPages} Page`;
-  $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
-  $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
-  $('#sumPages').classList.toggle('stat-error', sumPagesErr);
-  $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
+  if($('#sumStudy')) $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
+  if($('#sumPages')) $('#sumPages').textContent = sumPagesErr ? '오류!' : `${day.periods?.length || 0}회`;
+  if($('#sumWaste')) $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
+  if($('#sumStudy')) $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
+  if($('#sumPages')) $('#sumPages').classList.toggle('stat-error', sumPagesErr);
+  if($('#sumWaste')) $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
   renderDayCharts();
+  if(typeof updateRecordSummary === 'function') updateRecordSummary();
 
 }
 
@@ -1905,7 +2433,7 @@ function refreshStats(){
     }
     const pe = document.getElementById(`pages-${idx}`);
     if(pe){
-      pe.textContent = pErr ? '오류!' : pages + ' Page';
+      pe.textContent = pErr ? '오류!' : '1회';
       pe.classList.toggle('stat-error', pErr);
     }
     const we = document.getElementById(`waste-${idx}`);
@@ -1915,56 +2443,52 @@ function refreshStats(){
       we.classList.toggle('waste-color', !wErr);
     }
   });
-  $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
-  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${sumPages} Page`;
-  $('#sumWaste').textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
-  $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
-  $('#sumPages').classList.toggle('stat-error', sumPagesErr);
-  $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
+  const ss = $('#sumStudy'), sp = $('#sumPages'), sw = $('#sumWaste');
+  if(ss) ss.textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
+  if(sp) sp.textContent = sumPagesErr ? '오류!' : `${day.periods?.length || 0}회`;
+  if(sw) sw.textContent = sumWasteErr ? '오류!' : fmtDuration(sumWaste);
+  if(ss) ss.classList.toggle('stat-error', sumStudyErr);
+  if(sp) sp.classList.toggle('stat-error', sumPagesErr);
+  if(sw) sw.classList.toggle('stat-error', sumWasteErr);
   renderDayCharts();
 }
 
-// 페이지 입력 상태에 따라 시작/종료 시간 입력칸의 잠금 여부를 즉시 갱신한다.
+// 강의 카드의 시작/종료 버튼 상태 변화에 따라 시간 입력칸의 잠금 여부를 즉시 갱신한다.
 // (포커스를 유지하기 위해 renderPeriods() 를 다시 부르지 않고 DOM 만 수정)
-function refreshTimeFieldDisabled(idx){
+function refreshLectureTimeFieldDisabled(idx){
   const day = getDayData();
-  const p = day.periods[idx];
+  const p = day.periods?.[idx];
   if(!p) return;
-  const startPageBlank = String(p.startPage ?? '').trim() === '';
-  const endPageBlank = String(p.endPage ?? '').trim() === '';
+
   const hasStart = !!(p.startDate && p.startTime);
-  const hasEnd = !!(p.endDate && p.endTime);
-  const logical = logicalToday();
-  const selectedDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
-  const isPastDay = selectedDay < logical;
+  const hasEnd   = !!(p.endDate && p.endTime);
+  const startDisabled = !hasStart;
+  const endDisabled   = !hasStart || !hasEnd;
+
   const startInput = document.querySelector(`#periodList input[data-k="start"][data-idx="${idx}"]`);
-  const endInput = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
-  const endPageInput = document.querySelector(`#periodList input[data-k="endPage"][data-idx="${idx}"]`);
+  const endInput   = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
   const startField = startInput?.closest('.field.time');
-  const endField = endInput?.closest('.field.time');
-  if(startInput) startInput.disabled = isPastDay ? false : !hasStart;
-  if(endInput) endInput.disabled = isPastDay ? false : (!hasStart || !hasEnd);
-  if(endPageInput) endPageInput.disabled = !hasStart;
-  if(startField) startField.classList.toggle('disabled', isPastDay ? false : !hasStart);
-  if(endField) endField.classList.toggle('disabled', isPastDay ? false : (!hasStart || !hasEnd));
-  const startBtn=document.querySelector(`#periodList button[data-idx="${idx}"][data-study-action="start"],#periodList button[data-idx="${idx}"][data-study-action="cancel-start"]`);
-  const endBtn=document.querySelector(`#periodList button[data-idx="${idx}"][data-study-action="end"],#periodList button[data-idx="${idx}"][data-study-action="cancel-end"]`);
-  if(startBtn){
-    startBtn.dataset.studyAction = hasStart ? 'cancel-start' : 'start';
-    startBtn.textContent = hasStart ? '시작 취소' : '▶ 시작';
-    startBtn.classList.toggle('cancel-start', hasStart);
-    startBtn.disabled = hasStart ? false : startPageBlank;
+  const endField   = endInput?.closest('.field.time');
+
+  if(startInput) startInput.disabled = startDisabled;
+  if(endInput)   endInput.disabled   = endDisabled;
+  if(startField) startField.classList.toggle('disabled', startDisabled);
+  if(endField)   endField.classList.toggle('disabled', endDisabled);
+
+  const startLabel = startField?.querySelector('.ko-time-label');
+  if(startLabel){
+    startLabel.textContent = hasStart
+      ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
+      : '강의 시작을 누르면 자동 기록';
   }
-  if(endBtn){
-    endBtn.dataset.studyAction = hasEnd ? 'cancel-end' : 'end';
-    endBtn.textContent = hasEnd ? '종료 취소' : '■ 종료';
-    endBtn.classList.toggle('cancel-end', hasEnd);
-    endBtn.disabled = hasEnd ? false : (!hasStart || endPageBlank);
+  const endLabel = endField?.querySelector('.ko-time-label');
+  if(endLabel){
+    endLabel.textContent = !hasStart
+      ? '강의 시작을 누르면 자동 기록'
+      : (!hasEnd
+          ? '강의 종료를 누르면 자동 기록'
+          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
   }
-  const startLabel=startField?.querySelector('.ko-time-label');
-  const endLabel=endField?.querySelector('.ko-time-label');
-  if(startLabel) startLabel.textContent=hasStart?(koDateTimeLabel(p.startDate,p.startTime)||'시간을 눌러 수정'):(isPastDay?'시간을 눌러 입력':'시작을 누르면 자동기록');
-  if(endLabel) endLabel.textContent=hasEnd?(koDateTimeLabel(p.endDate,p.endTime)||'시간을 눌러 수정'):(isPastDay?'시간을 눌러 입력':(!hasStart?'시작을 누르면 자동기록':'종료를 누르면 자동기록'));
 }
 
 async function renderDay(){
@@ -1992,7 +2516,7 @@ $('#nextDay').onclick = async () => {
   const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()+1);
   const maxDate = logicalToday();
   if(next > maxDate){
-    await askConfirm('아직 시작되지 않은 공부일입니다.', true);
+    if(window.NativeUi?.showToast) window.NativeUi.showToast('아직 시작되지 않은 기록일입니다.'); else showToast('아직 시작되지 않은 기록일입니다.');
     return;
   }
   cur = next;
@@ -2000,7 +2524,7 @@ $('#nextDay').onclick = async () => {
 };
 
 // 가운데 날짜 제목을 누르면 연/월/일을 직접 선택할 수 있음
-// 선택 가능한 마지막 날짜는 설정한 하루 집계 기준시간에 따른 현재 공부일이다.
+// 선택 가능한 마지막 날짜는 설정한 하루 집계 기준시간에 따른 현재 강의일이다.
 function openDatePicker(){
   const picker = $('#datePicker');
   picker.value = ymd(cur);
@@ -2023,7 +2547,7 @@ $('#datePicker').onchange = async (e) => {
   const picked = new Date(y,m-1,d);
   const maxDate = logicalToday();
   if(picked > maxDate){
-    await askConfirm('아직 시작되지 않은 공부일입니다.', true);
+    if(window.NativeUi?.showToast) window.NativeUi.showToast('아직 시작되지 않은 기록일입니다.'); else showToast('아직 시작되지 않은 기록일입니다.');
     e.target.value = ymd(cur);
     return;
   }
@@ -2032,33 +2556,22 @@ $('#datePicker').onchange = async (e) => {
 };
 
 $('#addPeriod').onclick = async () => {
-  // v9.3: 다른 기기에서도 반드시 Supabase 최신 상태를 먼저 확인한다.
-  if(cloudUser){
-    try{
-      await autoSyncFromCloud();
-      enforceStudyDayLimit();
-      await renderCurrentView();
-    }catch(e){
-      console.error('교시 추가 전 최신 기록 확인 실패:', e);
-      alert('최신 공부 기록을 확인하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.');
-      return;
-    }
-  }
-
   const day = getDayData();
   const periods = day.periods || [];
 
-  // 첫 교시는 바로 추가 가능.
-  // 2교시 이상은 최신 마지막 교시의 시작/끝 페이지가 모두 1 이상의 정수여야 한다.
-  if(periods.length > 0){
+  if(periods.length){
     const last = periods[periods.length - 1];
-    const start = String(last.startPage ?? '').trim();
-    const end = String(last.endPage ?? '').trim();
-    const validStart = /^[1-9][0-9]*$/.test(start);
-    const validEnd = /^[1-9][0-9]*$/.test(end);
-
-    if(!validStart || !validEnd){
-      await askConfirm(`${periods.length}교시의 시작 페이지와 끝 페이지를 먼저 입력해주세요.`, true);
+    const slots = last.recordSlots || [];
+    const hasAnyRecord = slots.some(r =>
+      r && (
+        String(r.subject || '').trim() ||
+        Number(r.count || 0) > 0 ||
+        String(r.lastTime || '').trim() ||
+        Number(r.timerStartedAt || 0) > 0
+      )
+    );
+    if(!hasAnyRecord){
+      await askConfirm('기록 1·2·3 중 하나를 먼저 기록해주세요.');
       return;
     }
   }
@@ -2090,147 +2603,23 @@ $('#addPeriod').onclick = async () => {
       await autoSyncFromCloud();
       await renderCurrentView();
     }catch(e){
-      console.warn('교시 추가 후 재동기화 실패:', e);
+      console.warn('강의 추가 후 재동기화 실패:', e);
     }
   }
 };
-
-$('#periodList').addEventListener('click', async (e) => {
-  const btn=e.target.closest('button[data-study-action]');
-  if(!btn || btn.disabled) return;
-  userActionCount++;
-  // v9.14: 즉시 시각 피드백 — 서버 통신 중에도 눌린 게 보이게
-  const origLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '⏳';
-  try{
-    let idx=Number(btn.dataset.idx);
-    let day=getDayData();
-    let p=day.periods?.[idx];
-    if(!p) return;
-    const pid=p._id;
-    // v9.4: await 사이에 자동 동기화/재정렬이 일어나면 idx가 어긋난다.
-    //       _id 기준으로 다시 찾고, 서버 RPC에 넘길 idx도 함께 갱신한다.
-    const refetch = () => {
-      day = getDayData();
-      idx = day.periods.findIndex(x => String(x._id||'') === String(pid));
-      p = idx >= 0 ? day.periods[idx] : null;
-      return !!p;
-    };
-    const action=btn.dataset.studyAction;
-    const isCancel=action==='cancel-start' || action==='cancel-end';
-    if(cloudUser && !serverClockCalibrated){ try{ await calibrateServerClock(false); }catch(_){} }
-    const now=new Date(serverNowMs());
-    if(!isCancel && !isWithinSelectedStudyDay(now)){ showToast('오늘 공부 기록에서만 시작/종료 버튼을 사용할 수 있어요'); return; }
-    const beforeSync=deepClone(p);
-    if(action==='start'){
-      if(!/^[1-9][0-9]*$/.test(String(p.startPage||'').trim())) return;
-      if(!(await requestExclusiveSessionStart(now.getTime()))) return;
-      if(!refetch()) return;
-      // v9.10: 로컬 쓰기 확정 → 즉시 마킹 (await 이전).
-      //        통신 중 autoSync가 캐시를 교체해도 mergeMonths가 이
-      //        타임스탬프로 로컬 값을 보존한다.
-      p.startDate=ymd(now); p.startTime=hm(now); p.endDate=''; p.endTime=''; p.timerEndedAt=null;
-      p.timerStartedAt=Math.round(now.getTime());   // 낙관적 로컬 값
-      markChangedPeriodFields(p, beforeSync);
-      renderPeriods(); updateStudyTimer(); updateWasteTimer();
-      if(cloudUser){
-        try{
-          const row=await cloudStartActiveTimer(ymKey(cur),dKey(cur),p,idx);
-          const ts=row?.started_at?Date.parse(row.started_at):NaN;
-          if(Number.isFinite(ts) && ts>0){
-            if(!refetch()) return;
-            p.timerStartedAt=ts;
-            markChangedPeriodFields(p, beforeSync);
-          }
-          await calibrateServerClock(true);
-          if(!refetch()) return;
-        }
-        catch(_){ /* 낙관적 timerStartedAt 유지 */ }
-      }
-    }else if(action==='cancel-start'){
-      const msg = (p.endDate || p.endTime)
-        ? `${idx+1}교시의 시작·종료 기록을 모두 지울까요?`
-        : `${idx+1}교시 시작을 취소할까요?`;
-      if(!(await askConfirm(msg, true))) return;
-      // v9.10: 로컬 확정 → 즉시 마킹 (await 이전)
-      p.startDate=''; p.startTime=''; p.endDate=''; p.endTime='';
-      p.endPage='';
-      p.timerStartedAt=null; p.timerEndedAt=null;
-      markChangedPeriodFields(p, beforeSync);
-      renderPeriods(); updateStudyTimer(); updateWasteTimer();
-      if(cloudUser){ try{ await cloudClearActiveTimer(); }catch(_){} }
-      if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'study'},location.origin);
-      showToast('시작 기록을 취소했어요');
-    }else if(action==='end'){
-      if(!(p.startDate&&p.startTime) || !/^[1-9][0-9]*$/.test(String(p.endPage||'').trim())) return;
-      p.endDate=ymd(now); p.endTime=hm(now);
-      if(Number(p.timerStartedAt)>0) p.timerEndedAt=Math.round(serverNowMs());
-      markChangedPeriodFields(p, beforeSync);
-      renderPeriods(); updateStudyTimer(); updateWasteTimer();
-      if(Number(p.timerStartedAt)>0 && cloudUser){
-        try{
-          const row=await cloudStopActiveTimer(ymKey(cur),dKey(cur),p._id);
-          const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-          if(Number.isFinite(ts) && ts>0){
-            if(!refetch()) return;
-            p.timerEndedAt=ts;
-            markChangedPeriodFields(p, beforeSync);
-          }
-          await calibrateServerClock(true);
-          if(!refetch()) return;
-        }catch(_){}
-      }
-      if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'study'},location.origin);
-    }else if(action==='cancel-end'){
-      if(!(await askConfirm(`${idx+1}교시 종료를 취소할까요?`, true))) return;
-      p.endDate=''; p.endTime='';
-      p.timerEndedAt=null;
-      markChangedPeriodFields(p, beforeSync);
-      renderPeriods(); updateStudyTimer(); updateWasteTimer();
-      if(Number(p.timerStartedAt)>0 && cloudUser){
-        try{
-          await cloudResumeActiveTimer(ymKey(cur),dKey(cur),p,idx);
-          await calibrateServerClock(true);
-          if(!refetch()) return;
-        }catch(_){}
-      }
-      if(window.parent!==window){
-        try{ await requestExclusiveSessionStart(serverNowMs()); }catch(_){}
-      }
-      showToast('종료 기록을 취소했어요');
-    }
-    markChangedPeriodFields(p,beforeSync);
-    if(action !== 'start') autoSortPeriodsByStart(day);
-    await persistToday();
-    renderPeriods(); updateStudyTimer(); updateWasteTimer();
-  } finally {
-    userActionCount--;
-    if(btn.isConnected){
-      btn.disabled = false;
-      btn.textContent = origLabel;
-    }
-    await flushPendingRender();
-  }
-});
 
 $('#periodList').addEventListener('click', async (e) => {
   if(e.target.classList.contains('period-del')){
     const idx = Number(e.target.dataset.idx);
     const day = getDayData();
     const lastIdx = day.periods.length - 1;
-    // 과거 공부일은 원하는 교시를 바로 삭제할 수 있다.
-    // 당일 기록은 기존처럼 마지막 교시부터만 삭제한다.
-    const logical = logicalToday();
-    const selectedDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
-    const isPastDay = selectedDay < logical;
 
-    if(!isPastDay && idx !== lastIdx){
-      alert(`교시는 마지막 교시부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}교시를 삭제해주세요.`);
+    if(idx !== lastIdx){
+      await askConfirm(`기록은 마지막 기록부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}기록을 삭제해주세요.`, true);
       return;
     }
 
-    if(!(await askConfirm(`${idx+1}교시를 정말 삭제하시겠습니까?`, true))) return;
+    if(!(await askConfirm(`${idx+1}기록을 정말 삭제하시겠습니까?`, true))) return;
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
     renderPeriods();
@@ -2239,25 +2628,8 @@ $('#periodList').addEventListener('click', async (e) => {
   }
 });
 
-// 시작/종료 시간 필드(투명 처리된 input)를 어디를 클릭해도 시간 선택기가 열리도록 한다.
-$('#periodList').addEventListener('click', (e) => {
-  if(e.target.closest('button')) return;
-  const field = e.target.closest('.field.time');
-  if(!field) return;
-  // 잠긴 시간 필드는 시간 선택기를 열지 않는다.
-  if(field.classList.contains('disabled')) return;
-  const input = field.querySelector('input[type="datetime-local"]');
-  if(!input) return;
-  try{
-    if(typeof input.showPicker === 'function') input.showPicker();
-    else { input.focus(); input.click(); }
-  }catch(_){
-    input.focus();
-  }
-});
 
-
-// 페이지 번호는 빈칸 또는 1 이상의 정수만 허용한다.
+// 강의 횟수 번호는 빈칸 또는 1 이상의 정수만 허용한다.
 // -, +, ., e/E 및 기타 문자는 키보드/붙여넣기 모두 차단한다.
 $('#periodList').addEventListener('beforeinput', (e) => {
   const t = e.target;
@@ -2274,22 +2646,221 @@ $('#periodList').addEventListener('paste', (e) => {
   const text = (e.clipboardData || window.clipboardData)?.getData('text') ?? '';
   if(!/^[1-9]\d*$/.test(text.trim())){
     e.preventDefault();
-    showToast('페이지는 1 이상의 정수만 입력할 수 있어요');
+    showToast('강의 횟수는 1 이상의 정수만 입력할 수 있어요');
+  }
+});
+
+$('#periodList').addEventListener('input', async (e) => {
+  userActionCount++;
+  try{
+  const t = e.target;
+  if(t.tagName !== 'INPUT') return;
+  const idx = Number(t.dataset.idx);
+  const k = t.dataset.k;
+
+  if((k==='startPage' || k==='endPage')){
+    const raw = String(t.value ?? '');
+    if(raw === ''){
+      // 빈칸 허용
+    } else if(!/^\d+$/.test(raw)){
+      t.value = '';
+      showToast('강의 횟수는 1 이상의 정수만 입력할 수 있어요');
+    } else {
+      const normalized = raw.replace(/^0+/, '');
+      t.value = normalized; // 0 또는 000은 빈칸, 0012는 12
+    }
+  }
+
+  const day = getDayData();
+  const p = day.periods[idx];
+
+  const prevStartDate=p.startDate||'', prevStartTime=p.startTime||'';
+  const prevEndDate=p.endDate||'', prevEndTime=p.endTime||'';  ensureDaySync(day, ymKey(cur), dKey(cur));
+  const beforeSync = deepClone(p);
+  const prevVal = p[k];
+
+  if(k==='start' || k==='end'){
+    // datetime-local 하나로 날짜+시간을 함께 입력받아 "YYYY-MM-DDTHH:MM" 형태로 들어온다
+    const dateKey = k==='start' ? 'startDate' : 'endDate';
+    const timeKey = k==='start' ? 'startTime' : 'endTime';
+    const prevDTVal = (p[dateKey] && p[timeKey]) ? `${p[dateKey]}T${p[timeKey]}` : '';
+
+    // 시작/종료 일시는 선택한 강의일의 집계 범위 안에서만 입력 가능하고,
+    // 현재 시각보다 미래로도 입력할 수 없다.
+    if(t.value){
+      const [d, tm] = t.value.split('T');
+      const selected = combineDT(d, tm);
+      if(selected && !isWithinSelectedStudyDay(selected)){
+        recordRangeAlert();
+        t.value = prevDTVal;
+        return;
+      }
+      if(selected && selected.getTime() > serverNowMs()){
+        await askConfirm('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.', true);
+        t.value = prevDTVal;
+        return;
+      }
+      p[dateKey] = d || '';
+      p[timeKey] = tm || '';
+
+      // 직접 입력은 기록/합계 계산용이며 실시간 타이머를 시작하지 않는다.
+      // 과거 일시를 입력해도 '진행 중'이나 수백 시간 타이머가 생기지 않는다.
+      if(k === 'start'){
+        p.timerStartedAt = null;
+        p.timerEndedAt = null;
+      } else if(k === 'end'){
+        p.timerEndedAt = null;
+      }
+    } else {
+      p[dateKey] = '';
+      p[timeKey] = '';
+      if(k === 'start') p.timerStartedAt = null;
+      if(k === 'end') p.timerEndedAt = null;
+    }
+  } else {
+    p[k] = t.value;
+  }
+
+  // 강의 횟수 번호와 자동기록 시간을 서로 연동:
+  // - 강의 횟수를 처음 입력하는 순간(빈칸/0→값) 현재 날짜+시간을 자동 기록
+  // - 강의 횟수를 지우거나 0으로 만들면(값→빈칸/0) 자동 기록됐던 날짜+시간도 함께 지움
+  // - 이미 값이 있는 상태에서 숫자를 더 입력/수정하는 것만으로는 시간이 바뀌지 않음
+  if(k==='startPage' || k==='endPage'){
+    const isBlankPage = v => (v==='' || v==null || Number(v)===0);
+    const pageWasBlank = isBlankPage(prevVal);
+    const pageIsBlank = isBlankPage(t.value);
+    const dtKey = k==='startPage' ? 'start' : 'end';
+    const dateKey = k==='startPage' ? 'startDate' : 'endDate';
+    const timeKey = k==='startPage' ? 'startTime' : 'endTime';
+    const dtInput = () => $('#periodList').querySelector(`input[data-k="${dtKey}"][data-idx="${idx}"]`);
+
+    if(pageIsBlank){
+      p[dateKey] = '';
+      p[timeKey] = '';
+      const di = dtInput(); if(di) di.value = '';
+      if(k==='startPage'){
+        p.timerStartedAt = null;
+        p.timerEndedAt = null;
+        if(cloudUser) await cloudClearActiveTimer();
+      } else if(k==='endPage' && Number(p.timerStartedAt) > 0){
+        // 끝 강의 횟수를 지우면 같은 서버 시작 시점에서 다시 카운트한다.
+        p.timerEndedAt = null;
+        if(cloudUser) await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+      }
+    } else if(pageWasBlank && !isNaN(t.value)){
+      if(cloudUser && !serverClockCalibrated) await calibrateServerClock(false);
+      const now = new Date(serverNowMs());
+      // 현재 보고 있는 강의일이 실제 현재 강의일일 때만 '현재 시각' 자동기록.
+      // 과거 강의일을 수정할 때는 범위를 벗어나는 현재 시각이 들어가지 않도록 일시를 직접 입력하게 한다.
+      if(!p[timeKey]){
+        if(isWithinSelectedStudyDay(now)){
+          p[dateKey] = ymd(now);
+          p[timeKey] = hm(now);
+          const di = dtInput(); if(di) di.value = `${p[dateKey]}T${p[timeKey]}`;
+        } else {
+          const di = dtInput(); if(di) di.value = '';
+          showToast('과거 강의일은 일시를 직접 입력해 주세요');
+        }
+      }
+      // 실제 현재 강의일에서 강의 횟수를 새로 입력할 때만 초 단위 타이머를 제어한다.
+      if(isWithinSelectedStudyDay(now)){
+        if(k==='startPage'){
+          p.timerEndedAt = null;
+          if(cloudUser){
+            const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+            const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
+            p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+            void calibrateServerClock(true);
+          }else{
+            p.timerStartedAt = Math.round(serverNowMs());
+          }
+        } else if(k==='endPage' && Number(p.timerStartedAt) > 0 && !Number(p.timerEndedAt)){
+          if(cloudUser){
+            const row = await cloudStopActiveTimer();
+            const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
+            p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+            void calibrateServerClock(true);
+          }else{
+            p.timerEndedAt = Math.round(serverNowMs());
+          }
+        }
+      }
+    }
+    updateStudyTimer();
+  }
+  markChangedPeriodFields(p, beforeSync);
+  if(k === 'start' || k === 'end'){
+    const label = t.parentElement && t.parentElement.querySelector('.ko-time-label');
+    if(label){
+      const dateKey = k==='start' ? 'startDate' : 'endDate';
+      const timeKey = k==='start' ? 'startTime' : 'endTime';
+      label.textContent = koDateTimeLabel(p[dateKey], p[timeKey]) || '시간을 눌러 수정';
+    }
+    if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
+      await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
+      p.startDate = '';
+      p.startTime = '';
+      p.endDate = '';
+      p.endTime = '';
+      p.timerStartedAt = null;
+      p.timerEndedAt = null;
+      p._updatedAt = syncNow();
+      t.value = '';
+      if(label) label.textContent = '시간을 눌러 수정';
+    }
+    // 시작/종료 시간을 직접 입력·삭제하면 잠금 상태가 바뀌므로 즉시 반영한다.
+    refreshLectureTimeFieldDisabled(idx);
+    refreshStats();
+    updateStudyTimer();
+    updateWasteTimer();
+    void persistToday();
+    return;
+  }
+  if(k !== 'subject') refreshStats();
+
+  // 과목명은 IME/플로팅 키보드 입력 흐름을 막지 않도록 저장만 예약하고 즉시 반환한다.
+  if(k === 'subject'){
+    void persistToday();
+    return;
+  }
+  // 시작/종료가 모두 입력되면 다른 기록과 시간대가 겹치는지 먼저 확인한다.
+  if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
+    await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
+    // 카드 자체는 유지하고, 겹침을 만든 직접 입력 시간만 초기화한다.
+    p.startDate = '';
+    p.startTime = '';
+    p.endDate = '';
+    p.endTime = '';
+    p.timerStartedAt = null;
+    p.timerEndedAt = null;
+    p._updatedAt = syncNow();
+    await persistToday();
+    renderPeriods();
+    return;
+  }
+  // 유효한 기록만 시작시간 순으로 자동 재배치한다.
+  const reordered = (p.startDate && p.startTime && p.endDate && p.endTime)
+    ? autoSortPeriodsByStart(day) : false;
+  await persistToday();
+  if(reordered) renderPeriods();
+  }finally{
+    userActionCount--;
+    await flushPendingRender();
   }
 });
 
 
+
 // 실행 중인 타이머를, 화면에 지금 어떤 날짜가 표시돼 있는지와 무관하게 찾아낸다.
-let lastAutoStoppedId = null;
-let lastAutoStoppedAt = 0;
+let lastAutoStoppedId=null;
+let lastAutoStoppedAt=0;
 // (다른 날짜를 보고 있거나, 자정을 넘겨 이 탭을 새로 열었을 때도 놓치지 않도록)
 async function locateRunningPeriod(){
   if(cloudUser && sbClient){
     try{
       const {data,error} = await sbClient.from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
-      if(!error && data?.status==='running' && /^\d{4}-\d{2}$/.test(String(data.ym||''))){
+      if(!error && data?.status==='running'){
         const ym=String(data.ym||''), dk=String(data.day_key||'');
-        if(!/^\d{4}-\d{2}$/.test(ym)) throw new Error('skip-non-study-ym');
         await loadMonth(ym);
         const day=monthCache[ym]?.[dk];
         if(day?.periods){
@@ -2343,101 +2914,11 @@ async function locateStoppedPeriodNear(atMsTarget, toleranceMs=8000){
 }
 
 async function requestExclusiveSessionStart(atMs){
-  if(window.parent === window) return true;
-  try{
-    const req='study-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-    return await new Promise(resolve=>{
-      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
-      function onMsg(ev){
-        if(ev.source!==window.parent || ev.data?.type!=='exclusive-session-result' || ev.data?.req!==req) return;
-        clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
-      }
-      window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'study',req,at:atMs},location.origin);
-    });
-  }catch(e){return true}
+  // 기타 기록장 타이머는 다른 기록장과 완전히 독립적으로 동작한다.
+  return true;
 }
-window.addEventListener('message',async ev=>{
-  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='study') return;
-  window.parent.postMessage({type:'exclusive-session-stopped',kind:'study',req:ev.data.req,ok:true,stopped:true},location.origin);
-  console.log('★★★ STUDY STOP 신호 받음 ★★★');
-  let stopped=false;
-  try{
-    // 다른 기록장(강의/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
-    // 이 공부 세션의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
-    const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
-    const now=new Date(atMs);
-    const found=await locateRunningPeriod();
-    console.log('★STOP found=', JSON.stringify(found ? {ym:found.ym, dk:found.dk, endPage:found.p?.endPage, endDate:found.p?.endDate} : null));
-    if(found){
-      const {ym,dk,day,p}=found;
-      const before=deepClone(p);
-      p.endDate=ymd(now);p.endTime=hm(now);
-      p.timerEndedAt=Math.round(atMs);
-      lastAutoStoppedId = p._id;
-      lastAutoStoppedAt = atMs;
-      // 자동 전환 시 페이지 진도는 시작페이지 그대로 저장
-      if(String(p.startPage||'').trim()) p.endPage=String(p.startPage).trim();
-      p.timerEndedAt=Math.round(atMs);
-      if(cloudUser){
-        void cloudStopActiveTimer(ym, dk, p._id).then(row=>{
-          const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-          if(Number.isFinite(ts)){ p.timerEndedAt=ts; p._updatedAt=syncNow(); void saveMonth(ym); }
-        }).catch(()=>{});
-      }
-      markChangedPeriodFields(p, before);
-      autoSortPeriodsByStart(day);
-      // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
-      if(ym===ymKey(cur) && dk===dKey(cur)){
-        if(isPeriodInputEditing() || userActionCount > 0){
-          periodRenderPending = true;
-        } else {
-          renderPeriods();updateStudyTimer();updateWasteTimer();
-        }
-      }
-      void saveMonth(ym);
-      try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(e){console.log('렌더에러:',e);}
-      stopped=true;
-    }
-  }catch(e){console.warn('자동 공부 종료 실패',e)}
-  window.parent.postMessage({type:'exclusive-session-stopped',kind:'study',req:ev.data.req,ok:true,stopped},location.origin);
-});
-// 새로 시작한 다른 기록장의 타이머가 곧바로 취소되면, 그로 인해 자동 종료됐던 이 기록을 되돌린다.
-window.addEventListener('message',async ev=>{
-  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-undo-stop') return;
-  try{
-    const atMs=Number(ev.data.atMs);
-    if(!Number.isFinite(atMs)) return;
-    let found=null;
-    if(lastAutoStoppedId){
-      for(const ym of Object.keys(monthCache)){
-        const month=monthCache[ym];
-        for(const dk of Object.keys(month)){
-          if(!/^\d{1,2}$/.test(dk)) continue;
-          const day=month[dk];
-          if(!day?.periods) continue;
-          const idx=day.periods.findIndex(x=>String(x._id)===String(lastAutoStoppedId));
-          if(idx>=0){ found={ym,dk,day,p:day.periods[idx],idx}; break; }
-        }
-        if(found) break;
-      }
-    }
-    if(!found) found=await locateStoppedPeriodNear(atMs);
-    if(!found) return;
-    lastAutoStoppedId=null;
-    const {ym,dk,day,p,idx}=found;
-    const before=deepClone(p);
-    if(p.endPage && p.endPage===p.startPage) p.endPage='';
-    p.endDate=''; p.endTime=''; p.timerEndedAt=null;
-    if(cloudUser) await cloudResumeActiveTimer(ym, dk, p, idx);
-    markChangedPeriodFields(p, before);
-    autoSortPeriodsByStart(day);
-    await saveMonth(ym);
-    if(ym===ymKey(cur) && dk===dKey(cur)){
-      renderPeriods();updateStudyTimer();updateWasteTimer();
-    }
-  }catch(e){console.warn('타이머 복원 실패',e)}
-});
+
+// 기타 기록장은 exclusive-session-stop / undo-stop 메시지를 사용하지 않는다.
 
 function askConfirm(message, danger=false){
   return new Promise(resolve => {
@@ -2458,165 +2939,138 @@ function askConfirm(message, danger=false){
   });
 }
 
-$('#periodList').addEventListener('input', async (e) => {
-  userActionCount++;
+$('#periodList').addEventListener('click', (e) => {
+  if(e.target.closest('button')) return;
+  const field = e.target.closest('.field.time');
+  if(!field) return;
+  // 잠긴 시간 필드는 시간 선택기를 열지 않는다.
+  if(field.classList.contains('disabled')) return;
+  const input = field.querySelector('input[type="datetime-local"]');
+  if(!input) return;
   try{
-  const t = e.target;
-  if(t.tagName !== 'INPUT') return;
-  const idx = Number(t.dataset.idx);
-  const k = t.dataset.k;
-
-  if((k==='startPage' || k==='endPage')){
-    const raw = String(t.value ?? '');
-    if(raw === ''){
-      // 빈칸 허용
-    } else if(!/^\d+$/.test(raw)){
-      t.value = '';
-      showToast('페이지는 1 이상의 정수만 입력할 수 있어요');
-    } else {
-      const normalized = raw.replace(/^0+/, '');
-      t.value = normalized; // 0 또는 000은 빈칸, 0012는 12
-    }
+    if(typeof input.showPicker === 'function') input.showPicker();
+    else { input.focus(); input.click(); }
+  }catch(_){
+    input.focus();
   }
+});
 
+// 강의 카드의 시작/종료/취소 버튼
+$('#periodList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-lecture-action]');
+  if(!btn) return;
+  const idx = Number(btn.dataset.idx);
   const day = getDayData();
-  const p = day.periods[idx];
+  const p = day.periods?.[idx];
+  if(!p) return;
 
-  const prevStartDate=p.startDate||'', prevStartTime=p.startTime||'';
-  const prevEndDate=p.endDate||'', prevEndTime=p.endTime||'';  ensureDaySync(day, ymKey(cur), dKey(cur));
+  const action = btn.dataset.lectureAction;
+  const isCancel = action === 'cancel-start' || action === 'cancel-end';
+  if(cloudUser && !serverClockCalibrated){
+    try{ await calibrateServerClock(false); }catch(_){}
+  }
+  const now = new Date(serverNowMs());
+  if(!isCancel && !isWithinSelectedStudyDay(now)){
+    showToast('오늘 강의에서만 시작/종료 버튼을 사용할 수 있어요');
+    return;
+  }
+
   const beforeSync = deepClone(p);
-  const prevVal = p[k];
 
-  // 시작 페이지 없이 종료 페이지만 입력하려는 경우 입력을 막고 안내한다.
-  if(k==='endPage' && String(t.value ?? '').trim() && !String(p.startPage ?? '').trim()){
-    t.value = '';
-    p.endPage = '';
-    await askConfirm('시작 페이지를 먼저 입력해주세요.', true);
-    return;
-  }
-
-  if(k==='start' || k==='end'){
-    // datetime-local 하나로 날짜+시간을 함께 입력받아 "YYYY-MM-DDTHH:MM" 형태로 들어온다
-    const dateKey = k==='start' ? 'startDate' : 'endDate';
-    const timeKey = k==='start' ? 'startTime' : 'endTime';
-    const prevDTVal = (p[dateKey] && p[timeKey]) ? `${p[dateKey]}T${p[timeKey]}` : '';
-
-    // 시작/종료 일시는 선택한 공부일의 집계 범위 안에서만 입력 가능하고,
-    // 현재 시각보다 미래로도 입력할 수 없다.
-    if(t.value){
-      const [d, tm] = t.value.split('T');
-      const selected = combineDT(d, tm);
-      if(selected && !isWithinSelectedStudyDay(selected)){
-        recordRangeAlert();
-        t.value = prevDTVal;
-        return;
+  if(action === 'start'){
+    if(!(await requestExclusiveSessionStart(now.getTime()))) return;
+    p.startDate = ymd(now);
+    p.startTime = hm(now);
+    p.endDate = '';
+    p.endTime = '';
+    p.timerEndedAt = null;
+    if(cloudUser){
+      try{
+        const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
+        p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
+        void calibrateServerClock(true);
+      }catch(_){
+        p.timerStartedAt = Math.round(now.getTime());
       }
-      if(selected && selected.getTime() > serverNowMs()){
-        await askConfirm('시작/종료 일시는 현재 시간보다 미래로 설정할 수 없습니다.', true);
-        t.value = prevDTVal;
-        return;
+    }else{
+      p.timerStartedAt = Math.round(now.getTime());
+    }
+  }else if(action === 'end'){
+    if(!p.startDate || !p.startTime){
+      showToast('먼저 강의 시작을 눌러주세요');
+      return;
+    }
+    p.endDate = ymd(now);
+    p.endTime = hm(now);
+    if(cloudUser){
+      try{
+        const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
+        const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
+        p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+        void calibrateServerClock(true);
+      }catch(_){
+        p.timerEndedAt = Math.round(serverNowMs());
       }
-      p[dateKey] = d || '';
-      p[timeKey] = tm || '';
-
-      // 직접 입력은 기록/합계 계산용이며 실시간 타이머를 시작하지 않는다.
-      // 과거 일시를 입력해도 '진행 중'이나 수백 시간 타이머가 생기지 않는다.
-      if(k === 'start'){
-        p.timerStartedAt = null;
-        p.timerEndedAt = null;
-      } else if(k === 'end'){
-        p.timerEndedAt = null;
-      }
-    } else {
-      p[dateKey] = '';
-      p[timeKey] = '';
-      if(k === 'start') p.timerStartedAt = null;
-      if(k === 'end') p.timerEndedAt = null;
+    }else{
+      p.timerEndedAt = Math.round(serverNowMs());
     }
-  } else {
-    p[k] = t.value;
-  }
-
-  // 시작 페이지가 바뀌면 종료 페이지의 최소값만 갱신한다. 입력 자체는 항상 가능하다.
-  if(k==='startPage'){
-    const endEl = $('#periodList').querySelector(`input[data-k="endPage"][data-idx="${idx}"]`);
-    if(endEl) endEl.min = String(p.startPage||'').trim() || '1';
-  }
-
-  // 페이지 입력만으로는 시간을 기록하지 않는다. 버튼을 눌렀을 때만 시작/종료한다.
-  if(k==='startPage' || k==='endPage'){
-    if(k==='startPage' && !String(t.value||'').trim() && !(p.startDate && p.startTime)){
-      p.timerStartedAt=null; p.timerEndedAt=null;
-    }
-    if(k==='endPage' && !String(t.value||'').trim() && !(p.endDate && p.endTime)){
-      p.timerEndedAt=null;
-    }
-    refreshTimeFieldDisabled(idx);
-    updateStudyTimer();
-  }
-  // 직접 입력은 합계만 다시 계산하며 실시간 타이머 상태는 만들지 않는다.
-  if(k === 'start' || k === 'end'){
-    const labelEl = t.parentElement && t.parentElement.querySelector('.ko-time-label');
-    if(labelEl){
-      const dateKey = k==='start' ? 'startDate' : 'endDate';
-      const timeKey = k==='start' ? 'startTime' : 'endTime';
-      labelEl.textContent = koDateTimeLabel(p[dateKey], p[timeKey]) || '시간을 눌러 수정';
-    }
-    updateStudyTimer();
-    updateWasteTimer();
-  }
-  // 입력 중인 칸은 다시 그리지 않고, 계산되는 숫자만 갱신해서 포커스/커서를 유지
-  markChangedPeriodFields(p, beforeSync);
-  if(k !== 'subject') refreshStats();
-
-  // 과목명은 IME/플로팅 키보드 입력 흐름을 막지 않도록 저장만 예약하고 즉시 반환한다.
-  if(k === 'subject'){
-    void persistToday();
-    return;
-  }
-  // 시작/종료가 모두 입력되면 다른 기록과 시간대가 겹치는지 먼저 확인한다.
-  if(p.startDate && p.startTime && p.endDate && p.endTime && hasPeriodOverlap(day.periods || [], p)){
-    await askConfirm('기존 기록과 시간이 겹칩니다. 입력한 시간 내용을 지웁니다.', true);
-    // 카드 자체는 유지하고, 겹침을 만든 직접 입력 시간만 초기화한다.
+  }else if(action === 'cancel-start'){
+    const msg = (p.endDate || p.endTime)
+      ? `${idx+1}강의의 시작·종료 기록을 모두 지울까요?`
+      : `${idx+1}강의 시작을 취소할까요?`;
+    if(!(await askConfirm(msg, true))) return;
     p.startDate = '';
     p.startTime = '';
     p.endDate = '';
     p.endTime = '';
     p.timerStartedAt = null;
     p.timerEndedAt = null;
-    p._updatedAt = syncNow();
-    await persistToday();
-    renderPeriods();
+    if(cloudUser){
+      try{ await cloudClearActiveTimer(); }catch(_){}
+    }
+    // 방금 시작했던 타이머를 취소하는 것이므로, 그로 인해 자동 종료됐던
+    // 다른 기록장(공부/수면)의 기록을 되돌려 달라고 알린다.
+    showToast('시작 기록을 취소했어요');
+  }else if(action === 'cancel-end'){
+    if(!(await askConfirm(`${idx+1}강의 종료를 취소할까요?`, true))) return;
+    p.endDate = '';
+    p.endTime = '';
+    p.timerEndedAt = null;
+    if(Number(p.timerStartedAt) > 0 && cloudUser){
+      try{
+        await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        void calibrateServerClock(true);
+      }catch(_){}
+    }
+    if(window.parent!==window){
+      try{ await requestExclusiveSessionStart(serverNowMs()); }catch(_){}
+    }
+    showToast('종료 기록을 취소했어요');
+  }else{
     return;
   }
-  // 유효한 기록만 시작시간 순으로 자동 재배치한다.
-  const reordered = (p.startDate && p.startTime && p.endDate && p.endTime)
-    ? autoSortPeriodsByStart(day) : false;
+
+  markChangedPeriodFields(p, beforeSync);
+  p._updatedAt = syncNow();
+  if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
   await persistToday();
-  if(reordered) renderPeriods();
-  }finally{
-    userActionCount--;
-    await flushPendingRender();
-  }
+  renderPeriods();
+  updateStudyTimer();
+  updateWasteTimer();
 });
 
-
-
 // 자동 동기화 중 재렌더링이 보류됐으면, 입력칸을 완전히 벗어난 뒤 한 번만 반영한다.
-$('#periodList').addEventListener('focusout', (e) => {
+$('#periodList').addEventListener('focusout', () => {
   if(!periodRenderPending) return;
-  // v9.13: 포커스가 리스트 내부 버튼으로 이동 중이면 렌더 미룸 (click 씹힘 방지)
-  const next = e.relatedTarget;
-  if(next && next.closest && next.closest('#periodList')) return;
   setTimeout(async () => {
     if(isPeriodInputEditing()) return;
-    if(userActionCount > 0) return;
     periodRenderPending = false;
     await renderCurrentView();
   }, 80);
 });
 
-// 시작 페이지에서 엔터를 누르면 끝 페이지로 포커스 이동
+// 강의 시작에서 엔터를 누르면 끝 강의 횟수로 포커스 이동
 $('#periodList').addEventListener('keydown', (e) => {
   if(e.key !== 'Enter') return;
   const t = e.target;
@@ -2640,18 +3094,17 @@ function chartSvg(points, valueKey, kind, unit){
   const y=v=>T+innerH-(v/max)*innerH;
   const grid=[0,.5,1].map(fr=>{
     const gy=T+innerH-(innerH*fr);
-    const rawVal=max*fr;
+    const val=Math.round(max*fr);
     let axisLabel;
-    if(valueKey==='study' || valueKey==='waste'){
-      const mins=Math.max(0,Math.round(rawVal));
-      const hours=Math.floor(mins/60);
-      const minutes=mins%60;
-      const lines=[];
+    if(valueKey==='study'){
+      const mins = Math.max(0, Math.round(Number(val)||0));
+      const hours = Math.floor(mins / 60);
+      const minutes = mins % 60;
+      const lines = [];
       if(hours) lines.push(`${hours}시간`);
       if(minutes || !hours) lines.push(`${minutes}분`);
       axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy - (lines.length>1 ? 3 : -3)}" text-anchor="end">${lines.map((line,i)=>`<tspan x="${L-5}" dy="${i===0?0:10}">${escHtml(line)}</tspan>`).join('')}</text>`;
     }else{
-      const val=Math.round(rawVal);
       axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${escHtml(val)}</text>`;
     }
     return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/>${axisLabel}`;
@@ -2664,7 +3117,7 @@ function chartSvg(points, valueKey, kind, unit){
     const x=L+i*slot+(slot-barW)/2;
     const yy=y(v);
     const h=Math.max(v>0?2:0,T+innerH-yy);
-    const displayValue = valueKey==='pages' ? `${Math.round(v)} Page` : formatTooltipTime(v);
+    const displayValue = valueKey==='count' ? `${Math.round(v)}회` : (valueKey==='number' ? `${Math.round(v)}` : (valueKey==='pages' ? `${Math.round(v)}쪽` : formatTooltipTime(v)));
     return `<rect class="chart-bar-${kind}" data-chart-label="${escHtml(p.label)}" data-chart-value="${escHtml(displayValue)}" tabindex="0" x="${x}" y="${yy}" width="${barW}" height="${h}" rx="2"><title>${escHtml(p.label)}: ${escHtml(displayValue)}</title></rect>`;
   }).join('');
   const labels=points.map((p,i)=>{
@@ -2701,27 +3154,20 @@ function chartTotalTime(points,key){
   const mins=points.reduce((sum,p)=>sum+(Number(p[key])||0),0);
   return formatAvgTime(mins);
 }
-function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote="", activeDayAveragePoints=null){
+function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote="", title="기록"){
   if(!chartsVisible) return '';
-  if(!points.length || points.every(p=>!p.study && !p.pages && !p.waste)) return '';
+  if(!points.length || points.every(p=>!p.count && !p.number)) return '';
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
   const hasAverage = avgBase.length > 0;
-  const avgStudy = hasAverage ? formatAvgTime(chartAverage(avgBase,'study')) : '—';
-  const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))} Page` : '—';
-  const avgWaste = hasAverage ? formatAvgTime(chartAverage(avgBase,'waste')) : '—';
-  const totalStudy = chartTotalTime(points,'study');
-  const totalPages = Math.round(points.reduce((sum,p)=>sum+(Number(p.pages)||0),0));
-  const totalWaste = chartTotalTime(points,'waste');
-  const activeBase = Array.isArray(activeDayAveragePoints) ? activeDayAveragePoints : [];
-  const activeAvgStudy = activeBase.length ? formatAvgTime(chartAverage(activeBase,'study')) : '—';
-  const activeAvgWaste = activeBase.length ? formatAvgTime(chartAverage(activeBase,'waste')) : '—';
-  const activeStudyExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 공부시간 ${activeAvgStudy}</div>` : '';
-  const activeWasteExtra = activeDayAveragePoints ? `<div class="chart-avg-note">쉬는 날 제외 평균 낭비시간 ${activeAvgWaste}</div>` : '';
-  const note = averageNote ? `<div class="chart-period-note">${averageNote}</div>` : '';
+  const avgCount = hasAverage ? `${(chartAverage(avgBase,'count')).toFixed(1)}회` : '—';
+  const avgNumber = hasAverage ? `${(chartAverage(avgBase,'number')).toFixed(1)}` : '—';
+  const totalCount = Math.round(points.reduce((sum,p)=>sum+(Number(p.count)||0),0));
+  const totalNumber = Math.round(points.reduce((sum,p)=>sum+(Number(p.number)||0),0));
+  const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy}<br>총 ${totalStudy}</div></div>${activeStudyExtra}${note}${chartSvg(points,'study','study','분')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 페이지 추이</div><div class="chart-unit">${averageLabel} ${avgPages}<br>총 ${totalPages} Page</div></div>${note}${chartSvg(points,'pages','pages','Page')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">낭비시간 추이</div><div class="chart-unit">${averageLabel} ${avgWaste}<br>총 ${totalWaste}</div></div>${activeWasteExtra}${note}${chartSvg(points,'waste','waste','분')}</div>
+    <div class="summary-title" style="margin:6px 4px 0;text-align:center;">${escHtml(title)}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">횟수 추이</div><div class="chart-unit" style="color:#111827">${averageLabel} ${avgCount}<br>총 ${totalCount}회</div></div>${note}${chartSvg(points,'count','count','회')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title" style="color:#B86F7D">용량 추이</div><div class="chart-unit" style="color:#B86F7D">${averageLabel} ${avgNumber}<br>총 ${totalNumber}</div></div>${note}${chartSvg(points,'number','number','')}</div>
   </div>`;
 }
 
@@ -2745,15 +3191,21 @@ async function renderDayCharts(){
     const m = await loadMonth(ym);
     const day = m[dk] || {periods:[]};
     const periods = day.periods || [];
-    let study=0, pages=0, waste=0;
-    periods.forEach((p, idx)=>{
-      study += minutesBetween(p);
-      pages += periodPages(p);
-      waste += wasteBefore(periods, idx);
+    const slots = [
+      {count:0, number:0},
+      {count:0, number:0},
+      {count:0, number:0}
+    ];
+    periods.forEach((p)=>{
+      (p.recordSlots||[]).forEach((r,slot)=>{
+        if(!r || slot>2) return;
+        slots[slot].count += Number(r.count)||0;
+        slots[slot].number += Number(r.numberInput)||0;
+      });
     });
     points.push({
       label:`${d.getMonth()+1}/${d.getDate()}(${dayKeys[d.getDay()]})`,
-      study, pages, waste,
+      slots,
       date:new Date(d)
     });
   }
@@ -2761,7 +3213,7 @@ async function renderDayCharts(){
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate()+6);
   const heading = `<div class="summary-title" style="margin:4px 0 8px;color:var(--ink-soft);font-size:12px;">일자별 · ${fmtMD(weekStart)} ~ ${fmtMD(weekEnd)} (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>`;
-  if(points.every(p=>!p.study && !p.pages && !p.waste)){
+  if(points.every(p=>p.slots.every(v=>!v.count && !v.number))){
     el.innerHTML = heading + '<div class="chart-empty" style="margin-bottom:10px;">이 주에 기록된 그래프 데이터가 없어요.</div>';
     return;
   }
@@ -2774,8 +3226,13 @@ async function renderDayCharts(){
     d.setHours(0,0,0,0);
     return d <= currentStudyDay;
   });
-  const activeDayAveragePoints = averagePoints.filter(p => (Number(p.study)||0) > 0);
-  el.innerHTML = heading + chartsHtml(points, averagePoints, '일 평균', '', activeDayAveragePoints);
+  const names = ['카페인','Vita C','기록 3'];
+  const sections = names.map((name,slot)=>{
+    const slotPoints = points.map(p=>({label:p.label,date:p.date,count:p.slots[slot].count,number:p.slots[slot].number}));
+    const slotAveragePoints = averagePoints.map(p=>({label:p.label,date:p.date,count:p.slots[slot].count,number:p.slots[slot].number}));
+    return chartsHtml(slotPoints, slotAveragePoints, '일 평균', '', name);
+  }).join('');
+  el.innerHTML = heading + sections;
 }
 
 // ---------- 주별/월별 집계 ----------
@@ -2795,6 +3252,16 @@ function weekRange(year, monthIdx1, w){
 }
 function fmtMD(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
 
+function recordCountsFromPeriods(periods){
+  const counts=[0,0,0];
+  (periods||[]).forEach(p=>{
+    (p.recordSlots||[]).forEach((r,i)=>{
+      if(i<3) counts[i] += Number(r?.count || 0);
+    });
+  });
+  return counts;
+}
+
 async function computeMonthAgg(ym){
   const [year, mo] = ym.split('-').map(Number);
   const m = await loadMonth(ym);
@@ -2802,45 +3269,44 @@ async function computeMonthAgg(ym){
   const totalWeeks = weekOfMonth(year, mo, daysInMonth);
   const weeks = {};
   for(let w=1; w<=totalWeeks; w++){
-    weeks[w] = {study:0,pages:0,waste:0,days:0, ...weekRange(year, mo, w)};
+    weeks[w] = {counts:[0,0,0],numbers:[0,0,0],days:0, ...weekRange(year, mo, w)};
   }
 
-  let monthStudy=0, monthPages=0, monthWaste=0;
-  const activeDays = [];
+  const monthCounts=[0,0,0];
+  const monthNumbers=[0,0,0];
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
-    const dayData = m[dk];
-    const periods = dayData.periods||[];
-    let dStudy=0, dPages=0, dWaste=0;
-    periods.forEach((p, idx)=>{
-      dStudy += minutesBetween(p);
-      dPages += periodPages(p);
-      dWaste += wasteBefore(periods, idx);
-    });
+    const periods = m[dk]?.periods || [];
+    const counts = recordCountsFromPeriods(periods);
+    const numbers = [0,0,0];
+    periods.forEach(p => (p.recordSlots || []).forEach((r,i) => {
+      if(r && i < 3) numbers[i] += Number(r.numberInput) || 0;
+    }));
+    const total = counts.reduce((a,b)=>a+b,0);
     const w = weekOfMonth(year, mo, dayNum);
-    weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].days += 1;
-    monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste;
-    if(dStudy > 0){
-      activeDays.push({date:new Date(year, mo-1, dayNum), study:dStudy, pages:dPages, waste:dWaste});
+    for(let i=0;i<3;i++){
+      weeks[w].counts[i] += counts[i];
+      weeks[w].numbers[i] += numbers[i];
+      monthCounts[i] += counts[i];
+      monthNumbers[i] += numbers[i];
     }
+    if(total>0 || numbers.some(v=>v!==0)) weeks[w].days += 1;
   });
-  return { weeks, monthStudy, monthPages, monthWaste, activeDays };
+  return { weeks, monthCounts, monthNumbers };
 }
 
 async function renderWeekView(){
   const ym = ymKey(cur);
-  const { weeks, activeDays } = await computeMonthAgg(ym);
+  const { weeks } = await computeMonthAgg(ym);
   const el = $('#weekView');
   const today = logicalToday();
   const weekNums = Object.keys(weeks).map(Number).sort((a,b)=>a-b)
-    .filter(w => weeks[w].start <= today); // 아직 시작되지 않은 주차는 나중에 표시
+    .filter(w => weeks[w].start <= today);
   if(weekNums.length===0){
     el.innerHTML = `<div class="empty-state">${cur.getMonth()+1}월에는 아직 시작된 주차가 없어요.</div>`;
     return;
   }
-  const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste}));
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${cur.getFullYear()}년 ${cur.getMonth()+1}월 · 주별 정리 (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>` +
-    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.', activeDays.filter(p => p.date <= logicalToday())) +
     weekNums.map(w => `
       <div class="agg-row">
         <div>
@@ -2848,7 +3314,9 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          공부 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 페이지 <b>${weeks[w].pages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(weeks[w].waste)}</b>
+          카페인 <b>${weeks[w].counts[0]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[0]}</b><br>
+          Vita C <b>${weeks[w].counts[1]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[1]}</b><br>
+          기록3 <b>${weeks[w].counts[2]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[2]}</b>
         </div>
       </div>
     `).join('');
@@ -2860,31 +3328,22 @@ async function renderMonthView(){
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div><div class="empty-state">불러오는 중…</div>`;
   let html = '';
   let any = false;
-  const chartPoints = [];
-  const activeDayPoints = [];
   for(let mo=1; mo<=12; mo++){
-    const ym = `${year}-${pad(mo)}`;
-    const { monthStudy, monthPages, monthWaste, activeDays } = await computeMonthAgg(ym);
-    activeDayPoints.push(...activeDays);
-    chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste});
-    if(monthStudy===0 && monthPages===0 && monthWaste===0) continue;
+    const { monthCounts, monthNumbers } = await computeMonthAgg(`${year}-${pad(mo)}`);
+    const total = monthCounts.reduce((a,b)=>a+b,0) + monthNumbers.reduce((a,b)=>a+b,0);
+    if(total===0) continue;
     any = true;
     html += `
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          공부 <b class="study-color">${fmtDuration(monthStudy)}</b> · 페이지 <b>${monthPages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(monthWaste)}</b>
+          카페인 <b>${monthCounts[0]}회</b> · <b style="color:#B86F7D;">${monthNumbers[0]}</b><br>
+          Vita C <b>${monthCounts[1]}회</b> · <b style="color:#B86F7D;">${monthNumbers[1]}</b><br>
+          기록3 <b>${monthCounts[2]}회</b> · <b style="color:#B86F7D;">${monthNumbers[2]}</b>
         </div>
       </div>`;
   }
-  const currentStudyDay = logicalToday();
-  const averagePoints = chartPoints.filter((p, idx) => {
-    if(year < currentStudyDay.getFullYear()) return true;
-    if(year > currentStudyDay.getFullYear()) return false;
-    return (idx + 1) < (currentStudyDay.getMonth() + 1);
-  });
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div>` +
-    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.', activeDayPoints.filter(p => p.date <= logicalToday())) +
     (any ? html : `<div class="empty-state">${year}년에 기록된 데이터가 없어요.</div>`);
 }
 
@@ -2896,22 +3355,17 @@ async function renderYearView(){
   const sorted = [...years].filter(y=>y<=currentYear).sort((a,b)=>a-b);
   let rows = '';
   let any = false;
-  const chartPoints = [];
-  const activeDayPoints = [];
   for(const year of sorted){
-    let study=0, pages=0, waste=0;
+    const counts=[0,0,0], numbers=[0,0,0];
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
-      study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste;
-      activeDayPoints.push(...a.activeDays);
+      for(let i=0;i<3;i++){ counts[i] += a.monthCounts[i]; numbers[i] += a.monthNumbers[i]; }
     }
-    chartPoints.push({label:`${year}`, study, pages, waste});
-    if(study===0 && pages===0 && waste===0) continue;
+    if(counts.every(v=>v===0) && numbers.every(v=>v===0)) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">공부 <b class="study-color">${fmtDuration(study)}</b> · 페이지 <b>${pages} Page</b><br>낭비 <b class="waste-color">${fmtDuration(waste)}</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">카페인 <b>${counts[0]}회</b> · <b style="color:#B86F7D;">${numbers[0]}</b><br>Vita C <b>${counts[1]}회</b> · <b style="color:#B86F7D;">${numbers[1]}</b><br>기록3 <b>${counts[2]}회</b> · <b style="color:#B86F7D;">${numbers[2]}</b></div></div>` + rows;
   }
-  el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">년도별 정리</div>` +
-    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.', activeDayPoints.filter(p => p.date <= logicalToday())) +
+  el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
 }
 
@@ -3067,7 +3521,7 @@ function showChartTooltip(bar, clientX, clientY){
     if(refreshing || e.touches.length !== 1 || !atBottom() || interactive(e.target) || isPeriodInputEditing()){
       tracking = false; return;
     }
-    // 짧은 페이지에서 상단 pull-down과 충돌하지 않도록 화면 아래쪽에서 시작할 때만 허용
+    // 짧은 강의 횟수에서 상단 pull-down과 충돌하지 않도록 화면 아래쪽에서 시작할 때만 허용
     if(e.touches[0].clientY < window.innerHeight * 0.55){ tracking = false; return; }
     tracking = true; startY = e.touches[0].clientY; distance = 0;
   }, {passive:true});
@@ -3153,7 +3607,7 @@ function showChartTooltip(bar, clientX, clientY){
       const maxDate = logicalToday();
       if(next > maxDate){
         snapBack();
-        showToast('아직 시작되지 않은 공부일입니다.');
+        showToast('아직 시작되지 않은 기록일입니다.');
         return;
       }
       cur = next;
@@ -3290,17 +3744,14 @@ function closeSettings(){
   $('#settingsOverlay').classList.remove('show');
   $('#settingsOverlay').setAttribute('aria-hidden','true');
 }
-{
-  const settingsBtn = $('#settingsBtn');
-  if (settingsBtn) settingsBtn.onclick = openSettings;
-}
+
 $('#settingsClose').onclick = closeSettings;
 $('#settingsCancel').onclick = closeSettings;
 $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#settingsOverlay')) closeSettings(); });
 
 async function deleteAllStudyRecords(){
   if(!window.__skipDeleteConfirm){
-    if(!(await askConfirm('정말 모든 공부 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.', true))) return;
+    if(!(await askConfirm('정말 모든 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.', true))) return;
   }
   window.__skipDeleteConfirm = false;
 
@@ -3311,14 +3762,12 @@ async function deleteAllStudyRecords(){
       alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
       return;
     }
-    const {data:studyRows,error:readErr} = await sbClient.from('study_months').select('ym').eq('user_id', cloudUser.id);
-    if(readErr){
-      alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message);
-      return;
-    }
-    const studyYms=(studyRows||[]).map(r=>String(r.ym||'')).filter(ym=>/^\d{4}-\d{2}$/.test(ym));
+    const {data:lecRows,error:readErr} = await sbClient.from('study_months')
+      .select('ym').eq('user_id', cloudUser.id).like('ym','R:%');
+    if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); return; }
+    const lecYms=(lecRows||[]).map(r=>String(r.ym||''));
     const markerIso = new Date(Math.round(serverNowMs())).toISOString();
-    for(const ym of studyYms){
+    for(const ym of lecYms){
       const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
         .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
       if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); return; }
@@ -3333,8 +3782,6 @@ async function deleteAllStudyRecords(){
         if(insErr){ alert('삭제 실패: ' + insErr.message); return; }
       }
     }
-    // [FIX4] study_months 를 지워도 active_timer 가 남으면 유령 타이머로 살아난다.
-    //        함께 삭제해 이후 동기화에서 존재하지 않는 period_id 를 찾지 않도록 한다.
     await cloudClearActiveTimerIfMine();
   }
 
@@ -3348,9 +3795,9 @@ async function deleteAllStudyRecords(){
   if(!window.__skipPostDeleteRender){
     await renderCurrentView();
   }
-  showToast('모든 공부 기록을 삭제했어요');
+  showToast('모든 강의 기록을 삭제했어요');
   if(window.parent !== window){
-    window.parent.postMessage({type:'journal-delete-done', kind:'study'}, location.origin);
+    window.parent.postMessage({type:'journal-delete-done', kind:'record'}, location.origin);
   }
 }
 
@@ -3360,12 +3807,11 @@ $('#deleteAllRecords').onclick = deleteAllStudyRecords;
 window.addEventListener('message', async (ev)=>{
   if(ev.origin !== location.origin) return;
   if(ev.data?.type !== 'journal-delete-request') return;
-  if(ev.data?.kind !== 'study') return;
+  if(ev.data?.kind !== 'record') return;
   await deleteAllStudyRecords();
 });
 
 $('#settingsSave').onclick = async () => {
-  // v2: 설정 UI 는 index(부모)의 공통 설정 패널로 일원화.
   alert('설정은 상단 ⚙ 공통 설정에서 변경해주세요.');
 };
 
@@ -3388,16 +3834,14 @@ let cloudUser = null;
 
 function initSupabase(){
   if(sbClient) return true;
-  // 부모 클라이언트만 쓴다. 자식이 createClient 호출하면 GoTrueClient 중복 → 무한 재귀.
   if(window.parent !== window){
     try{
       const p = window.parent.getSupabaseClient;
       if(typeof p === 'function'){
-        const client = p();
-        if(client){ sbClient = client; return true; }
+        sbClient = p();
+        if(sbClient) return true;
       }
     }catch(e){}
-    return false;
   }
   return false;
 }
@@ -3413,6 +3857,10 @@ async function refreshCloudStatus(){
   $('#cloudLogout').style.display = cloudUser ? '' : 'none';
 }
 
+
+function recordCloudYm(ym){ const s=String(ym||''); return s.startsWith('R:') ? s : `R:${s}`; }
+function recordLocalYm(v){ return String(v||'').startsWith('R:') ? String(v).slice(2) : null; }
+
 async function cloudSaveMonth(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
   // 낙관적 병합: 저장 직전 클라우드 최신본을 읽고 날짜/교시/필드 단위로 합친다.
@@ -3421,13 +3869,13 @@ async function cloudSaveMonth(ym){
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',ym).limit(1);
+      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',recordCloudYm(ym)).limit(1);
     if(readErr){
       console.error('클라우드 저장 전 읽기 실패:', readErr);
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
-    if(row?.deleted_at){
+    if(false && row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
@@ -3435,15 +3883,10 @@ async function cloudSaveMonth(ym){
       }
       const nowIso2 = new Date(serverNowMs()).toISOString();
       let q2 = sbClient.from('study_months').update({data:local, deleted_at:null, updated_at:nowIso2})
-        .eq('user_id',cloudUser.id).eq('ym',ym);
+        .eq('user_id',cloudUser.id).eq('ym',recordCloudYm(ym));
       if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
       const {data:w2,error:wErr2} = await q2.select('updated_at');
-      if(!wErr2 && w2 && w2.length){
-        // 저장 왕복 중 유저가 캐시에 쓴 값을 보존
-        const current = ensureMonthSync(monthCache[ym] || {}, ym);
-        monthCache[ym] = mergeMonths(local, current, ym);
-        return;
-      }
+      if(!wErr2 && w2 && w2.length){ monthCache[ym]=local; return; }
       lastSaveErr = wErr2 || new Error('삭제 후 재생성 실패');
       await new Promise(r=>setTimeout(r,120*(attempt+1)));
       continue;
@@ -3453,21 +3896,19 @@ async function cloudSaveMonth(ym){
     let writeOk=false;
     if(row){
       let q = sbClient.from('study_months').update({data:merged,updated_at:nowIso})
-        .eq('user_id',cloudUser.id).eq('ym',ym);
+        .eq('user_id',cloudUser.id).eq('ym',recordCloudYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
-      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym,data:merged,updated_at:nowIso});
+      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:recordCloudYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
       else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
     if(writeOk){
-      // ★ 저장 왕복 중 유저가 쓴 값이 있으면 그쪽을 살린다
-      const current = ensureMonthSync(monthCache[ym] || {}, ym);
-      monthCache[ym] = mergeMonths(merged, current, ym);
+      monthCache[ym]=merged;
       return;
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
@@ -3490,10 +3931,6 @@ async function uploadAllToCloud(){
 
 async function autoSyncFromCloud(lockOwned=false){
   if(!sbClient || !cloudUser) return;
-  if(!lockOwned && userActionCount > 0){
-    periodRenderPending = true;
-    return;
-  }
   if(!lockOwned){
     if(fullCloudSyncRunning) return;
     fullCloudSyncRunning = true;
@@ -3504,16 +3941,17 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
-  const studyRows=(data||[]).filter(row=>/^\d{4}-\d{2}$/.test(String(row.ym||'')));
-  // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 → 다른 기기 삭제 반영
-  const serverYms = new Set(studyRows.map(r=>String(r.ym||'')));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:'));
+  // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 (L: 접두사)
+  const serverYms = new Set(lectureRows.map(r=>String(r.ym||'')));
   Object.keys(monthCache).forEach(localYm => {
-    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has(localYm)){
+    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has('R:'+localYm)){
       delete monthCache[localYm];
     }
   });
-  for(const row of studyRows){
-    const ym=row.ym;
+  for(const row of lectureRows){
+    const ym=recordLocalYm(row.ym);
+    if(!ym) continue;
     if(false && row.deleted_at){
       delete monthCache[ym];
       continue;
@@ -3540,11 +3978,14 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const studyRows=(data||[]).filter(row=>/^\d{4}-\d{2}$/.test(String(row.ym||'')));
-  if(studyRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
-  if(!confirm('클라우드 기록으로 이 브라우저의 공부 기록을 교체할까요?')) return;
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:'));
+  if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
+  if(!(await askConfirm('클라우드 기록으로 이 브라우저의 기록을 교체할까요?', true))) return;
   monthCache={};
-  studyRows.forEach(row=>{ monthCache[row.ym]=ensureMonthSync(deepClone(row.data||{}),row.ym); });
+  lectureRows.forEach(row=>{
+    const ym=recordLocalYm(row.ym);
+    if(ym) monthCache[ym]=ensureMonthSync(deepClone(row.data||{}),ym);
+  });
   enforceStudyDayLimit();
   await renderCurrentView();
   showToast('클라우드 기록을 불러왔어요');
@@ -3588,6 +4029,9 @@ $('#cloudGoogle').onclick = async () => {
     });
     if(error){ alert('Google 로그인 실패: ' + error.message); return; }
     if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    // OAuth PKCE verifier는 이 프레임의 Supabase client가 만들었으므로
+    // Android callback도 반드시 이 프레임에서 교환한다.
+    try{ window.top.__androidOAuthSource = 'record.html'; }catch(_e){}
     window.NativeAuth.openUrl(data.url);
     return;
   }
@@ -3618,7 +4062,7 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     await refreshCloudStatus();
 
     if(cloudUser){
-      await calibrateServerClock(true);
+      void calibrateServerClock(true);
       await autoSyncFromCloud();
       startActiveTimerRealtime();
       await syncActiveTimerFromCloud(true);
@@ -3676,16 +4120,13 @@ $('#cloudDownload').onclick = downloadAllFromCloud;
 $('#cloudSync').onclick = runManualCloudSync;
 
 
-// PWA Service Worker는 페이지 하단에서 등록합니다.
+// PWA Service Worker는 강의 횟수 하단에서 등록합니다.
 
 initSupabase();
 
-// [FIX] 자식 iframe은 부모의 journal-auth-changed 알림만 받는다 (재귀 방지)
-if(false && sbClient){
-  let __authBusy=false;
-  false && sbClient.auth.onAuthStateChange((event, session) => { setTimeout(async () => {
-    if(__authBusy) return; __authBusy=true; try{
-    if(event === 'TOKEN_REFRESHED') return;
+// 로그인 세션을 계속 유지하고, 세션이 복원/갱신될 때 자동으로 상태와 데이터를 맞춘다.
+if(sbClient){
+  sbClient.auth.onAuthStateChange(async (event, session) => {
     cloudUser = session?.user || null;
     const status = $('#cloudStatus');
     if(status){
@@ -3697,7 +4138,7 @@ if(false && sbClient){
     // 새 로그인이나 기존 로그인 세션 복원 시 클라우드 최신 기록을 자동으로 불러온다.
     if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')){
       try{
-        await calibrateServerClock(true);
+        void calibrateServerClock(true);
         await autoSyncFromCloud();
         enforceStudyDayLimit();
         await renderCurrentView();
@@ -3715,15 +4156,13 @@ if(false && sbClient){
     } else if(!cloudUser){
       stopActiveTimerRealtime();
     }
-    } finally { __authBusy=false; }
-  }, 0); });
+  });
 }
 
 (async () => {
-  try{
   await refreshCloudStatus();
   if(cloudUser){
-    await calibrateServerClock(true);
+    void calibrateServerClock(true);
     await autoSyncFromCloud();
     startActiveTimerRealtime();
     await syncActiveTimerFromCloud(true);
@@ -3741,9 +4180,6 @@ if(false && sbClient){
 
   // v9.6: 초기화 완료 후 foreground 루프가 살아 있는지 보장
   startBackgroundSensitiveLoops();
-  }catch(e){ console.error('[init] 초기 동기화 실패:', e); }
-  enforceStudyDayLimit();
-  await renderCurrentView();
 })().finally(()=>{ try{ window.__journalReady = true; }catch(e){} });
 
 
@@ -3768,101 +4204,44 @@ function activeTimerRowFingerprint(row){
 }
 
 async function cloudStartActiveTimer(ym, dayKey, p, idx){
-  if(!sbClient || !cloudUser) return null;
-  const {data,error} = await sbClient.rpc('start_active_timer',{
-    p_ym: ym,
-    p_day_key: String(dayKey),
-    p_period_id: String(p._id || ''),
-    p_period_index: Number(idx || 0)
-  });
-  if(error){
-    console.error('서버 타이머 시작 실패:', error);
-    showToast('서버 타이머 시작 실패');
-    return null;
-  }
-  return data || null;
+  return null;
 }
 
-// [FIX2] ym/day_key/period_id 를 함께 넘겨 자신의 타이머만 종료한다.
+// [FIX2] 자신의 타이머만 종료하도록 파라미터 전달
 async function cloudStopActiveTimer(ym, dayKey, periodId){
-  if(!sbClient || !cloudUser) return null;
-  const {data,error} = await sbClient.rpc('stop_active_timer',{
-    p_ym: ym ? String(ym) : null,
-    p_day_key: dayKey != null ? String(dayKey) : null,
-    p_period_id: periodId ? String(periodId) : null
-  });
-  if(error){
-    console.error('서버 타이머 종료 실패:', error);
-    showToast('서버 타이머 종료 실패');
-    return null;
-  }
-  return data || null;
+  return null;
 }
 
 async function cloudResumeActiveTimer(ym, dayKey, p, idx){
-  if(!sbClient || !cloudUser || !Number(p.timerStartedAt)) return null;
-  const {data,error} = await sbClient.rpc('resume_active_timer',{
-    p_ym: ym,
-    p_day_key: String(dayKey),
-    p_period_id: String(p._id || ''),
-    p_period_index: Number(idx || 0),
-    p_started_at: new Date(Number(p.timerStartedAt)).toISOString()
-  });
-  if(error){
-    console.error('서버 타이머 재개 실패:', error);
-    return null;
-  }
-  return data || null;
+  return null;
 }
 
 async function cloudClearActiveTimer(){
-  if(!sbClient || !cloudUser) return;
-  const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
-  if(error) console.warn('서버 타이머 삭제 실패:', error);
-  else activeTimerLastFingerprint = '';
+  return;
 }
 
-// [DEL-FIX-3] 공부장 소유(ym = "YYYY-MM")인 경우에만 active_timer 삭제.
-//             강의(L:) / 수면(S:) 타이머를 실수로 지우지 않도록 방어.
+// [DEL-FIX-3] 강의장 소유(ym = "L:YYYY-MM")인 경우에만 active_timer 삭제.
+//             공부(숫자) / 수면(S:) 타이머를 실수로 지우지 않도록 방어.
 async function cloudClearActiveTimerIfMine(){
-  if(!sbClient || !cloudUser) return;
-  try{
-    const {data,error:readErr} = await sbClient.from('active_timer')
-      .select('ym').eq('user_id',cloudUser.id).maybeSingle();
-    if(readErr){ console.warn('active_timer 조회 실패:', readErr); return; }
-    const ym = String(data?.ym || '');
-    if(!/^\d{4}-\d{2}$/.test(ym)) return;
-    const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
-    if(error) console.warn('서버 타이머 삭제 실패:', error);
-    else activeTimerLastFingerprint = '';
-  }catch(e){
-    console.warn('선택적 타이머 삭제 실패:', e);
-  }
+  return;
 }
 
 function findPeriodForActiveTimer(row){
   if(!row) return null;
-  const ym = String(row.ym || '');
+  let ym = String(row.ym || '');
+  if(ym.startsWith('R:') || ym.startsWith('L:') || ym.startsWith('S:')) ym = ym.slice(2);
   const dk = String(row.day_key || '');
   const month = monthCache[ym];
   const day = month && month[dk];
   if(!day || !Array.isArray(day.periods)) return null;
 
   let idx = day.periods.findIndex(p => String(p._id || '') === String(row.period_id || ''));
-  if(idx < 0 && !row.period_id){
-    const fallback = Number(row.period_index);
-    if(Number.isInteger(fallback) && day.periods[fallback]) idx = fallback;
-  }
   if(idx < 0) return null;
   return {ym, dk, day, p:day.periods[idx], idx};
 }
 
 async function applyActiveTimerRow(row){
   if(!row) return false;
-
-  // study는 자신의 ym(YYYY-MM)만 반영한다. 강의(L:)·수면(S:)은 무시.
-  const rowYm = String(row.ym || '');
-  if(!/^\d{4}-\d{2}$/.test(rowYm)) return false;
 
   let found = findPeriodForActiveTimer(row);
 
@@ -3878,8 +4257,7 @@ async function applyActiveTimerRow(row){
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
   if(!Number.isFinite(started)) return false;
 
-  const beforeApply = deepClone(found.p);
-  // [FIX1] 서버 타이머 값을 startDate/startTime/endDate/endTime 에 함께 반영
+  // [FIX1] 서버 타이머 값을 시작/종료 일시에 함께 반영
   const startDT = new Date(started);
   found.p.startDate = ymd(startDT);
   found.p.startTime = hm(startDT);
@@ -3890,8 +4268,6 @@ async function applyActiveTimerRow(row){
     found.p.endTime = hm(stopDT);
     found.p.timerEndedAt = stopped;
   }else if(row.status === 'running'){
-    // 서버가 아직 running인데 로컬에 이미 종료시각이 있으면
-    // (stop handler와 2초 폴링 간 race) 로컬 값을 유지한다.
     const localEnd = Number(found.p.timerEndedAt);
     if(!(Number.isFinite(localEnd) && localEnd > started)){
       found.p.endDate = '';
@@ -3904,9 +4280,7 @@ async function applyActiveTimerRow(row){
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
     // [FIX7] 입력 중이면 재렌더 미룸 (입력 필드 파괴 방지)
-    // v9.12: 버튼 클릭 핸들러 진행 중에도 재렌더 미룸 (DOM 교체로 클릭 씹힘 방지)
-    if(typeof isPeriodInputEditing === 'function'
-       && (isPeriodInputEditing() || (typeof userActionCount === 'number' && userActionCount > 0))){
+    if(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing()){
       periodRenderPending = true;
     }else{
       await renderCurrentView();
@@ -3919,39 +4293,7 @@ async function applyActiveTimerRow(row){
 }
 
 async function syncActiveTimerFromCloud(force=false){
-  if(activeTimerSyncBusy || !sbClient || !cloudUser) return;
-  activeTimerSyncBusy = true;
-
-  try{
-    const {data,error} = await sbClient
-      .from('active_timer')
-      .select('*')
-      .eq('user_id',cloudUser.id)
-      .maybeSingle();
-
-    if(error) throw error;
-
-    const fp = activeTimerRowFingerprint(data);
-    if(!force && fp === activeTimerLastFingerprint) return;
-
-    if(data){
-      const applied = await applyActiveTimerRow(data);
-      // period가 아직 클라우드 월 데이터에 안 올라온 경우 다음 2초 poll에서 다시 시도한다.
-      if(applied) activeTimerLastFingerprint = fp;
-    }else{
-      const previouslyHadTimer = !!activeTimerLastFingerprint;
-      activeTimerLastFingerprint = '';
-      if(previouslyHadTimer){
-        await autoSyncFromCloud();
-        updateStudyTimer();
-        syncAndroidTimer();
-      }
-    }
-  }catch(e){
-    console.warn('서버 타이머 동기화 실패:', e);
-  }finally{
-    activeTimerSyncBusy = false;
-  }
+  return;
 }
 
 // Realtime이 활성화된 프로젝트에서는 즉시 반영.
@@ -3960,13 +4302,7 @@ function startActiveTimerRealtime(){
   if(!sbClient || !cloudUser || activeTimerRealtimeChannel) return;
   try{
     activeTimerRealtimeChannel = sbClient
-      .channel(`gongbujang-active-${cloudUser.id}`)
-      .on(
-        'postgres_changes',
-        {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${cloudUser.id}`},
-        ()=>syncActiveTimerFromCloud(true)
-      )
-      // [RT] study_months 변경도 서버가 즉시 밀어준다
+      .channel(`record-data-${cloudUser.id}`)
       .on(
         'postgres_changes',
         {event:'*',schema:'public',table:'study_months',filter:`user_id=eq.${cloudUser.id}`},
@@ -3991,7 +4327,7 @@ function stopActiveTimerRealtime(){
 window.yangStudyAppResume = async function(){
   try{
     if(!cloudUser) return;
-    await calibrateServerClock(true);
+    void calibrateServerClock(true);
     // v9.6: Android WebView 복귀도 동일한 foreground 복구 순서를 사용.
     startBackgroundSensitiveLoops();
     await recoverFromBackground();
@@ -4008,7 +4344,7 @@ function collectBackupData(){
     if(/^\d{4}-\d{2}$/.test(ym)) months[ym]=monthCache[ym];
   });
   return {
-    app: 'study-log',
+    app: 'record-log',
     version: 1,
     exportedAt: new Date().toISOString(),
     settings: appSettings,
@@ -4016,37 +4352,30 @@ function collectBackupData(){
   };
 }
 
-/* [fix] 백업/복원 UI는 index가 소유. iframe 내부에는 요소가 없어
-   TypeError로 이후 초기화가 죽는 문제 방지. */
-(() => {
-  const _b = document.getElementById('backupData');
-  const _r = document.getElementById('restoreData');
-  const _f = document.getElementById('restoreFile');
-  if (!_b || !_r || !_f) { console.info('[study] 백업/복원 UI 없음 — skip'); return; }
-
-$('#backupData').onclick = () => {
-  const data = collectBackupData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `study-log-backup-${ymd(new Date())}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-showToast('백업 파일을 저장했어요');
-};
-
-$('#restoreData').onclick = () => $('#restoreFile').click();
-
-$('#restoreFile').addEventListener('change', async (e) => {
-  // v2: 백업/복원 UI 는 index(부모)에서 처리.
-  alert('복원은 홈 화면의 데이터 복원 버튼을 사용해주세요.');
-  e.target.value = '';
+document.addEventListener('DOMContentLoaded', () => {
+  const bd = document.getElementById('backupData');
+  if(bd) bd.onclick = () => {
+    const data = collectBackupData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `record-log-backup-${ymd(new Date())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    showToast('백업 파일을 저장했어요');
+  };
+  const rd = document.getElementById('restoreData');
+  if(rd) rd.onclick = () => { const rf = document.getElementById('restoreFile'); if(rf) rf.click(); };
+  const rf = document.getElementById('restoreFile');
+  if(rf) rf.addEventListener('change', (e) => {
+    alert('복원은 홈 화면의 데이터 복원 버튼을 사용해주세요.');
+    e.target.value = '';
+  });
 });
-})();
-renderDay();
+setTimeout(()=>renderDay(), 0);
 </script>
 
 <script>
@@ -4060,109 +4389,457 @@ if ('serviceWorker' in navigator) {
 </script>
 
 
-<script>
-(()=>{
- const KEY='studyAlarm:device:v1', $=q=>document.querySelector(q);
- const LOCK_KEY='appAlarm:lock:v1', OWNER='study';
- let ac=null,osc=null,gain=null,to=null,watch=null,ringing=false,file=null,fileAudio=null,vibe=null,autoStop=null;
- const pad=n=>String(n).padStart(2,'0');
- function get(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
- function put(v){localStorage.setItem(KEY,JSON.stringify(v))}
- function readLock(){try{return JSON.parse(localStorage.getItem(LOCK_KEY)||'null')}catch(e){return null}}
- function writeLock(due){try{localStorage.setItem(LOCK_KEY,JSON.stringify({owner:OWNER,due}))}catch(e){}}
- function clearLockIfMine(){try{const l=readLock();if(l&&l.owner===OWNER)localStorage.removeItem(LOCK_KEY)}catch(e){}}
- function ownActive(){return ringing||!!get()?.enabled}
- function refreshLockUI(){
-   if(ownActive())return;
-   const lock=readLock(), btn=$('#studyAlarmStart'), d=$('#studyAlarmDue');
-   const blocked=!!(lock&&lock.owner!==OWNER);
-   if(btn)btn.disabled=blocked;
-   if(d)d.textContent=blocked?`다른 화면(${lock.owner==='lecture'?'강의기록':lock.owner==='sleep'?'수면장':lock.owner})에서 알람이 진행 중입니다.`:'알람이 설정되지 않았습니다.';
- }
- function dur(){
-   const h=Math.max(0,Math.min(48,parseInt($('#studyAlarmHours')?.value||0,10)||0));
-   const m=Math.max(0,Math.min(59,parseInt($('#studyAlarmMinutes')?.value||0,10)||0));
-   return (h*60+m)*60000;
- }
- function due(ms){const d=new Date();d.setSeconds(0,0);return d.getTime()+ms}
- function fmt(t){const d=new Date(t);return `${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()}시 ${pad(d.getMinutes())}분 알람 예정`}
- async function prime(){
-   ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-   if(ac.state==='suspended')await ac.resume();
-   if(!osc){osc=ac.createOscillator();gain=ac.createGain();osc.frequency.value=880;gain.gain.value=.00001;osc.connect(gain);gain.connect(ac.destination);osc.start()}
- }
- function ui(a){
-   const b=$('#studyAlarmStart'),d=$('#studyAlarmDue');
-   if(a?.enabled){b.textContent='⏰ 알람 중';b.classList.add('running');d.textContent=fmt(a.due)}
-   else if(!ringing){b.textContent='알람 시작';b.classList.remove('running');d.textContent='알람이 설정되지 않았습니다.'}
- }
- function silence(){
-   ringing=false;
-   clearInterval(vibe);vibe=null;
-   clearTimeout(autoStop);autoStop=null;
-   try{navigator.vibrate?.(0)}catch(e){}
-   if(fileAudio){try{fileAudio.pause();fileAudio.currentTime=0}catch(e){}}
-   if(gain&&ac){try{gain.gain.cancelScheduledValues(ac.currentTime);gain.gain.setValueAtTime(.00001,ac.currentTime)}catch(e){}}
-   $('#studyAlarmStop')?.classList.remove('show');put({enabled:false});clearLockIfMine();ui(null);refreshLockUI();
- }
- async function fire(){
-   const a=get();if(!a?.enabled||ringing)return;
-   ringing=true;a.enabled=false;put(a);clearTimeout(to);clearInterval(watch);
-   $('#studyAlarmDue').textContent='⏰ 알람 시간입니다';
-   $('#studyAlarmStop').classList.add('show');
-   const buzz=()=>{try{navigator.vibrate?.([900,250,900,250,900])}catch(e){}};
-   buzz();
-   clearInterval(vibe);
-   vibe=setInterval(buzz,3400);
-   clearTimeout(autoStop);
-   autoStop=setTimeout(silence,10*60*1000);
-   if(fileAudio){
-     try{fileAudio.loop=true;fileAudio.currentTime=0;await fileAudio.play();return}catch(e){}
-   }
-   await prime();
-   const now=ac.currentTime;
-   gain.gain.cancelScheduledValues(now);
-   for(let i=0;i<600;i++){const t=now+i*.5;gain.gain.setValueAtTime(.00001,t);gain.gain.linearRampToValueAtTime(.3,t+.03);gain.gain.linearRampToValueAtTime(.00001,t+.34)}
- }
- function arm(a){
-   clearTimeout(to);clearInterval(watch);ui(a);
-   const left=a.due-Date.now();if(left<=0)return fire();
-   to=setTimeout(fire,left);watch=setInterval(()=>{const x=get();if(x?.enabled&&Date.now()>=x.due)fire()},250);
- }
- document.addEventListener('DOMContentLoaded',()=>{
-   $('#studyAlarmStart')?.addEventListener('click',async()=>{
-     const lock=readLock();
-     if(lock&&lock.owner!==OWNER){alert('다른 화면에서 이미 알람이 실행 중입니다. 그 알람을 먼저 해제해주세요.');return}
-     const ms=dur();if(ms<60000){alert('알람 시간을 1분 이상 설정해주세요.');return}
-     await prime();const a={enabled:true,due:due(ms),sound:$('#studyAlarmSound').value};put(a);writeLock(a.due);arm(a);
-   });
-   $('#studyAlarmCancel')?.addEventListener('click',async()=>{
-     const a=get();if(!a?.enabled)return;
-     if(!(await askConfirm('설정한 알람을 정말 해제하시겠습니까?', true)))return;
-     clearTimeout(to);clearInterval(watch);silence();
-   });
-   $('#studyAlarmStop')?.addEventListener('click',silence);
-   $('#studyAlarmPreview')?.addEventListener('click',async()=>{
-     if(fileAudio){try{fileAudio.currentTime=0;await fileAudio.play();setTimeout(()=>fileAudio.pause(),2200);return}catch(e){}}
-     await prime();const n=ac.currentTime;
-     for(let i=0;i<5;i++){const t=n+i*.35;gain.gain.setValueAtTime(.00001,t);gain.gain.linearRampToValueAtTime(.2,t+.03);gain.gain.linearRampToValueAtTime(.00001,t+.25)}
-   });
-   $('#studyAlarmFilePick')?.addEventListener('click',()=>$('#studyAlarmFile').click());
-   $('#studyAlarmFile')?.addEventListener('change',e=>{
-     file=e.target.files?.[0]||null;
-     if(file)fileAudio=new Audio(URL.createObjectURL(file));
-   });
-   const a=get();if(a?.enabled){writeLock(a.due);arm(a)}else{ui(null);refreshLockUI()}
-   window.addEventListener('storage',e=>{if(e.key===LOCK_KEY)refreshLockUI()});
- });
-})();
+
+
+
+
+
+
+
+
+<script id="lecture-after-end-labels">
+document.addEventListener('DOMContentLoaded',()=>{
+  const rewrite=()=>{
+    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+    for(const n of nodes){
+      if(n.nodeValue.includes('낭비시간')) n.nodeValue=n.nodeValue.replaceAll('낭비시간','강의 종료 후 시간');
+      if(n.nodeValue.includes('낭비 시간')) n.nodeValue=n.nodeValue.replaceAll('낭비 시간','강의 종료 후 시간');
+      if(n.nodeValue.includes('교시 선택')) n.nodeValue=n.nodeValue.replaceAll('교시 선택','강의 선택');
+      if(n.nodeValue.includes('공부 선택')) n.nodeValue=n.nodeValue.replaceAll('공부 선택','강의 선택');
+    }
+  };
+  rewrite();
+});
+
+const recordTimerStarts = [null,null,null];
+let recordTimerTick = null;
+
+function recordHMS(ms){
+  const sec = Math.max(0, Math.floor(ms/1000));
+  const h = String(Math.floor(sec/3600)).padStart(2,'0');
+  const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+  const ss = String(sec%60).padStart(2,'0');
+  return `${h}:${m}:${ss}`;
+}
+function syncRecordTimerStarts(){
+  // 과거 날짜의 기록은 현재 진행 중인 상단 경과 타이머에 영향을 주지 않는다.
+  // 오늘 날짜에서만 타이머 시작값을 다시 동기화한다.
+  if(ymd(cur) !== ymd(logicalToday())) return;
+  const day=getDayData();
+  for(let slot=0;slot<3;slot++){
+    let latest=0;
+    (day.periods||[]).forEach(p=>{
+      const st=Number(p.recordSlots?.[slot]?.timerStartedAt)||0;
+      if(st>latest) latest=st;
+    });
+    recordTimerStarts[slot]=latest||null;
+  }
+}
+function updateRecordSummary(){
+  const day = getDayData();
+  const counts=[0,0,0];
+  const numbers=[0,0,0];
+  (day.periods||[]).forEach(p=>{
+    (p.recordSlots||[]).forEach((r,i)=>{
+      if(!r) return;
+      if(r.count) counts[i]+=r.count;
+      const n = Number(r.numberInput)||0;
+      if(n>0) numbers[i]+=n;
+    });
+  });
+  for(let i=0;i<3;i++){
+    const ce=document.getElementById(`recordCount${i+1}`);
+    if(ce) ce.textContent=`${counts[i]}회`;
+    const ne=document.getElementById(`recordNumber${i+1}`);
+    if(ne) ne.textContent=String(numbers[i]);
+    const te=document.getElementById(`recordTimer${i+1}`);
+    if(te) te.textContent=recordTimerStarts[i] ? recordHMS(Date.now()-recordTimerStarts[i]) : '00:00:00';
+  }
+}
+function ensureRecordTimerTick(){
+  if(recordTimerTick) return;
+  recordTimerTick=setInterval(updateRecordSummary,1000);
+}
+
+/* Lecture 구조와 동일: 버튼 하나가 start / cancel-start 상태를 바꾸고,
+   취소는 Lecture의 askConfirm() 모달을 그대로 사용한다. */
+document.addEventListener('click', async (e)=>{
+  const btn=e.target.closest('.record-lecture-add[data-record-action]');
+  if(!btn) return;
+
+  const idx=Number(btn.dataset.idx), slot=Number(btn.dataset.slot);
+  const day=getDayData(), p=day.periods?.[idx];
+  if(!p) return;
+  if(!Array.isArray(p.recordSlots)) p.recordSlots=[null,null,null];
+  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null,numberInput:0};
+  const r=p.recordSlots[slot];
+  const action=btn.dataset.recordAction;
+  const before = JSON.parse(JSON.stringify(p));
+
+  if(action==='start'){
+    const input=document.querySelector(`.record-subject[data-idx="${idx}"][data-slot="${slot}"]`);
+    if(input && slot > 1) r.subject=input.value||'';
+
+    const now=new Date();
+    const hh=String(now.getHours()).padStart(2,'0');
+    const mm=String(now.getMinutes()).padStart(2,'0');
+    r.count=(r.count||0)+1;
+    r.lastTime=`${hh}:${mm}`;
+    r.timerStartedAt=Date.now();
+    // 과거 날짜에 입력한 기록은 상단의 현재 경과 타이머와 완전히 분리한다.
+    if(ymd(cur) === ymd(logicalToday())) recordTimerStarts[slot]=r.timerStartedAt;
+    markChangedPeriodFields(p, before);
+
+    ensureRecordTimerTick();
+    renderPeriods();
+    updateRecordSummary();
+    void persistToday();
+    return;
+  }
+
+  if(action==='cancel-start'){
+    if(!(await askConfirm(`${idx+1}기록의 기록 ${slot+1}을 취소할까요?`, true))) return;
+
+    r.count=Math.max(0,(r.count||0)-1);
+    r.lastTime='';
+    r.timerStartedAt=null;
+    markChangedPeriodFields(p, before);
+
+    syncRecordTimerStarts();
+    renderPeriods();
+    updateRecordSummary();
+    showToast('기록을 취소했어요');
+    void persistToday();
+  }
+});
+
+document.addEventListener('input',(e)=>{
+  const timeInput=e.target.closest('.record-start-value[data-idx][data-slot]');
+  if(timeInput){
+    const tIdx=Number(timeInput.dataset.idx), tSlot=Number(timeInput.dataset.slot);
+    const tDay=getDayData(), tP=tDay.periods?.[tIdx];
+    if(tP){
+      if(!Array.isArray(tP.recordSlots)) tP.recordSlots=[null,null,null];
+      if(!tP.recordSlots[tSlot]) tP.recordSlots[tSlot]={count:0,subject:'',lastTime:'',timerStartedAt:null,numberInput:0};
+      const tBefore=JSON.parse(JSON.stringify(tP));
+      if(timeInput.value){
+        tP.recordSlots[tSlot].lastTime = timeInput.value;
+      }
+      markChangedPeriodFields(tP,tBefore);
+      void persistToday();
+    }
+    return;
+  }
+  const cntInput=e.target.closest('.record-count-input');
+  if(cntInput){
+    const cIdx=Number(cntInput.dataset.idx), cSlot=Number(cntInput.dataset.slot);
+    const cDay=getDayData(), cP=cDay.periods?.[cIdx];
+    if(cP){
+      if(!Array.isArray(cP.recordSlots)) cP.recordSlots=[null,null,null];
+      if(!cP.recordSlots[cSlot]) cP.recordSlots[cSlot]={count:0,subject:'',lastTime:'',timerStartedAt:null};
+      const cBefore=JSON.parse(JSON.stringify(cP));
+      let cv=parseInt(cntInput.value,10);
+      if(!Number.isFinite(cv)||cv<0) cv=0;
+      cP.recordSlots[cSlot].numberInput=cv;
+      markChangedPeriodFields(cP,cBefore);
+      updateRecordSummary();
+      void persistToday();
+    }
+    return;
+  }
+  const input=e.target.closest('.record-subject');
+  if(!input) return;
+  const idx=Number(input.dataset.idx), slot=Number(input.dataset.slot);
+  if(slot === 0 || slot === 1) return;
+  const day=getDayData(), p=day.periods?.[idx];
+  if(!p) return;
+  if(!Array.isArray(p.recordSlots)) p.recordSlots=[null,null,null];
+  if(!p.recordSlots[slot]) p.recordSlots[slot]={count:0,subject:'',lastTime:'',timerStartedAt:null,numberInput:0};
+  p.recordSlots[slot].subject=input.value||'';
+  persistToday();
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  syncRecordTimerStarts();
+  ensureRecordTimerTick();
+  updateRecordSummary();
+});
+
 </script>
-
-
-
 
 <!-- vibration-repeat-verified-v1 -->
 
 <div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
+
+<script id="record-independent-index-alarm">
+(()=>{
+ const KEY='recordAlarm:v1', LIST_KEY='githubAlarmSounds:v1', SELECT_KEY='recordGithubAlarmSelected:v1';
+ const API='https://api.github.com/repos/yanghw7/study/contents/sounds';
+ const CACHE='alarm-sounds-v1';
+ const $=q=>document.querySelector(q); let timer=null,watch=null,ring=null,ctx=null,gain=null,preparedURL=null,vibeTimer=null,wakeLock=null,swReg=null;
+ if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(r=>swReg=r).catch(()=>{})}
+ async function ensureNotifyPermission(){try{if(!('Notification' in window))return false;if(Notification.permission==='granted')return true;if(Notification.permission==='denied')return false;const p=await Notification.requestPermission();return p==='granted'}catch(e){return false}}
+ async function notifyRing(){try{const reg=swReg||(navigator.serviceWorker&&await navigator.serviceWorker.ready);if(!reg)return;await reg.showNotification('⏰ 알람이 울리고 있어요',{body:'설정한 알람 시간이 되었습니다. 앱을 열어 확인해주세요.',tag:'record-journal-alarm',renotify:true,requireInteraction:true,vibrate:[900,250,900,250,1200,300],icon:'./icon-192.png',badge:'./icon-192.png',silent:false})}catch(e){}}
+ async function requestWake(){try{if('wakeLock' in navigator && document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){wakeLock=null}}
+ function releaseWake(){try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null}
+ const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
+ const write=v=>localStorage.setItem(KEY,JSON.stringify(v)); const pad=n=>String(n).padStart(2,'0');
+ const audioExt=/\.(mp3|m4a|aac|wav|ogg|flac)$/i;
+ function title(name){return decodeURIComponent(name).replace(audioExt,'')}
+ function savedList(){try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]')}catch(e){return []}}
+ function render(list){const sel=$('#alarmSoundSelect');if(!list.length){sel.innerHTML='<option value="">알람음 없음</option>';return}sel.innerHTML=list.map(x=>`<option value="${x.url.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${title(x.name)}</option>`).join('');const old=localStorage.getItem(SELECT_KEY);if(old&&list.some(x=>x.url===old))sel.value=old;else{sel.value=list[0].url;localStorage.setItem(SELECT_KEY,sel.value)}}
+ async function refreshSounds(){let list=[];try{const r=await fetch(API,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});if(!r.ok)throw new Error('GitHub '+r.status);const j=await r.json();list=j.filter(x=>x.type==='file'&&audioExt.test(x.name)).map(x=>({name:x.name,url:x.download_url}));localStorage.setItem(LIST_KEY,JSON.stringify(list))}catch(e){list=savedList()}render(list)}
+ async function cacheSelected(){const u=$('#alarmSoundSelect').value;if(!u)return false;localStorage.setItem(SELECT_KEY,u);try{const c=await caches.open(CACHE);let r=await c.match(u);if(!r){r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error();await c.put(u,r.clone())}return true}catch(e){return false}}
+ async function audioURL(){const u=$('#alarmSoundSelect').value||localStorage.getItem(SELECT_KEY);if(!u)return null;try{const c=await caches.open(CACHE);const r=await c.match(u);if(r){const b=await r.blob();return URL.createObjectURL(b)}}catch(e){}return u}
+ async function beep(){ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const o=ctx.createOscillator();gain=ctx.createGain();o.frequency.value=880;gain.gain.value=.18;o.connect(gain);gain.connect(ctx.destination);o.start();o.stop(ctx.currentTime+1.2)}
+ async function play(loop=false){try{if(ring){ring.loop=loop;ring.currentTime=0;await ring.play();return true}}catch(e){}const u=await audioURL();if(u){try{ring=new Audio(u);preparedURL=u;ring.loop=loop;await ring.play();return true}catch(e){}}await beep();return false}
+ function stopRing(){clearInterval(vibeTimer);vibeTimer=null;try{ring?.pause();if(ring){ring.currentTime=0;ring.loop=false;ring.volume=1;ring.src='';ring.load()}}catch(e){};ring=null;try{navigator.vibrate?.(0)}catch(e){};releaseWake();try{swReg&&swReg.getNotifications({tag:'record-journal-alarm'}).then(ns=>ns.forEach(n=>n.close()))}catch(e){};const b=$('#alarmStop');if(b){b.classList.remove('show');b.hidden=true;b.style.display='none'}}
+ function resetAlarm(){clearTimeout(timer);clearInterval(watch);timer=null;watch=null;stopRing();write({enabled:false,ringing:false,due:null});$('#alarmHours').value='0';$('#alarmMinutes').value='0';$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='';}
+ function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${d.getMonth()+1}월 ${d.getDate()}일 ${ap} ${h}시 ${pad(d.getMinutes())}분에 울립니다`}
+ function ui(a){if(!a?.ringing){const b=$('#alarmStop');b.classList.remove('show');b.hidden=true;b.style.display='none';}if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmt(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
+ function alignedDue(ms){const n=new Date();n.setSeconds(0,0);return n.getTime()+ms}
+ function updatePreview(){const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;$('#alarmStatus').textContent=ms>=60000?fmt(alignedDue(ms)):''}
+ async function fire(){const a=read();if(!a?.enabled)return;clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent=fmt(a.due);let sounded=false;try{if(!ring){const u=await audioURL();if(u)ring=new Audio(u)}if(ring){ring.loop=true;ring.volume=1;ring.currentTime=0;await ring.play();sounded=!ring.paused}}catch(e){sounded=false}if(!sounded){try{await beep();sounded=true}catch(e){}}try{const buzz=()=>{navigator.vibrate?.([900,250,900,250,1200,300]);notifyRing()};buzz();clearInterval(vibeTimer);vibeTimer=setInterval(buzz,4000)}catch(e){};notifyRing();write({...a,enabled:false,ringing:true});const b=$('#alarmStop');b.hidden=false;b.classList.add('show');b.style.display='inline-block';if(!sounded){$('#alarmStatus').textContent='🔔 알람 시간! (소리 재생이 막혀 진동/알림으로 대신 울리는 중)'}}
+ function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500);requestWake()}
+ function catchUp(){const x=read();if(!x)return;if(x.enabled&&Date.now()>=x.due){fire()}else if(x.enabled){arm(x)}}
+ document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',updatePreview);$('#alarmMinutes').addEventListener('input',updatePreview);$('#alarmPreview').onclick=async()=>{await cacheSelected();const u=await audioURL();if(!u)return alert('알람음을 선택해주세요.');try{const preview=new Audio(u);preview.volume=1;await preview.play();setTimeout(()=>{try{preview.pause();preview.currentTime=0}catch(e){}},2500)}catch(e){alert('미리듣기를 재생할 수 없습니다.')}};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await ensureNotifyPermission();await cacheSelected();stopRing();try{const u=await audioURL();if(u){ring=new Audio(u);ring.loop=true;ring.volume=1;await ring.play();ring.pause();ring.currentTime=0}ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(e){}const a={enabled:true,ringing:false,due:alignedDue(ms),sound:$('#alarmSoundSelect').value};write(a);arm(a)};$('#alarmCancel').onclick=()=>{if(!confirm('알람을 정말 해제하시겠습니까?'))return;resetAlarm()};$('#alarmStop').onclick=()=>{resetAlarm()};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp();requestWake()}});window.addEventListener('pageshow',()=>{catchUp();requestWake()});window.addEventListener('focus',()=>{catchUp()})});
+})();
+
+function ensureFrameLoaded(kind){
+  return new Promise((resolve,reject)=>{
+    const frame=tabs[kind]?.frame;
+    if(!frame)return reject(new Error('frame not found'));
+    if(frame.contentWindow && frame.contentDocument?.readyState==='complete')return resolve(frame);
+    if(!frame.getAttribute('src') && frame.dataset.src) frame.src=frame.dataset.src;
+    const timer=setTimeout(()=>reject(new Error('load timeout')),8000);
+    frame.addEventListener('load',()=>{clearTimeout(timer);resolve(frame)},{once:true});
+  });
+}
+let sharedBackupDirectoryHandle=null;
+async function downloadJSON(data,name){
+  const text=JSON.stringify(data,null,2);
+  if(sharedBackupDirectoryHandle){
+    try{
+      const permission=await sharedBackupDirectoryHandle.queryPermission({mode:'readwrite'});
+      if(permission==='granted'||await sharedBackupDirectoryHandle.requestPermission({mode:'readwrite'})==='granted'){
+        const fileHandle=await sharedBackupDirectoryHandle.getFileHandle(name,{create:true});
+        const writable=await fileHandle.createWritable();
+        await writable.write(text);await writable.close();return;
+      }
+    }catch(e){}
+  }
+  const blob=new Blob([text],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function backupDate(){
+  const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+async function getJournalBackup(kind){
+  const frame=await ensureFrameLoaded(kind);
+  const fn=frame.contentWindow?.collectBackupData;
+  if(typeof fn!=='function')throw new Error('backup function unavailable');
+  return fn.call(frame.contentWindow);
+}
+function initSharedBackupUI(){
+  if(!document.getElementById('sharedBackupBtn')) return;
+  const main=document.getElementById('sharedBackupBtn'),choice=document.getElementById('sharedBackupChoice');
+  const restore=document.getElementById('sharedRestoreBtn'),file=document.getElementById('sharedRestoreFile');
+  const locationBtn=document.getElementById('sharedBackupLocationBtn'),locationStatus=document.getElementById('sharedBackupLocationStatus');
+  locationBtn.addEventListener('click',async()=>{
+    if(typeof window.showDirectoryPicker!=='function'){alert('이 브라우저에서는 저장 위치를 직접 지정할 수 없습니다. 백업 파일은 기본 다운로드 폴더에 저장됩니다.');return;}
+    try{
+      sharedBackupDirectoryHandle=await window.showDirectoryPicker({mode:'readwrite'});
+      locationStatus.textContent=`저장 위치: ${sharedBackupDirectoryHandle.name}`;
+    }catch(e){if(e?.name!=='AbortError')alert('저장 위치를 설정하지 못했습니다.');}
+  });
+  main.addEventListener('click',()=>{const open=!choice.classList.contains('open');choice.classList.toggle('open',open);choice.setAttribute('aria-hidden',String(!open));});
+  choice.querySelectorAll('[data-backup-kind]').forEach(btn=>btn.addEventListener('click',async()=>{
+    const kind=btn.dataset.backupKind;
+    try{
+      if(kind==='all'){
+        const [study,lecture,sleep]=await Promise.all(['study','lecture','sleep'].map(getJournalBackup));
+        downloadJSON({app:'journal-all',version:1,exportedAt:new Date().toISOString(),study,lecture,sleep},`journal-all-backup-${backupDate()}.json`);
+      }else{
+        const data=await getJournalBackup(kind);
+        const names={study:'study-log',lecture:'lecture-log',sleep:'sleep-log'};
+        downloadJSON(data,`${names[kind]}-backup-${backupDate()}.json`);
+      }
+      choice.classList.remove('open');choice.setAttribute('aria-hidden','true');
+    }catch(e){alert('백업 파일을 만들지 못했습니다. 잠시 후 다시 시도해주세요.');}
+  }));
+  restore.addEventListener('click',()=>file.click());
+  file.addEventListener('change',()=>{alert('복원 선택 메뉴는 다음 단계에서 연결할 수 있습니다.');file.value='';});
+}
+initSharedBackupUI();
+</script>
+
+<style id="record-native-datetime-picker-style">
+.record-start-value[type="time"]{
+  width:100%!important;
+  min-height:28px!important;
+  cursor:pointer!important;
+  color:#463437!important;
+  background:transparent!important;
+}
+.record-start-value[type="time"]::-webkit-calendar-picker-indicator{
+  opacity:1!important;
+  cursor:pointer!important;
+}
+.record-start-value[type="time"]:disabled{
+  opacity:.55!important;
+  cursor:default!important;
+}
+</style>
+
+<script id="record-24hour-time-picker">
+// 기록 시간 선택기는 시/분만 사용하며 값은 항상 24시간 HH:MM 형식으로 저장한다.
+document.documentElement.setAttribute('lang', 'en-GB');
+</script>
+
+<style id="record-custom-24h-picker-style">
+#recordTimePickerBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:99990;display:none;align-items:flex-end;justify-content:center}
+#recordTimePickerBackdrop.open{display:flex}
+#recordTimePicker{width:min(100%,520px);background:#fff;border-radius:28px 28px 0 0;padding:24px 22px calc(20px + env(safe-area-inset-bottom));box-sizing:border-box;box-shadow:0 -8px 30px rgba(0,0,0,.12)}
+#recordTimePickerTitle{font-size:20px;font-weight:800;margin:2px 0 24px;color:#222}
+.record-time-columns{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:0 auto 26px;max-width:330px}
+.record-time-columns select{width:100%;height:150px;border:1px solid #ddd;border-radius:14px;background:#fff;font-size:30px;font-weight:700;text-align:center;text-align-last:center;color:#222;outline:none}
+.record-time-colon{font-size:30px;font-weight:700;color:#777}
+.record-time-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.record-time-actions button{height:54px;border:0;border-radius:15px;font-size:18px;font-weight:800}
+#recordTimeCancel{background:#f3f3f3;color:#333} #recordTimeSet{background:#bd7180;color:#fff}
+.record-start-value{cursor:pointer!important}
+.record-start-value:disabled{cursor:default!important}
+</style>
+<div id="recordTimePickerBackdrop" aria-hidden="true">
+  <div id="recordTimePicker" role="dialog" aria-modal="true" aria-label="기록 시간 설정">
+    <div id="recordTimePickerTitle">기록 시간 설정</div>
+    <div class="record-time-columns">
+      <select id="recordTimeHour" size="5" aria-label="시"></select>
+      <div class="record-time-colon">:</div>
+      <select id="recordTimeMinute" size="5" aria-label="분"></select>
+    </div>
+    <div class="record-time-actions"><button type="button" id="recordTimeCancel">취소</button><button type="button" id="recordTimeSet">설정</button></div>
+  </div>
+</div>
+<script id="record-custom-24h-picker-script">
+(()=>{
+  const back=document.getElementById('recordTimePickerBackdrop');
+  const hour=document.getElementById('recordTimeHour');
+  const minute=document.getElementById('recordTimeMinute');
+  const cancel=document.getElementById('recordTimeCancel');
+  const set=document.getElementById('recordTimeSet');
+  if(!back||!hour||!minute) return;
+  for(let h=0;h<24;h++){const o=document.createElement('option');o.value=String(h).padStart(2,'0');o.textContent=o.value;hour.appendChild(o)}
+  for(let m=0;m<60;m++){const o=document.createElement('option');o.value=String(m).padStart(2,'0');o.textContent=o.value;minute.appendChild(o)}
+  let target=null;
+  function close(){back.classList.remove('open');back.setAttribute('aria-hidden','true');target=null}
+  document.addEventListener('click',(e)=>{
+    const input=e.target.closest('.record-start-value[data-idx][data-slot]');
+    if(!input||input.disabled) return;
+    e.preventDefault();
+    target=input;
+    const m=String(input.value||'').match(/^(\d{2}):(\d{2})$/);
+    const now=new Date();
+    hour.value=m?m[1]:String(now.getHours()).padStart(2,'0');
+    minute.value=m?m[2]:String(now.getMinutes()).padStart(2,'0');
+    back.classList.add('open');back.setAttribute('aria-hidden','false');
+  });
+  cancel.addEventListener('click',close);
+  back.addEventListener('click',(e)=>{if(e.target===back) close()});
+  set.addEventListener('click',()=>{
+    if(!target) return close();
+    target.value=`${hour.value}:${minute.value}`;
+    target.dispatchEvent(new Event('input',{bubbles:true}));
+    close();
+  });
+})();
+</script>
 </body>
 </html>
+
+<style id="record-v118-time-one-line">
+.record-start-value{
+  white-space:nowrap!important;
+  font-size:16px!important;
+  letter-spacing:0!important;
+}
+.record-count-input{
+  width:100%!important;
+  box-sizing:border-box!important;
+  height:42px!important;
+  min-height:42px!important;
+  border:1px solid #EEDDE1!important;
+  border-radius:14px!important;
+  padding:0 10px!important;
+  font:inherit!important;
+  font-size:15px!important;
+  font-weight:800!important;
+  text-align:center!important;
+  color:#9A5866!important;
+  background:#fff!important;
+  -moz-appearance:textfield!important;
+}
+.record-count-input::-webkit-outer-spin-button,
+.record-count-input::-webkit-inner-spin-button{
+  -webkit-appearance:none!important;
+  margin:0!important;
+}
+.record-count-input:focus{
+  outline:2px solid #D9AAB3!important;
+  outline-offset:-1px!important;
+}
+@media(max-width:760px){
+  .record-count-input{height:38px!important;min-height:38px!important;font-size:14px!important;padding:0 6px!important;}
+}
+.record-count-input{
+  width:100%!important;
+  box-sizing:border-box!important;
+  height:42px!important;
+  min-height:42px!important;
+  border:1px solid #EEDDE1!important;
+  border-radius:14px!important;
+  padding:0 10px!important;
+  font:inherit!important;
+  font-size:15px!important;
+  font-weight:800!important;
+  text-align:center!important;
+  color:#9A5866!important;
+  background:#fff!important;
+  -moz-appearance:textfield!important;
+}
+.record-count-input::-webkit-outer-spin-button,
+.record-count-input::-webkit-inner-spin-button{
+  -webkit-appearance:none!important;
+  margin:0!important;
+}
+.record-count-input:focus{
+  outline:2px solid #D9AAB3!important;
+  outline-offset:-1px!important;
+}
+@media(max-width:760px){
+  .record-count-input{height:38px!important;min-height:38px!important;font-size:14px!important;padding:0 6px!important;}
+}
+</style>
+
+<style id="record-time-editable-style">
+.record-start-value{
+  width:100%!important;
+  box-sizing:border-box!important;
+  border:0!important;
+  outline:0!important;
+  background:transparent!important;
+  padding:0!important;
+  font:inherit!important;
+  font-size:16px!important;
+  font-weight:900!important;
+  text-align:right!important;
+  color:#463437!important;
+}
+</style>
+
+<style>
+#periodList input[data-k="subject"]{text-align:center!important;}
+</style>

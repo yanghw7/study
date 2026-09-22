@@ -91,22 +91,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun deliverAuthCallback(uri: Uri) {
-        val values = mutableMapOf<String,String>()
-        uri.fragment?.split('&')?.forEach { part ->
-            val a = part.split('=', limit=2); if(a.size==2) values[Uri.decode(a[0])] = Uri.decode(a[1])
-        }
-        uri.queryParameterNames.forEach { k -> uri.getQueryParameter(k)?.let { values[k]=it } }
-        val access = values["access_token"] ?: ""
-        val refresh = values["refresh_token"] ?: ""
-        val code = values["code"] ?: ""
-        val error = values["error_description"] ?: values["error"] ?: ""
-        fun jsq(x:String) = org.json.JSONObject.quote(x)
+        // IMPORTANT: Supabase PKCE stores the code verifier in the WebView/frame that
+        // started OAuth. Returning the code only to the top index page can therefore
+        // show a cached account label while leaving the real child-page session empty.
+        // Route the full callback URL back to the exact frame that initiated OAuth.
+        val callbackUrl = org.json.JSONObject.quote(uri.toString())
         val js = """
-            (()=>{
-              const detail={access_token:${jsq(access)},refresh_token:${jsq(refresh)},code:${jsq(code)},error:${jsq(error)}};
-              window.dispatchEvent(new CustomEvent('android-auth-callback',{detail}));
-              document.querySelectorAll('iframe').forEach(f=>{try{f.contentWindow.dispatchEvent(new CustomEvent('android-auth-callback',{detail}))}catch(e){}});
-            })();
+        (function(){
+          const callbackUrl=$callbackUrl;
+          const source=window.__androidOAuthSource||'index.html';
+          if(source==='index.html'){
+            const u=new URL(callbackUrl), q=u.searchParams;
+            const h=new URLSearchParams((u.hash||'').replace(/^#/,''));
+            window.dispatchEvent(new CustomEvent('android-auth-callback',{detail:{
+              access_token:q.get('access_token')||h.get('access_token')||'',
+              refresh_token:q.get('refresh_token')||h.get('refresh_token')||'',
+              code:q.get('code')||h.get('code')||'',
+              error:q.get('error_description')||q.get('error')||h.get('error_description')||h.get('error')||''
+            }}));
+            return;
+          }
+          const frames=[...document.querySelectorAll('iframe')];
+          const target=frames.find(f=>{
+            const src=(f.getAttribute('src')||f.getAttribute('data-src')||'').split('?')[0];
+            return src.endsWith(source);
+          });
+          if(target?.contentWindow && typeof target.contentWindow.yangStudyHandleOAuthCallback==='function'){
+            target.contentWindow.yangStudyHandleOAuthCallback(callbackUrl);
+          } else {
+            // If a lazy iframe was replaced/reloaded, try every loaded child without
+            // consuming the code in the top page first.
+            for(const f of frames){
+              try{
+                if(typeof f.contentWindow?.yangStudyHandleOAuthCallback==='function'){
+                  f.contentWindow.yangStudyHandleOAuthCallback(callbackUrl);
+                  break;
+                }
+              }catch(_e){}
+            }
+          }
+        })();
         """.trimIndent()
         web.post { web.evaluateJavascript(js, null) }
     }

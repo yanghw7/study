@@ -3,26 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>강의 기록장</title>
+<title>수면 기록장</title>
 
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
-<meta name="theme-color" content="#3B6E5C">
+<meta name="theme-color" content="#456D96">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="강의 기록장">
+<meta name="apple-mobile-web-app-title" content="수면 기록장">
 <link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600;700&display=swap');
 
   :root{
-    --bg:#EFF1EC;
+    --bg:#EEF3F8;
     --surface:#FFFFFF;
-    --ink:#1F2A24;
-    --ink-soft:#57635C;
-    --line:#DDE2D9;
-    --accent:#3B6E5C;
-    --accent-soft:#E4EEE9;
+    --ink:#202A35;
+    --ink-soft:#5B6673;
+    --line:#D9E1EA;
+    --accent:#456D96;
+    --accent-soft:#E5EEF7;
     --warn:#B5533C;
     --warn-soft:#F7E7E2;
     --study:#1B5E3A;
@@ -180,7 +180,7 @@
   .summary-item span{font-size:11.5px;color:var(--ink-soft);}
   .summary-item.warn b{color:var(--waste);}
   .summary-item.ok b{color:var(--study);}
-  /* 합계: 강의 횟수와 강의 종료 후 시간을 오른쪽으로 정돈 */
+  /* 합계: 수면 횟수와 기상 후 경과시간을 오른쪽으로 정돈 */
   .summary-grid .summary-item:nth-child(2){text-align:center;transform:translateX(10px);}
   .summary-grid .summary-item:nth-child(3){text-align:right;}
   /* 강의별 통계: 세 항목 사이 간격을 넓혀 보기 쉽게 배치 */
@@ -207,7 +207,7 @@
   .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px 9px;}
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
-  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
+  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;}
   .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
@@ -218,8 +218,8 @@
   .chart-dot-study{fill:var(--study);}
   .chart-dot-pages{fill:var(--accent);}
   .chart-dot-waste{fill:var(--waste);}
-  .chart-bar-study{fill:var(--accent);}
-  .chart-bar-pages{fill:#111827;}
+  .chart-bar-study{fill:var(--study);}
+  .chart-bar-pages{fill:#2563eb;}
   .chart-bar-waste{fill:#dc2626;}
   .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
   .chart-card{position:relative;}
@@ -340,7 +340,7 @@
   .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px 9px;}
   .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 4px 6px;}
   .chart-title{font-size:13px;font-weight:700;color:var(--ink);}
-  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;text-align:right;line-height:1.45;margin-left:auto;}
+  .chart-unit{font-size:12px;font-weight:800;color:#2563eb;}
   .chart-avg-note{font-size:10.5px;color:var(--ink-soft);margin:-2px 4px 7px;text-align:right;line-height:1.35;}
   .bar-chart{width:100%;height:126px;display:block;overflow:visible;}
   .chart-grid{stroke:var(--line);stroke-width:1;}
@@ -351,8 +351,8 @@
   .chart-dot-study{fill:var(--study);}
   .chart-dot-pages{fill:var(--accent);}
   .chart-dot-waste{fill:var(--waste);}
-  .chart-bar-study{fill:var(--accent);}
-  .chart-bar-pages{fill:#111827;}
+  .chart-bar-study{fill:var(--study);}
+  .chart-bar-pages{fill:#2563eb;}
   .chart-bar-waste{fill:#dc2626;}
   .chart-empty{font-size:12px;color:var(--ink-soft);padding:18px 8px;text-align:center;}
   .chart-card{position:relative;}
@@ -484,23 +484,23 @@
 </style>
 
 <style>
-:root{--accent:#67538b;--bg:#f7f5fb;--surface:#fff;--ink:#302b3d;--muted:#746e82;--line:#e2ddea}
-body{background:#f7f5fb!important}
-.add-btn,.primary,.study-alarm-row .alarm-start{background:#67538b!important;border-color:#67538b!important}
-.study-alarm-due{color:#67538b!important}
+:root{--accent:#456D96;--bg:#EEF3F8;--surface:#fff;--ink:#202A35;--muted:#5B6673;--line:#D9E1EA}
+body{background:#EEF3F8!important}
+.add-btn,.primary,.study-alarm-row .alarm-start{background:#456D96!important;border-color:#456D96!important}
+.study-alarm-due{color:#456D96!important}
 </style>
 
 
 <style id="lecture-visibility-fix">
 .lecture-page-fix{}
 .add-btn{
-  background:#67538b !important;
-  border:1.5px solid #67538b !important;
+  background:#456D96 !important;
+  border:1.5px solid #456D96 !important;
   color:#fff !important;
   box-shadow:0 2px 7px rgba(103,83,139,.16);
 }
 .add-btn:active{transform:translateY(1px)}
-.empty-state{color:#746e82!important}
+.empty-state{color:#5B6673!important}
 </style>
 
 
@@ -514,7 +514,7 @@ body{background:#f7f5fb!important}
 .lecture-card-action.cancel-start{
   background:#efeaf6!important;
   color:#5c487d!important;
-  border:1.5px solid #67538b!important;
+  border:1.5px solid #456D96!important;
   box-shadow:none!important;
 }
 .lecture-card-action.cancel-end{
@@ -533,22 +533,22 @@ body{background:#f7f5fb!important}
 }
 .lecture-confirm-panel{
   width:min(520px,100%);
-  background:#fff;border:1px solid #e2ddea;border-radius:18px;
+  background:#fff;border:1px solid #D9E1EA;border-radius:18px;
   padding:18px;box-shadow:0 14px 45px rgba(0,0,0,.16);
 }
-.lecture-confirm-msg{margin:0 0 14px;font-size:15px;font-weight:700;line-height:1.45;color:#302b3d}
+.lecture-confirm-msg{margin:0 0 14px;font-size:15px;font-weight:700;line-height:1.45;color:#202A35}
 .lecture-confirm-actions{display:flex;gap:8px}
 .lecture-confirm-actions button{
   flex:1;border-radius:10px;padding:11px 12px;font-size:14px;font-weight:800;cursor:pointer
 }
-.lecture-confirm-no{border:1px solid #e2ddea;background:#fff;color:#302b3d}
-.lecture-confirm-yes{border:0;background:#67538b;color:#fff}
+.lecture-confirm-no{border:1px solid #D9E1EA;background:#fff;color:#202A35}
+.lecture-confirm-yes{border:0;background:#456D96;color:#fff}
 .lecture-confirm-yes.danger{background:#a43c31}
 </style>
 
 
 <style id="lecture-cancel-alert-android-style">
-/* 시작 취소 / 종료 취소 확인창: Android alert 느낌, 화면 중앙 */
+/* 수면 취소 / 기상 취소 확인창: Android alert 느낌, 화면 중앙 */
 .lecture-confirm-overlay{
   position:fixed!important;inset:0!important;z-index:10050!important;
   background:rgba(0,0,0,.58)!important;
@@ -604,8 +604,8 @@ body{background:#f7f5fb!important}
 
 <style id="lecture-graph-purple-only">
 /* Same study-journal graph; only lecture accent is purple. */
-.charts-wrap,.chart-card{--accent:#67538b;--ink:#302b3d;--line:#e2ddea;--surface:#fff}
-.chart-toggle-btn.active{background:#67538b!important;border-color:#67538b!important;color:#fff!important}
+.charts-wrap,.chart-card{--accent:#456D96;--ink:#202A35;--line:#D9E1EA;--surface:#fff}
+.chart-toggle-btn.active{background:#456D96!important;border-color:#456D96!important;color:#fff!important}
 </style>
 
 
@@ -613,17 +613,17 @@ body{background:#f7f5fb!important}
 /* Lecture metrics = purple */
 #totalStudy, #todayStudy, .study-total, .study-value,
 .lecture-time-value, [data-metric="study"], [data-metric="lecture"] {
-  color:#72539b!important;
+  color:#456D96!important;
 }
 .chart-card svg rect.bar-study,
 .chart-card svg rect.bar-lecture,
 .chart-card .bar-study,
 .chart-card .bar-lecture {
-  fill:#72539b!important;
+  fill:#456D96!important;
 }
 .chart-card svg path.line-study,
 .chart-card svg path.line-lecture {
-  stroke:#72539b!important;
+  stroke:#456D96!important;
 }
 /* Post-lecture time stays red */
 #totalWaste, #todayWaste, .waste-total, .waste-value,
@@ -699,25 +699,51 @@ body{background:#f7f5fb!important}
   left:10px!important;right:10px!important;bottom:8px!important;
   pointer-events:none!important;z-index:3!important;
   text-align:right!important;font-size:12.5px!important;
-  letter-spacing:-.2px!important;color:#302b3d!important;
+  letter-spacing:-.2px!important;color:#202A35!important;
 }
 .lecture-card-action.cancel-start,.lecture-card-action.cancel-end{
   font-size:13px!important;letter-spacing:-.3px!important;
 }
 </style>
+<style id="sleep-summary-five-metrics">
+.summary-grid.sleep-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.summary-grid.sleep-summary-grid .summary-item{min-width:0;text-align:center;transform:none}
+.summary-grid.sleep-summary-grid .summary-item b{font-size:14px;white-space:nowrap}
+.summary-grid.sleep-summary-grid .summary-item span{font-size:9px;line-height:1.15;white-space:normal;word-break:keep-all}
+@media(max-width:430px){.summary-grid.sleep-summary-grid{gap:3px}.summary-grid.sleep-summary-grid .summary-item b{font-size:13px}.summary-grid.sleep-summary-grid .summary-item span{font-size:8.5px}}
+</style>
+
+<style id="sleep-summary-count-compact-final">
+/* 수면 횟수 칸은 최대 2자리 표시 폭만 사용하고, 확보 공간을 긴 항목에 배분 */
+.summary-grid.sleep-summary-grid{
+  grid-template-columns:minmax(0,1.18fr) minmax(0,1.32fr) minmax(0,1.02fr) 34px minmax(0,1.16fr)!important;
+  column-gap:4px!important;
+}
+.summary-grid.sleep-summary-grid .summary-item:nth-child(4){
+  width:34px!important;min-width:34px!important;max-width:34px!important;overflow:visible!important;
+}
+.summary-grid.sleep-summary-grid .summary-item:nth-child(4) b{
+  width:34px!important;white-space:nowrap!important;font-size:13px!important;
+}
+.summary-grid.sleep-summary-grid .summary-item:nth-child(4) span{
+  width:34px!important;white-space:nowrap!important;font-size:8px!important;letter-spacing:-.5px!important;
+}
+.summary-grid.sleep-summary-grid .summary-item:nth-child(1) b,
+.summary-grid.sleep-summary-grid .summary-item:nth-child(2) b,
+.summary-grid.sleep-summary-grid .summary-item:nth-child(3) b,
+.summary-grid.sleep-summary-grid .summary-item:nth-child(5) b{
+  font-size:13px!important;letter-spacing:-.35px!important;
+}
+</style>
 <style id="time-field-lock">
 /* 시간 입력 잠금 상태 */
 .field.time.disabled{opacity:.55;cursor:not-allowed;}
-.field.time.disabled .ko-time-label{color:#746e82;font-weight:600;}
+.field.time.disabled .ko-time-label{color:#5B6673;font-weight:600;}
 </style>
 <style id="locked-card-style">
-.period-card.locked-card{opacity:.5;pointer-events:none;}
-</style>
-<style id="locked-card-style">
-.period-card.locked-card{opacity:.5;pointer-events:none;}
+.period-card.locked-card{opacity:.5!important;pointer-events:none!important;}
 </style>
 </head>
-
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
 <div id="pullSyncUp" class="pull-sync-up" aria-hidden="true">↑ 당겨서 동기화</div>
@@ -725,20 +751,22 @@ body{background:#f7f5fb!important}
 
   <div class="summary-card">
       <div class="summary-head">
-        <div class="summary-title today-summary-title">오늘 강의 합계</div>
-        <div class="study-timer" id="studyTimer" aria-live="polite" title="강의 시작 입력 시 시작 · 끝 강의 횟수 입력 시 종료">
-          <span class="study-timer-label" id="studyTimerLabel">타이머</span>
+        <div class="summary-title today-summary-title">오늘 수면 합계</div>
+        <div class="study-timer" id="studyTimer" aria-live="polite" title="수면 시작 시 시작 · 기상 시 종료">
+          <span class="study-timer-label" id="studyTimerLabel">수면시간</span>
           <span class="study-timer-time" id="studyTimerTime">00:00:00</span>
         </div>
-        <div class="study-timer waste-timer" id="wasteTimer" aria-live="polite" title="강의 종료 후부터 다음 강의 시작까지 자동 측정">
-          <span class="study-timer-label" id="wasteTimerLabel">강의 종료 후 시간</span>
+        <div class="study-timer waste-timer" id="wasteTimer" aria-live="polite" title="기상 후부터 다음 수면 시작까지 자동 측정">
+          <span class="study-timer-label" id="wasteTimerLabel">기상 후 경과시간</span>
           <span class="study-timer-time" id="wasteTimerTime">00:00:00</span>
         </div>
       </div>
-      <div class="summary-grid">
-        <div class="summary-item ok"><b id="sumStudy">0분</b><span>강의시간</span></div>
-        <div class="summary-item"><b id="sumPages">0회</b><span>강의 횟수</span></div>
-        <div class="summary-item warn"><b id="sumWaste">0분</b><span>강의 종료 후 시간</span></div>
+      <div class="summary-grid sleep-summary-grid">
+        <div class="summary-item ok"><b id="sumStudy">0분</b><span>총 수면</span></div>
+        <div class="summary-item"><b id="sumLongest">0분</b><span>가장 긴 수면시간</span></div>
+        <div class="summary-item"><b id="sumLatestWake">-</b><span>최근 기상</span></div>
+        <div class="summary-item"><b id="sumPages">0회</b><span>수면 횟수</span></div>
+        <div class="summary-item warn"><b id="sumWaste">0분</b><span>기상 후 경과시간</span></div>
       </div>
     </div>
 
@@ -796,7 +824,7 @@ body{background:#f7f5fb!important}
         <button class="data-btn" id="cloudLogin">로그인</button>
         <button class="data-btn" id="cloudGoogle">Google로 로그인</button>
       </div>
-      <div class="cloud-note">Supabase 연결 정보는 이미 설정되어 있습니다. 로그인 후에는 강의 기록이 브라우저와 클라우드에 함께 자동 저장됩니다.</div>
+      <div class="cloud-note">Supabase 연결 정보는 이미 설정되어 있습니다. 로그인 후에는 수면 기록이 브라우저와 클라우드에 함께 자동 저장됩니다.</div>
     </div>
   </div>
 
@@ -827,7 +855,7 @@ body{background:#f7f5fb!important}
 
     <div id="dayCharts"></div>
     <div id="periodList"></div>
-    <button class="add-btn" id="addPeriod">+ 강의 기록 추가</button>
+    <button class="add-btn" id="addPeriod">+ 수면 기록 추가</button>
   </div>
 
   <div id="weekView" style="display:none;"></div>
@@ -845,7 +873,7 @@ body{background:#f7f5fb!important}
     <div class="setting-row">
       <div>
         <div class="setting-label">하루 집계 기준시간</div>
-        <div class="setting-desc">00:00~11:00 중 1시간 단위로 선택합니다. 변경한 시간은 현재 강의일을 건드리지 않고 다음 적용 시점부터 사용됩니다.</div>
+        <div class="setting-desc">00:00~11:00 중 1시간 단위로 선택합니다. 변경한 시간은 현재 수면일을 건드리지 않고 다음 적용 시점부터 사용됩니다.</div>
         <div class="setting-status" id="dayStartStatus"></div>
       </div>
       <select class="setting-select" id="dayStartSelect" aria-label="하루 집계 기준시간"></select>
@@ -863,7 +891,7 @@ body{background:#f7f5fb!important}
     </div>
     <div class="settings-danger-wrap">
       <button class="settings-danger" id="deleteAllRecords">모든 기록 삭제</button>
-      <div class="settings-danger-note">강의 기록만 삭제하며 설정과 로그인 정보는 유지됩니다.</div>
+      <div class="settings-danger-note">수면 기록만 삭제하며 설정과 로그인 정보는 유지됩니다.</div>
     </div>
   </div>
 </div>
@@ -1168,7 +1196,7 @@ async function loadMonth(ym){
   }
   try{
     const {data, error} = await sbClient.from('study_months')
-      .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', lectureCloudYm(ym)).maybeSingle();
+      .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', sleepCloudYm(ym)).maybeSingle();
     if(error) throw error;
     if(data?.deleted_at){ monthCache[ym] = {}; return monthCache[ym]; }
     const m = data?.data || {};
@@ -1353,7 +1381,7 @@ async function calibrateServerClock(force=false){
 // v9.6: visibility handling centralized below
 
 
-// 강의 시작 입력부터 끝 강의 횟수 입력까지 초 단위로 보여주는 상단 타이머
+// 수면 시작 입력부터 끝 수면 횟수 입력까지 초 단위로 보여주는 상단 타이머
 function timerElapsedMs(p, nowMs = serverNowMs()){
   const start = Number(p?.timerStartedAt);
   if(!Number.isFinite(start) || start <= 0) return 0;
@@ -1386,8 +1414,8 @@ function timerPeriodForCurrentDay(){
   return best;
 }
 
-// v9.9: 1강의가 끝난 뒤부터 다음 교시가 시작될 때까지 실시간 강의 종료 후 시간 타이머.
-// 저장/통계의 강의 종료 후 시간(wasteBefore)은 기존 방식 그대로 유지한다.
+// v9.9: 1수면이 끝난 뒤부터 다음 교시가 시작될 때까지 실시간 기상 후 경과시간 타이머.
+// 저장/통계의 기상 후 경과시간(wasteBefore)은 기존 방식 그대로 유지한다.
 function wasteTimerForCurrentDay(){
   const logical = logicalToday();
   if(ymd(cur) !== ymd(logical)) return null;
@@ -1395,7 +1423,7 @@ function wasteTimerForCurrentDay(){
   const day = getDayData();
   if(!day.periods.length) return null;
 
-  // 공부 중에는 강의 종료 후 시간 타이머를 멈춘다.
+  // 공부 중에는 기상 후 경과시간 타이머를 멈춘다.
   const running = day.periods.some(p =>
     Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
   );
@@ -1423,12 +1451,12 @@ function updateStudyTimer(){
   const info = timerPeriodForCurrentDay();
   if(!info){
     timeEl.textContent = '00:00:00';
-    labelEl.textContent = '강의시간';
+    labelEl.textContent = '수면시간';
     box.classList.remove('running');
     return;
   }
   timeEl.textContent = formatTimer(timerElapsedMs(info.p));
-  labelEl.textContent = info.running ? `${info.idx+1}강의 · 진행 중` : `${info.idx+1}강의 · 종료`;
+  labelEl.textContent = info.running ? `${info.idx+1}회 수면 · 진행 중` : `${info.idx+1}회 수면 · 종료`;
   box.classList.toggle('running', !!info.running);
 }
 
@@ -1438,11 +1466,11 @@ function updateWasteTimer(){
   const info = wasteTimerForCurrentDay();
   if(!info){
     timeEl.textContent = '00:00:00';
-    labelEl.textContent = '강의 종료 후 시간';
+    labelEl.textContent = '기상 후 경과시간';
     return;
   }
   timeEl.textContent = formatTimer(Math.max(0, serverNowMs() - info.startedAt));
-  labelEl.textContent = `${info.idx+1}강의 후 · 강의 종료 후 시간`;
+  labelEl.textContent = '기상 후 경과시간';
 }
 
 setInterval(()=>{
@@ -1453,19 +1481,19 @@ setInterval(()=>{
 
 // ---------- v9.5: 기준시점 횡단 + 소급 분할 복구 ----------
 // 기본 원칙:
-// - 시작강의 횟수 입력 -> 시작일시/타이머 시작
-// - 끝강의 횟수 입력 -> 종료일시/타이머 종료
+// - 시작수면 횟수 입력 -> 시작일시/타이머 시작
+// - 끝수면 횟수 입력 -> 종료일시/타이머 종료
 //
 // 예외:
-// 기준시점 이전에 시작강의 횟수가 입력된 '미완료 진행 교시'가
+// 기준시점 이전에 시작수면 횟수가 입력된 '미완료 진행 교시'가
 // 기준시점을 넘어간 경우에만 자동 분할한다.
 //
-// 이전 강의일:
-//   끝강의 횟수 = 시작강의 횟수
+// 이전 수면일:
+//   끝수면 횟수 = 시작수면 횟수
 //   종료일시 = 기준시점 1분 전
 //
-// 다음 강의일 1강의:
-//   시작강의 횟수 = 같은 강의 횟수
+// 다음 수면일 1강의:
+//   시작수면 횟수 = 같은 수면 횟수
 //   시작일시 = 기준시점
 //
 // 타이머:
@@ -1483,8 +1511,8 @@ function studyDayBoundaryMs(ym, dk, day){
   const d = new Date(y, m-1, Number(dk), 12, 0, 0, 0);
   d.setDate(d.getDate() + 1);
 
-  // 이 강의일에 실제 저장된 cutoffHour가 최우선.
-  // 기준시점 설정을 바꾸더라도 과거 강의일의 경계는 바뀌지 않는다.
+  // 이 수면일에 실제 저장된 cutoffHour가 최우선.
+  // 기준시점 설정을 바꾸더라도 과거 수면일의 경계는 바뀌지 않는다.
   const cutoff = Number.isInteger(day?.cutoffHour)
     ? day.cutoffHour
     : Number(appSettings.dayStartHour || 0);
@@ -1511,7 +1539,7 @@ function isBoundaryEligiblePeriod(p, boundaryMs=null){
   const started = Number(p.timerStartedAt);
   const ended = Number(p.timerEndedAt);
 
-  // 사용자가 말한 안전조건 (v10: 강의 횟수 입력칸이 사라지고 시작/종료 버튼 방식으로
+  // 사용자가 말한 안전조건 (v10: 수면 횟수 입력칸이 사라지고 시작/종료 버튼 방식으로
   // UI가 바뀌었으므로, 더 이상 존재하지 않는 startPage/endPage 대신
   // 시작일시가 있고, 종료일시가 없고, 실제 타이머가 진행 중일 때만으로 판별한다.
   if(!p.startDate || !p.startTime) return false;
@@ -1519,7 +1547,7 @@ function isBoundaryEligiblePeriod(p, boundaryMs=null){
   if(!Number.isFinite(started) || started <= 0) return false;
   if(Number.isFinite(ended) && ended >= started) return false;
 
-  // 최초 강의 시작이 경계 이전이어야 '경계 횡단'이다.
+  // 최초 수면 시작이 경계 이전이어야 '경계 횡단'이다.
   if(Number.isFinite(boundaryMs) && started >= boundaryMs) return false;
 
   return true;
@@ -1613,7 +1641,7 @@ async function splitRunningPeriodAtBoundary(running){
   const originalTimerStartedAt = Number(oldP.timerStartedAt);
   const displayEnd = new Date(boundaryMs - 60000);
 
-  // A. 이전 강의일 자동 마감
+  // A. 이전 수면일 자동 마감
   const beforeOld = deepClone(oldP);
 
   oldP.endDate = ymd(displayEnd);
@@ -1621,9 +1649,9 @@ async function splitRunningPeriodAtBoundary(running){
   oldP.timerEndedAt = boundaryMs;
 
   markChangedPeriodFields(oldP, beforeOld);
-  void saveMonth(running.ym);
+  await saveMonth(running.ym);
 
-  // B. 다음 강의일 1강의 생성/복구
+  // B. 다음 수면일 1강의 생성/복구
   const next = nextStudyDayKey(running.ym, running.dk);
   await loadMonth(next.ym);
 
@@ -1669,7 +1697,7 @@ async function splitRunningPeriodAtBoundary(running){
 
     markChangedPeriodFields(nextP, beforeNew);
   }else{
-    // 자동 이어쓰기 교시는 다음 강의일의 1강의.
+    // 자동 이어쓰기 교시는 다음 수면일의 1강의.
     newDay.periods.forEach(p=>{
       const n = Number(p._order||0);
       if(Number.isFinite(n) && n > 0) p._order = n + 1;
@@ -1706,11 +1734,11 @@ async function splitRunningPeriodAtBoundary(running){
 
   void saveMonth(next.ym);
 
-  // C. 서버 active_timer도 새 강의일 1강의로 이동.
+  // C. 서버 active_timer도 새 수면일 1강의로 이동.
   // resume_active_timer에 최초 timerStartedAt을 전달하므로 서버에서도 연속 타이머 유지.
   if(cloudUser){
     try{
-      await cloudResumeActiveTimer(
+      void cloudResumeActiveTimer(
         next.ym,
         next.dk,
         nextP,
@@ -1722,7 +1750,7 @@ async function splitRunningPeriodAtBoundary(running){
   }
 
   // D. 첫 화면은 logicalToday() 규칙을 따르되,
-  // 사용자가 자동 마감된 강의일을 보고 있었다면 새 강의일로 자연스럽게 이동.
+  // 사용자가 자동 마감된 수면일을 보고 있었다면 새 수면일로 자연스럽게 이동.
   if(ymKey(cur) === running.ym && dKey(cur) === running.dk){
     cur = new Date(
       next.date.getFullYear(),
@@ -1888,7 +1916,7 @@ function syncAndroidTimer(){
       const localWasteStarted = Math.round(
         (Number(wasteInfo.startedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
       ) * 1000;
-      const wasteLabel = `${wasteInfo.idx+1}강의 종료 · 강의 종료 후 시간`;
+      const wasteLabel = `${wasteInfo.idx+1}기상 · 기상 후 경과시간`;
       const key = `waste:${localWasteStarted}:${wasteLabel}`;
       if(key !== lastAndroidTimerKey){
         window.AndroidTimer.startTimer(localWasteStarted, wasteLabel);
@@ -1898,7 +1926,7 @@ function syncAndroidTimer(){
     }
 
     const p = info.p;
-    const label = `${info.idx+1}강의`;
+    const label = `${info.idx+1}회 수면`;
 
     if(info.running && Number(p.timerStartedAt) > 0){
       // 서버 epoch를 이 Android 기기의 wall clock epoch로 변환한다.
@@ -1926,14 +1954,14 @@ function syncAndroidTimer(){
 setInterval(syncAndroidTimer, 1000);
 
 
-// 각 강의일은 생성 당시의 집계 기준시간을 보존한다. 설정을 바꿔도 과거 기록 범위는 변하지 않는다.
+// 각 수면일은 생성 당시의 집계 기준시간을 보존한다. 설정을 바꿔도 과거 기록 범위는 변하지 않는다.
 function cutoffForDate(date = cur){
   const ym = ymKey(date), dk = dKey(date);
   const day = monthCache[ym] && monthCache[ym][dk];
   return day && Number.isInteger(day.cutoffHour) ? day.cutoffHour : appSettings.dayStartHour;
 }
-// 현재 선택한 강의일(cur)에 기록할 수 있는 실제 시간 범위.
-// 예: 기준 11:00이면 9/13 강의일 = 9/13 11:00 ~ 9/14 10:59.
+// 현재 선택한 수면일(cur)에 기록할 수 있는 실제 시간 범위.
+// 예: 기준 11:00이면 9/13 수면일 = 9/13 11:00 ~ 9/14 10:59.
 function studyDayBounds(date = cur){
   const cutoff = cutoffForDate(date);
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), cutoff, 0, 0, 0);
@@ -1959,7 +1987,7 @@ function maxAllowedRecordDT(){
   return now < endLastMinute ? now : endLastMinute;
 }
 function recordRangeAlert(){
-  alert(`이 강의일의 기록 가능 시간은 ${studyDayRangeText(cur)}입니다.`);
+  alert(`이 수면일의 기록 가능 시간은 ${studyDayRangeText(cur)}입니다.`);
 }
 
 function minutesBetween(p){
@@ -1974,7 +2002,7 @@ function periodPages(p){
     ? Math.max(0, Number(p.endPage)-Number(p.startPage)+1) : 0;
 }
 
-// 끝 강의 횟수가 강의 시작보다 작으면 물리적으로 모순
+// 끝 수면 횟수가 수면 시작보다 작으면 물리적으로 모순
 function pagesInvalid(p){
   return (p.startPage!=='' && p.endPage!=='' && p.startPage!=null && p.endPage!=null &&
           !isNaN(p.startPage) && !isNaN(p.endPage) && Number(p.endPage) < Number(p.startPage));
@@ -1987,7 +2015,7 @@ function studyInvalid(p){
   return (e - s) < 0;
 }
 
-// 강의 종료 후 시간 = 이전 교시 종료 일시와 현재 교시 시작 일시의 차이 (자동 계산, 입력 없음)
+// 기상 후 경과시간 = 이전 교시 종료 일시와 현재 교시 시작 일시의 차이 (자동 계산, 입력 없음)
 function wasteBefore(periods, idx){
   if(idx===0) return 0;
   const prevEnd = periodEndDT(periods[idx-1]);
@@ -2004,6 +2032,26 @@ function wasteInvalid(periods, idx){
   const curStart = periodStartDT(periods[idx]);
   if(!prevEnd || !curStart) return false;
   return (curStart - prevEnd) < 0;
+}
+
+function updateSleepExtraSummary(day){
+  const completed = (day?.periods || []).filter(p => periodStartDT(p) && periodEndDT(p));
+  const durations = completed.map(p => minutesBetween(p)).filter(v => Number.isFinite(v) && v >= 0);
+  const longestEl = $('#sumLongest');
+  const latestWakeEl = $('#sumLatestWake');
+  const gapEl = $('#sumWaste');
+  if(longestEl) longestEl.textContent = durations.length ? fmtDuration(Math.max(...durations)) : '0분';
+  const latest = completed.length ? periodEndDT(completed[completed.length-1]) : null;
+  if(latestWakeEl) latestWakeEl.textContent = latest ? `${latest.getHours()}시 ${pad(latest.getMinutes())}분` : '-';
+  if(gapEl){
+    const last = day?.periods?.length ? day.periods[day.periods.length-1] : null;
+    const isToday = ymd(cur) === ymd(logicalToday());
+    if(isToday && latest && last && periodEndDT(last)){
+      gapEl.textContent = fmtDuration(Math.max(0, Math.round((serverNowMs() - latest.getTime()) / 60000)));
+    }else if(!latest){
+      gapEl.textContent = '0분';
+    }
+  }
 }
 
 function renderPeriods(){
@@ -2033,35 +2081,32 @@ function renderPeriods(){
     const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
     const hasStart = !!(p.startDate && p.startTime);
     const hasEnd = !!(p.endDate && p.endTime);
-    // 오늘 기록은 기존 타이머 흐름에 따라 잠금. 과거 기록은 타이머 상태와 무관하게 직접 수정 가능.
-    const startTimeDisabled = isCurrentLectureDay && !hasStart;
-    const endTimeDisabled   = isCurrentLectureDay && (!hasStart || !hasEnd);
+    // 과거 수면일은 타이머 상태와 관계없이 시작/기상 시간을 직접 추가·수정 가능.
+    const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+    const startTimeDisabled = isPastDay ? false : !hasStart;
+    const endTimeDisabled   = isPastDay ? false : (!hasStart || !hasEnd);
 
-    const startTimePlaceholder = !isCurrentLectureDay
-      ? (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
-      : (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '강의 시작을 누르면 자동 기록');
-    const endTimePlaceholder = !isCurrentLectureDay
-      ? (hasEnd ? (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
-      : (!hasStart
-          ? '강의 시작을 누르면 자동 기록'
-          : (!hasEnd
-              ? '강의 종료를 누르면 자동 기록'
-              : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정')));
+    const startTimePlaceholder = hasStart
+      ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
+      : (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록');
+    const endTimePlaceholder = !hasStart
+      ? (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록')
+      : (!hasEnd
+          ? (isPastDay ? '시간을 눌러 입력' : '깨어남을 누르면 자동 기록')
+          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
 
-    let startAction = 'start', startLabel = '▶ 강의 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
+    let startAction = 'start', startLabel = '☾ 수면 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
     if(hasStart){
       startAction = 'cancel-start';
-      startLabel = '시작 취소';
-      // 과거 기록은 시간을 직접 입력해도 타이머 버튼 비활성화를 유지한다.
-      startDisabled = !isCurrentLectureDay;
+      startLabel = '수면 취소';
+      startDisabled = false;
       startClass = 'start cancel-start';
     }
-    let endAction = 'end', endLabel = '■ 강의 종료', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
+    let endAction = 'end', endLabel = '☀ 깨어남 입력', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
     if(hasEnd){
       endAction = 'cancel-end';
-      endLabel = '종료 취소';
-      // 과거 기록은 시간을 직접 입력해도 타이머 버튼 비활성화를 유지한다.
-      endDisabled = !isCurrentLectureDay;
+      endLabel = '깨어남 취소';
+      endDisabled = false;
       endClass = 'end cancel-end';
     }
 
@@ -2069,8 +2114,8 @@ function renderPeriods(){
     card.className = 'period-card';
     card.innerHTML = `
       <div class="period-head">
-        <div class="period-num">${idx+1}강의</div>
-        <input type="text" class="subject-input" data-idx="${idx}" data-k="subject" value="${p.subject || ''}" placeholder="과목">
+        <div class="period-num">${idx+1}회 수면</div>
+        <input type="text" class="subject-input" data-idx="${idx}" data-k="subject" value="${p.subject || ''}" placeholder="수면 종류">
         <button class="period-del" data-idx="${idx}">✕</button>
       </div>
       <div class="field-grid">
@@ -2078,21 +2123,21 @@ function renderPeriods(){
           <button type="button" class="lecture-card-action ${startClass}" data-lecture-action="${startAction}" data-idx="${idx}" ${startDisabled ? 'disabled' : ''}>${startLabel}</button>
         </div>
         <div class="field time${startTimeDisabled ? ' disabled' : ''}">
-          <label>시작 시간</label>
+          <label>수면 시작시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="start" min="${minDT}" max="${maxDT}" ${startTimeDisabled ? 'disabled' : ''} value="${p.startDate && p.startTime ? p.startDate+'T'+p.startTime : ''}"><div class="ko-time-label">${startTimePlaceholder}</div>
         </div>
         <div class="field lecture-action-field">
           <button type="button" class="lecture-card-action ${endClass}" data-lecture-action="${endAction}" data-idx="${idx}" ${endDisabled ? 'disabled' : ''}>${endLabel}</button>
         </div>
         <div class="field time${endTimeDisabled ? ' disabled' : ''}">
-          <label>종료 시간</label>
+          <label>기상 시간</label>
           <input type="datetime-local" data-idx="${idx}" data-k="end" min="${minDT}" max="${maxDT}" ${endTimeDisabled ? 'disabled' : ''} value="${p.endDate && p.endTime ? p.endDate+'T'+p.endTime : ''}"><div class="ko-time-label">${endTimePlaceholder}</div>
         </div>
       </div>
       <div class="period-stats">
-        <div class="stat">강의시간<b id="study-${idx}" class="${sErr ? 'stat-error' : 'study-color'}">${sErr ? '오류!' : fmtDuration(study)}</b></div>
-        <div class="stat">강의 횟수<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : '1회'}</b></div>
-        ${idx>0 ? `<div class="stat">강의 종료 후 시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
+        <div class="stat">수면시간<b id="study-${idx}" class="${sErr ? 'stat-error' : 'study-color'}">${sErr ? '오류!' : fmtDuration(study)}</b></div>
+        <div class="stat">수면 횟수<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : '1회'}</b></div>
+        ${idx>0 ? `<div class="stat">기상 후 경과시간<b id="waste-${idx}" class="${wErr ? 'stat-error' : 'waste-color'}">${wErr ? '오류!' : fmtDuration(waste)}</b></div>` : ''}
       </div>
     `;
     list.appendChild(card);
@@ -2104,6 +2149,7 @@ function renderPeriods(){
   $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
   $('#sumPages').classList.toggle('stat-error', sumPagesErr);
   $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
+  updateSleepExtraSummary(day);
   renderDayCharts();
 
 }
@@ -2148,21 +2194,20 @@ function refreshStats(){
   $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
   $('#sumPages').classList.toggle('stat-error', sumPagesErr);
   $('#sumWaste').classList.toggle('stat-error', sumWasteErr);
+  updateSleepExtraSummary(day);
   renderDayCharts();
 }
 
-// 강의 카드의 시작/종료 버튼 상태 변화에 따라 시간 입력칸의 잠금 여부를 즉시 갱신한다.
-// (포커스를 유지하기 위해 renderPeriods() 를 다시 부르지 않고 DOM 만 수정)
-function refreshLectureTimeFieldDisabled(idx){
+function refreshSleepTimeFieldDisabled(idx){
   const day = getDayData();
   const p = day.periods?.[idx];
   if(!p) return;
 
   const hasStart = !!(p.startDate && p.startTime);
   const hasEnd   = !!(p.endDate && p.endTime);
-  const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
-  const startDisabled = isCurrentLectureDay && !hasStart;
-  const endDisabled   = isCurrentLectureDay && (!hasStart || !hasEnd);
+  const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+  const startDisabled = isPastDay ? false : !hasStart;
+  const endDisabled   = isPastDay ? false : (!hasStart || !hasEnd);
 
   const startInput = document.querySelector(`#periodList input[data-k="start"][data-idx="${idx}"]`);
   const endInput   = document.querySelector(`#periodList input[data-k="end"][data-idx="${idx}"]`);
@@ -2176,19 +2221,17 @@ function refreshLectureTimeFieldDisabled(idx){
 
   const startLabel = startField?.querySelector('.ko-time-label');
   if(startLabel){
-    startLabel.textContent = !isCurrentLectureDay
-      ? (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
-      : (hasStart ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정') : '강의 시작을 누르면 자동 기록');
+    startLabel.textContent = hasStart
+      ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
+      : (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록');
   }
   const endLabel = endField?.querySelector('.ko-time-label');
   if(endLabel){
-    endLabel.textContent = !isCurrentLectureDay
-      ? (hasEnd ? (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정') : '시간을 눌러 입력')
-      : (!hasStart
-          ? '강의 시작을 누르면 자동 기록'
-          : (!hasEnd
-              ? '강의 종료를 누르면 자동 기록'
-              : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정')));
+    endLabel.textContent = !hasStart
+      ? (isPastDay ? '시간을 눌러 입력' : '수면 시작을 누르면 자동 기록')
+      : (!hasEnd
+          ? (isPastDay ? '시간을 눌러 입력' : '깨어남을 누르면 자동 기록')
+          : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
   }
 }
 
@@ -2217,7 +2260,7 @@ $('#nextDay').onclick = async () => {
   const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()+1);
   const maxDate = logicalToday();
   if(next > maxDate){
-    await askConfirm('아직 시작되지 않은 강의일입니다.', true);
+    await askConfirm('아직 시작되지 않은 수면일입니다.', true);
     return;
   }
   cur = next;
@@ -2225,7 +2268,7 @@ $('#nextDay').onclick = async () => {
 };
 
 // 가운데 날짜 제목을 누르면 연/월/일을 직접 선택할 수 있음
-// 선택 가능한 마지막 날짜는 설정한 하루 집계 기준시간에 따른 현재 강의일이다.
+// 선택 가능한 마지막 날짜는 설정한 하루 집계 기준시간에 따른 현재 수면일이다.
 function openDatePicker(){
   const picker = $('#datePicker');
   picker.value = ymd(cur);
@@ -2248,7 +2291,7 @@ $('#datePicker').onchange = async (e) => {
   const picked = new Date(y,m-1,d);
   const maxDate = logicalToday();
   if(picked > maxDate){
-    await askConfirm('아직 시작되지 않은 강의일입니다.', true);
+    await askConfirm('아직 시작되지 않은 수면일입니다.', true);
     e.target.value = ymd(cur);
     return;
   }
@@ -2257,24 +2300,24 @@ $('#datePicker').onchange = async (e) => {
 };
 
 $('#addPeriod').onclick = async () => {
-  // 새 강의 제한: 마지막 강의가 진행 중이면 다음 강의를 추가할 수 없음.
+  // 새 강의 제한: 마지막 수면이 진행 중이면 다음 수면을 추가할 수 없음.
   const currentDay = getDayData();
   const currentPeriods = currentDay.periods || [];
-  const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
-  if(isCurrentLectureDay && currentPeriods.length > 0){
+  const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+  if(!isPastDay && currentPeriods.length > 0){
     const last = currentPeriods[currentPeriods.length - 1];
     const hasStarted = !!(last.startDate && last.startTime);
     const hasEnded = !!(last.endDate && last.endTime);
 
-    // 마지막 강의가 아예 시작되지 않았어도 다음 강의 추가 금지
+    // 마지막 수면이 아예 시작되지 않았어도 다음 수면 추가 금지
     if(!hasStarted){
-      await askConfirm(`${currentPeriods.length}강의를 먼저 시작해주세요.`, true);
+      await askConfirm(`${currentPeriods.length}회 수면을 먼저 시작해주세요.`, true);
       return;
     }
 
-    // 시작했지만 아직 종료되지 않은 경우도 다음 강의 추가 금지
+    // 시작했지만 아직 종료되지 않은 경우도 다음 수면 추가 금지
     if(!hasEnded){
-      await askConfirm(`${currentPeriods.length}강의가 진행 중입니다.\n강의를 종료한 후 다음 강의를 추가해주세요.`, true);
+      await askConfirm(`${currentPeriods.length}회 수면이 진행 중입니다.\n수면을 종료한 후 다음 수면을 추가해주세요.`, true);
       return;
     }
   }
@@ -2286,8 +2329,8 @@ $('#addPeriod').onclick = async () => {
       enforceStudyDayLimit();
       await renderCurrentView();
     }catch(e){
-      console.error('강의 추가 전 최신 기록 확인 실패:', e);
-      await askConfirm('최신 강의 기록을 확인하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.', true);
+      console.error('수면 추가 전 최신 기록 확인 실패:', e);
+      await askConfirm('최신 수면 기록을 확인하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.', true);
       return;
     }
   }
@@ -2322,7 +2365,7 @@ $('#addPeriod').onclick = async () => {
       await autoSyncFromCloud();
       await renderCurrentView();
     }catch(e){
-      console.warn('강의 추가 후 재동기화 실패:', e);
+      console.warn('수면 추가 후 재동기화 실패:', e);
     }
   }
 };
@@ -2333,13 +2376,13 @@ $('#periodList').addEventListener('click', async (e) => {
     const day = getDayData();
     const lastIdx = day.periods.length - 1;
 
-    const isPastLectureDay = ymd(cur) < ymd(logicalToday());
-    if(!isPastLectureDay && idx !== lastIdx){
-      await askConfirm(`강의는 마지막 강의부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}강의를 삭제해주세요.`, true);
+    const isPastDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) < logicalToday();
+    if(!isPastDay && idx !== lastIdx){
+      await askConfirm(`수면은 마지막 수면부터 순서대로 삭제할 수 있어요.\n먼저 ${lastIdx+1}회 수면을 삭제해주세요.`, true);
       return;
     }
 
-    if(!confirm(`${idx+1}강의를 정말 삭제하시겠습니까?`)) return;
+    if(!(await askConfirm(`${idx+1}회 수면을 정말 삭제하시겠습니까?`, true))) return;
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
     renderPeriods();
@@ -2349,7 +2392,7 @@ $('#periodList').addEventListener('click', async (e) => {
 });
 
 
-// 강의 횟수 번호는 빈칸 또는 1 이상의 정수만 허용한다.
+// 수면 횟수 번호는 빈칸 또는 1 이상의 정수만 허용한다.
 // -, +, ., e/E 및 기타 문자는 키보드/붙여넣기 모두 차단한다.
 $('#periodList').addEventListener('beforeinput', (e) => {
   const t = e.target;
@@ -2366,7 +2409,7 @@ $('#periodList').addEventListener('paste', (e) => {
   const text = (e.clipboardData || window.clipboardData)?.getData('text') ?? '';
   if(!/^[1-9]\d*$/.test(text.trim())){
     e.preventDefault();
-    showToast('강의 횟수는 1 이상의 정수만 입력할 수 있어요');
+    showToast('수면 횟수는 1 이상의 정수만 입력할 수 있어요');
   }
 });
 
@@ -2384,7 +2427,7 @@ $('#periodList').addEventListener('input', async (e) => {
       // 빈칸 허용
     } else if(!/^\d+$/.test(raw)){
       t.value = '';
-      showToast('강의 횟수는 1 이상의 정수만 입력할 수 있어요');
+      showToast('수면 횟수는 1 이상의 정수만 입력할 수 있어요');
     } else {
       const normalized = raw.replace(/^0+/, '');
       t.value = normalized; // 0 또는 000은 빈칸, 0012는 12
@@ -2405,7 +2448,7 @@ $('#periodList').addEventListener('input', async (e) => {
     const timeKey = k==='start' ? 'startTime' : 'endTime';
     const prevDTVal = (p[dateKey] && p[timeKey]) ? `${p[dateKey]}T${p[timeKey]}` : '';
 
-    // 시작/종료 일시는 선택한 강의일의 집계 범위 안에서만 입력 가능하고,
+    // 시작/종료 일시는 선택한 수면일의 집계 범위 안에서만 입력 가능하고,
     // 현재 시각보다 미래로도 입력할 수 없다.
     if(t.value){
       const [d, tm] = t.value.split('T');
@@ -2441,9 +2484,9 @@ $('#periodList').addEventListener('input', async (e) => {
     p[k] = t.value;
   }
 
-  // 강의 횟수 번호와 자동기록 시간을 서로 연동:
-  // - 강의 횟수를 처음 입력하는 순간(빈칸/0→값) 현재 날짜+시간을 자동 기록
-  // - 강의 횟수를 지우거나 0으로 만들면(값→빈칸/0) 자동 기록됐던 날짜+시간도 함께 지움
+  // 수면 횟수 번호와 자동기록 시간을 서로 연동:
+  // - 수면 횟수를 처음 입력하는 순간(빈칸/0→값) 현재 날짜+시간을 자동 기록
+  // - 수면 횟수를 지우거나 0으로 만들면(값→빈칸/0) 자동 기록됐던 날짜+시간도 함께 지움
   // - 이미 값이 있는 상태에서 숫자를 더 입력/수정하는 것만으로는 시간이 바뀌지 않음
   if(k==='startPage' || k==='endPage'){
     const isBlankPage = v => (v==='' || v==null || Number(v)===0);
@@ -2463,15 +2506,15 @@ $('#periodList').addEventListener('input', async (e) => {
         p.timerEndedAt = null;
         if(cloudUser) await cloudClearActiveTimer();
       } else if(k==='endPage' && Number(p.timerStartedAt) > 0){
-        // 끝 강의 횟수를 지우면 같은 서버 시작 시점에서 다시 카운트한다.
+        // 끝 수면 횟수를 지우면 같은 서버 시작 시점에서 다시 카운트한다.
         p.timerEndedAt = null;
-        if(cloudUser) await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        if(cloudUser) void cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
       }
     } else if(pageWasBlank && !isNaN(t.value)){
       if(cloudUser && !serverClockCalibrated) await calibrateServerClock(false);
       const now = new Date(serverNowMs());
-      // 현재 보고 있는 강의일이 실제 현재 강의일일 때만 '현재 시각' 자동기록.
-      // 과거 강의일을 수정할 때는 범위를 벗어나는 현재 시각이 들어가지 않도록 일시를 직접 입력하게 한다.
+      // 현재 보고 있는 수면일이 실제 현재 수면일일 때만 '현재 시각' 자동기록.
+      // 과거 수면일을 수정할 때는 범위를 벗어나는 현재 시각이 들어가지 않도록 일시를 직접 입력하게 한다.
       if(!p[timeKey]){
         if(isWithinSelectedStudyDay(now)){
           p[dateKey] = ymd(now);
@@ -2479,10 +2522,10 @@ $('#periodList').addEventListener('input', async (e) => {
           const di = dtInput(); if(di) di.value = `${p[dateKey]}T${p[timeKey]}`;
         } else {
           const di = dtInput(); if(di) di.value = '';
-          showToast('과거 강의일은 일시를 직접 입력해 주세요');
+          showToast('과거 수면일은 일시를 직접 입력해 주세요');
         }
       }
-      // 실제 현재 강의일에서 강의 횟수를 새로 입력할 때만 초 단위 타이머를 제어한다.
+      // 실제 현재 수면일에서 수면 횟수를 새로 입력할 때만 초 단위 타이머를 제어한다.
       if(isWithinSelectedStudyDay(now)){
         if(k==='startPage'){
           p.timerEndedAt = null;
@@ -2528,22 +2571,22 @@ $('#periodList').addEventListener('input', async (e) => {
       t.value = '';
       if(label) label.textContent = '시간을 눌러 수정';
     }
-    // 시작/종료 시간을 직접 입력·삭제하면 잠금 상태가 바뀌므로 즉시 반영한다.
-    refreshLectureTimeFieldDisabled(idx);
+    // 시작/기상 시간을 직접 입력·삭제하면 잠금 상태가 바뀌므로 즉시 반영한다.
+    refreshSleepTimeFieldDisabled(idx);
     refreshStats();
     updateStudyTimer();
     updateWasteTimer();
-    // 시작시간을 직접 입력/수정한 경우에도 즉시 시간순으로 카드 위치를 다시 정렬한다.
-    // 종료시간이 아직 없어도 시작시간만 있으면 정렬 대상이 된다.
-    const reordered = (k === 'start' && p.startDate && p.startTime)
-      ? autoSortPeriodsByStart(day) : false;
-    await persistToday();
-    if(reordered) renderPeriods();
+
+    // 시작시간을 직접 추가/수정한 경우에도 즉시 시간순으로 자동 정렬한다.
+    // 예: 3번째 카드 시간이 1번과 2번 사이면 자동으로 2번째 카드로 이동한다.
+    const reorderedByTime = (p.startDate && p.startTime) ? autoSortPeriodsByStart(day) : false;
+    void persistToday();
+    if(reorderedByTime) renderPeriods();
     return;
   }
   if(k !== 'subject') refreshStats();
 
-  // 과목명은 IME/플로팅 키보드 입력 흐름을 막지 않도록 저장만 예약하고 즉시 반환한다.
+  // 수면 종류은 IME/플로팅 키보드 입력 흐름을 막지 않도록 저장만 예약하고 즉시 반환한다.
   if(k === 'subject'){
     void persistToday();
     return;
@@ -2641,7 +2684,7 @@ async function locateStoppedPeriodNear(atMsTarget, toleranceMs=8000){
 async function requestExclusiveSessionStart(atMs){
   if(window.parent===window) return true;
   try{
-    const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    const req='sleep-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     return await new Promise(resolve=>{
       const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
       function onMsg(ev){
@@ -2649,12 +2692,13 @@ async function requestExclusiveSessionStart(atMs){
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
       }
       window.addEventListener('message',onMsg);
-      window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req,at:atMs},location.origin);
+      window.parent.postMessage({type:'exclusive-session-start',kind:'sleep',req,at:atMs},location.origin);
     });
   }catch(e){return true}
 }
 window.addEventListener('message',async ev=>{
-  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
+  if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='sleep')return;
+  window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped:true},location.origin);
   let stopped=false;
   try{
     // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
@@ -2670,27 +2714,21 @@ window.addEventListener('message',async ev=>{
       lastAutoStoppedId=p._id;
       lastAutoStoppedAt=atMs;
       if(cloudUser){
-        const row=null; void cloudStopActiveTimer(ym, dk, p._id);const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
+        const row=await cloudStopActiveTimer(ym, dk, p._id);
+const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
         p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
       }else p.timerEndedAt=Math.round(atMs);
       markChangedPeriodFields(p, before);
       autoSortPeriodsByStart(day);
       // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
-      await saveMonth(ym);
+      void saveMonth(ym);
       if(ym===ymKey(cur) && dk===dKey(cur)){
         renderPeriods();updateStudyTimer();updateWasteTimer();
       }
-      if(ym===ymKey(cur) && dk===dKey(cur)){
-        const _sHasFocus = document.hasFocus();
-        if(!(_sHasFocus && isPeriodInputEditing()) && userActionCount===0){
-          renderPeriods();updateStudyTimer();updateWasteTimer();
-        }
-      }
-      try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(_){}
       stopped=true;
     }
-  }catch(e){console.warn('자동 강의 종료 실패',e)}
-  window.parent.postMessage({type:'exclusive-session-stopped',kind:'lecture',req:ev.data.req,ok:true,stopped},location.origin);
+  }catch(e){console.warn('자동 기상 실패',e)}
+  window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped},location.origin);
 });
 // 새로 시작한 다른 기록장의 타이머가 곧바로 취소되면, 그로 인해 자동 종료됐던 이 기록을 되돌린다.
 window.addEventListener('message',async ev=>{
@@ -2718,7 +2756,7 @@ window.addEventListener('message',async ev=>{
     const {ym,dk,day,p,idx}=found;
     const before=deepClone(p);
     p.endDate=''; p.endTime=''; p.timerEndedAt=null;
-    if(cloudUser) await cloudResumeActiveTimer(ym, dk, p, idx);
+    if(cloudUser) void cloudResumeActiveTimer(ym, dk, p, idx);
     markChangedPeriodFields(p, before);
     autoSortPeriodsByStart(day);
     await saveMonth(ym);
@@ -2772,10 +2810,17 @@ $('#periodList').addEventListener('click', async (e) => {
   btn.disabled = true;
   btn.textContent = '⏳';
   try{
-  const idx = Number(btn.dataset.idx);
-  const day = getDayData();
-  const p = day.periods?.[idx];
-  if(!p) return;
+    let idx = Number(btn.dataset.idx);
+    let day = getDayData();
+    let p = day.periods?.[idx];
+    if(!p) return;
+    const pid = p._id;
+    const refetch = () => {
+      day = getDayData();
+      idx = day.periods.findIndex(x => String(x._id||'') === String(pid));
+      p = idx >= 0 ? day.periods[idx] : null;
+      return !!p;
+    };
 
   const action = btn.dataset.lectureAction;
   const isCancel = action === 'cancel-start' || action === 'cancel-end';
@@ -2784,7 +2829,7 @@ $('#periodList').addEventListener('click', async (e) => {
   }
   const now = new Date(serverNowMs());
   if(!isCancel && !isWithinSelectedStudyDay(now)){
-    showToast('오늘 강의에서만 시작/종료 버튼을 사용할 수 있어요');
+    showToast('오늘 수면일에서만 시작/종료 버튼을 사용할 수 있어요');
     return;
   }
 
@@ -2792,43 +2837,56 @@ $('#periodList').addEventListener('click', async (e) => {
 
   if(action === 'start'){
     if(!(await requestExclusiveSessionStart(now.getTime()))) return;
+    if(!refetch()) return;
     p.startDate = ymd(now);
     p.startTime = hm(now);
     p.endDate = '';
     p.endTime = '';
     p.timerEndedAt = null;
     p.timerStartedAt = Math.round(now.getTime());
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
-      void cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx).then(row=>{
+      try{
+        const row = null; void cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
         const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
-        if(Number.isFinite(ts)){ p.timerStartedAt = ts; p._updatedAt = syncNow(); }
-        return calibrateServerClock(true);
-      }).catch(()=>{});
+        if(Number.isFinite(ts) && ts > 0){
+          if(!refetch()) return;
+          p.timerStartedAt = ts;
+          markChangedPeriodFields(p, beforeSync);
+        }
+        void calibrateServerClock(true);
+        if(!refetch()) return;
+      }catch(_){}
     }
   }else if(action === 'end'){
     if(!p.startDate || !p.startTime){
-      showToast('먼저 강의 시작을 눌러주세요');
+      showToast('먼저 수면 시작을 눌러주세요');
       return;
     }
     p.endDate = ymd(now);
     p.endTime = hm(now);
-    if(cloudUser){
+    if(Number(p.timerStartedAt) > 0) p.timerEndedAt = Math.round(serverNowMs());
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
+    if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
-        const row = null; void cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
+        const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
         const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
-        p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
+        if(Number.isFinite(ts) && ts > 0){
+          if(!refetch()) return;
+          p.timerEndedAt = ts;
+          markChangedPeriodFields(p, beforeSync);
+        }
         void calibrateServerClock(true);
-      }catch(_){
-        p.timerEndedAt = Math.round(serverNowMs());
-      }
-    }else{
-      p.timerEndedAt = Math.round(serverNowMs());
+        if(!refetch()) return;
+      }catch(_){}
     }
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
   }else if(action === 'cancel-start'){
     const msg = (p.endDate || p.endTime)
-      ? `${idx+1}강의의 시작·종료 기록을 모두 지울까요?`
-      : `${idx+1}강의 시작을 취소할까요?`;
+      ? `${idx+1}회 수면의 시작·종료 기록을 모두 지울까요?`
+      : `${idx+1}회 수면 시작을 취소할까요?`;
     if(!(await askConfirm(msg, true))) return;
     p.startDate = '';
     p.startTime = '';
@@ -2836,22 +2894,27 @@ $('#periodList').addEventListener('click', async (e) => {
     p.endTime = '';
     p.timerStartedAt = null;
     p.timerEndedAt = null;
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
       try{ await cloudClearActiveTimer(); }catch(_){}
     }
     // 방금 시작했던 타이머를 취소하는 것이므로, 그로 인해 자동 종료됐던
-    // 다른 기록장(공부/수면)의 기록을 되돌려 달라고 알린다.
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'lecture'},location.origin);
+    // 다른 기록장(공부/강의)의 기록을 되돌려 달라고 알린다.
+    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'sleep'},location.origin);
     showToast('시작 기록을 취소했어요');
   }else if(action === 'cancel-end'){
-    if(!(await askConfirm(`${idx+1}강의 종료를 취소할까요?`, true))) return;
+    if(!(await askConfirm(`${idx+1}회 수면 종료를 취소할까요?`, true))) return;
     p.endDate = '';
     p.endTime = '';
     p.timerEndedAt = null;
+    markChangedPeriodFields(p, beforeSync);
+    renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
-        await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        void cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
         void calibrateServerClock(true);
+        if(!refetch()) return;
       }catch(_){}
     }
     if(window.parent!==window){
@@ -2862,13 +2925,12 @@ $('#periodList').addEventListener('click', async (e) => {
     return;
   }
 
-  markChangedPeriodFields(p, beforeSync);
   p._updatedAt = syncNow();
   if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
+  await persistToday();
   renderPeriods();
   updateStudyTimer();
   updateWasteTimer();
-  void persistToday();
   } finally {
     userActionCount--;
     if(btn.isConnected){
@@ -2880,16 +2942,19 @@ $('#periodList').addEventListener('click', async (e) => {
 });
 
 // 자동 동기화 중 재렌더링이 보류됐으면, 입력칸을 완전히 벗어난 뒤 한 번만 반영한다.
-$('#periodList').addEventListener('focusout', () => {
+$('#periodList').addEventListener('focusout', (e) => {
   if(!periodRenderPending) return;
+  const next = e.relatedTarget;
+  if(next && next.closest && next.closest('#periodList')) return;
   setTimeout(async () => {
     if(isPeriodInputEditing()) return;
+    if(userActionCount > 0) return;
     periodRenderPending = false;
     await renderCurrentView();
   }, 80);
 });
 
-// 강의 시작에서 엔터를 누르면 끝 강의 횟수로 포커스 이동
+// 수면 시작에서 엔터를 누르면 끝 수면 횟수로 포커스 이동
 $('#periodList').addEventListener('keydown', (e) => {
   if(e.key !== 'Enter') return;
   const t = e.target;
@@ -2914,19 +2979,8 @@ function chartSvg(points, valueKey, kind, unit){
   const grid=[0,.5,1].map(fr=>{
     const gy=T+innerH-(innerH*fr);
     const val=Math.round(max*fr);
-    let axisLabel;
-    if(valueKey==='study'){
-      const mins = Math.max(0, Math.round(Number(val)||0));
-      const hours = Math.floor(mins / 60);
-      const minutes = mins % 60;
-      const lines = [];
-      if(hours) lines.push(`${hours}시간`);
-      if(minutes || !hours) lines.push(`${minutes}분`);
-      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy - (lines.length>1 ? 3 : -3)}" text-anchor="end">${lines.map((line,i)=>`<tspan x="${L-5}" dy="${i===0?0:10}">${escHtml(line)}</tspan>`).join('')}</text>`;
-    }else{
-      axisLabel = `<text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${escHtml(val)}</text>`;
-    }
-    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/>${axisLabel}`;
+    const axisLabel = valueKey==='pages' ? `${val}` : `${Math.round(val/60)}시간`;
+    return `<line class="chart-grid" x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}"/><text class="chart-axis-label" x="${L-5}" y="${gy+3}" text-anchor="end">${axisLabel}</text>`;
   }).join('');
   const n=Math.max(points.length,1);
   const slot=innerW/n;
@@ -2973,22 +3027,22 @@ function chartTotalTime(points,key){
   const mins=points.reduce((sum,p)=>sum+(Number(p[key])||0),0);
   return formatAvgTime(mins);
 }
-function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote=""){
+function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote="", thirdKey="waste", thirdTitle="기상 후 경과시간 추이"){
   if(!chartsVisible) return '';
-  if(!points.length || points.every(p=>!p.study && !p.pages)) return '';
+  if(!points.length || points.every(p=>!p.study && !p.pages && !p.waste)) return '';
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
   const hasAverage = avgBase.length > 0;
   const avgStudy = hasAverage ? formatAvgTime(chartAverage(avgBase,'study')) : '—';
   const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))}회` : '—';
-  const activeBase = avgBase.filter(p => (Number(p.study)||0) > 0);
-  const restAvgStudy = activeBase.length ? formatAvgTime(chartAverage(activeBase,'study')) : '—';
-  const restAvgPages = activeBase.length ? `${Math.round(chartAverage(activeBase,'pages'))}회` : '—';
+  const avgWaste = hasAverage ? formatAvgTime(chartAverage(avgBase,thirdKey)) : '—';
   const totalStudy = chartTotalTime(points,'study');
   const totalPages = Math.round(points.reduce((sum,p)=>sum+(Number(p.pages)||0),0));
+  const totalWaste = thirdKey==='longest' ? formatAvgTime(Math.max(0,...points.map(p=>Number(p[thirdKey])||0))) : chartTotalTime(points,thirdKey);
   const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">강의시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy}<br>총 ${totalStudy}<br>쉬는 날 제외 평균 ${restAvgStudy}</div></div>${note}${chartSvg(points,'study','study','시간')}</div>
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">공부 강의 횟수 추이</div><div class="chart-unit">${averageLabel} ${avgPages}<br>총 ${totalPages}회<br>쉬는 날 제외 평균 ${restAvgPages}</div></div>${note}${chartSvg(points,'pages','pages','회')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">수면시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${note}${chartSvg(points,'study','study','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">${thirdTitle}</div><div class="chart-unit">${averageLabel} ${avgWaste} · ${thirdKey==='longest'?'최장':'총'} ${totalWaste}</div></div>${note}${chartSvg(points,thirdKey,'waste','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">수면 횟수 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages}회</div></div>${note}${chartSvg(points,'pages','pages','회')}</div>
   </div>`;
 }
 
@@ -3068,25 +3122,27 @@ async function computeMonthAgg(ym){
   const totalWeeks = weekOfMonth(year, mo, daysInMonth);
   const weeks = {};
   for(let w=1; w<=totalWeeks; w++){
-    weeks[w] = {study:0,pages:0,waste:0,days:0, ...weekRange(year, mo, w)};
+    weeks[w] = {study:0,pages:0,waste:0,longest:0,days:0, ...weekRange(year, mo, w)};
   }
 
-  let monthStudy=0, monthPages=0, monthWaste=0;
+  let monthStudy=0, monthPages=0, monthWaste=0, monthLongest=0;
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
     const dayData = m[dk];
     const periods = dayData.periods||[];
-    let dStudy=0, dPages=0, dWaste=0;
+    let dStudy=0, dPages=0, dWaste=0, dLongest=0;
     periods.forEach((p, idx)=>{
-      dStudy += minutesBetween(p);
+      const sleepMins = minutesBetween(p);
+      dStudy += sleepMins;
+      dLongest = Math.max(dLongest, sleepMins);
       dPages += periodPages(p);
       dWaste += wasteBefore(periods, idx);
     });
     const w = weekOfMonth(year, mo, dayNum);
-    weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].days += 1;
-    monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste;
+    weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].longest = Math.max(weeks[w].longest, dLongest); weeks[w].days += 1;
+    monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste; monthLongest = Math.max(monthLongest, dLongest);
   });
-  return { weeks, monthStudy, monthPages, monthWaste };
+  return { weeks, monthStudy, monthPages, monthWaste, monthLongest };
 }
 
 async function renderWeekView(){
@@ -3100,9 +3156,9 @@ async function renderWeekView(){
     el.innerHTML = `<div class="empty-state">${cur.getMonth()+1}월에는 아직 시작된 주차가 없어요.</div>`;
     return;
   }
-  const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste}));
+  const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste, longest:weeks[w].longest}));
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${cur.getFullYear()}년 ${cur.getMonth()+1}월 · 주별 정리 (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>` +
-    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.') +
+    chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.', 'longest', '가장 긴 수면시간 추이') +
     weekNums.map(w => `
       <div class="agg-row">
         <div>
@@ -3110,7 +3166,7 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          강의시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b><br>강의횟수 <b>${weeks[w].pages}회</b>
+          수면시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 수면 횟수 <b>${weeks[w].pages}회</b><br>가장 긴 수면시간 <b class="waste-color">${fmtDuration(weeks[w].longest)}</b>
         </div>
       </div>
     `).join('');
@@ -3125,15 +3181,15 @@ async function renderMonthView(){
   const chartPoints = [];
   for(let mo=1; mo<=12; mo++){
     const ym = `${year}-${pad(mo)}`;
-    const { monthStudy, monthPages, monthWaste } = await computeMonthAgg(ym);
-    chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste});
+    const { monthStudy, monthPages, monthWaste, monthLongest } = await computeMonthAgg(ym);
+    chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste, longest:monthLongest});
     if(monthStudy===0 && monthPages===0 && monthWaste===0) continue;
     any = true;
     html += `
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          강의시간 <b class="study-color">${fmtDuration(monthStudy)}</b><br>강의횟수 <b>${monthPages}회</b>
+          수면시간 <b class="study-color">${fmtDuration(monthStudy)}</b> · 수면 횟수 <b>${monthPages}회</b><br>가장 긴 수면시간 <b class="waste-color">${fmtDuration(monthLongest)}</b>
         </div>
       </div>`;
   }
@@ -3144,7 +3200,7 @@ async function renderMonthView(){
     return (idx + 1) < (currentStudyDay.getMonth() + 1);
   });
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div>` +
-    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.') +
+    chartsHtml(chartPoints, averagePoints, '월 평균', '평균은 완료된 전월까지 계산합니다.', 'longest', '가장 긴 수면시간 추이') +
     (any ? html : `<div class="empty-state">${year}년에 기록된 데이터가 없어요.</div>`);
 }
 
@@ -3158,19 +3214,19 @@ async function renderYearView(){
   let any = false;
   const chartPoints = [];
   for(const year of sorted){
-    let study=0, pages=0, waste=0;
+    let study=0, pages=0, waste=0, longest=0;
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
-      study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste;
+      study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste; longest = Math.max(longest, a.monthLongest||0);
     }
-    chartPoints.push({label:`${year}`, study, pages, waste});
+    chartPoints.push({label:`${year}`, study, pages, waste, longest});
     if(study===0 && pages===0 && waste===0) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">강의시간 <b class="study-color">${fmtDuration(study)}</b><br>강의횟수 <b>${pages}회</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">수면시간 <b class="study-color">${fmtDuration(study)}</b> · 수면 횟수 <b>${pages}회</b><br>가장 긴 수면시간 <b class="waste-color">${fmtDuration(longest)}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
-    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +
-    (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
+    chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.', 'longest', '가장 긴 수면시간 추이') +
+    (any ? rows : `<div class="empty-state">기록된 연도별 수면 데이터가 없어요.</div>`);
 }
 
 function updateChartToggle(){
@@ -3325,7 +3381,7 @@ function showChartTooltip(bar, clientX, clientY){
     if(refreshing || e.touches.length !== 1 || !atBottom() || interactive(e.target) || isPeriodInputEditing()){
       tracking = false; return;
     }
-    // 짧은 강의 횟수에서 상단 pull-down과 충돌하지 않도록 화면 아래쪽에서 시작할 때만 허용
+    // 짧은 수면 횟수에서 상단 pull-down과 충돌하지 않도록 화면 아래쪽에서 시작할 때만 허용
     if(e.touches[0].clientY < window.innerHeight * 0.55){ tracking = false; return; }
     tracking = true; startY = e.touches[0].clientY; distance = 0;
   }, {passive:true});
@@ -3411,7 +3467,7 @@ function showChartTooltip(bar, clientX, clientY){
       const maxDate = logicalToday();
       if(next > maxDate){
         snapBack();
-        showToast('아직 시작되지 않은 강의일입니다.');
+        showToast('아직 시작되지 않은 수면일입니다.');
         return;
       }
       cur = next;
@@ -3555,7 +3611,7 @@ $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#setti
 
 async function deleteAllStudyRecords(){
   if(!window.__skipDeleteConfirm){
-    if(!confirm('정말 모든 강의 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.')) return;
+    if(!(await askConfirm('정말 모든 수면 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.', true))) return;
   }
   window.__skipDeleteConfirm = false;
 
@@ -3566,12 +3622,12 @@ async function deleteAllStudyRecords(){
       alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
       return;
     }
-    const {data:lecRows,error:readErr} = await sbClient.from('study_months')
-      .select('ym').eq('user_id', cloudUser.id).like('ym','L:%');
+    const {data:sleepRows,error:readErr} = await sbClient.from('study_months')
+      .select('ym').eq('user_id', cloudUser.id).like('ym','S:%');
     if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); return; }
-    const lecYms=(lecRows||[]).map(r=>String(r.ym||''));
+    const sleepYms=(sleepRows||[]).map(r=>String(r.ym||''));
     const markerIso = new Date(Math.round(serverNowMs())).toISOString();
-    for(const ym of lecYms){
+    for(const ym of sleepYms){
       const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
         .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
       if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); return; }
@@ -3599,9 +3655,9 @@ async function deleteAllStudyRecords(){
   if(!window.__skipPostDeleteRender){
     await renderCurrentView();
   }
-  showToast('모든 강의 기록을 삭제했어요');
+  showToast('모든 수면 기록을 삭제했어요');
   if(window.parent !== window){
-    window.parent.postMessage({type:'journal-delete-done', kind:'lecture'}, location.origin);
+    window.parent.postMessage({type:'journal-delete-done', kind:'sleep'}, location.origin);
   }
 }
 
@@ -3611,7 +3667,7 @@ $('#deleteAllRecords').onclick = deleteAllStudyRecords;
 window.addEventListener('message', async (ev)=>{
   if(ev.origin !== location.origin) return;
   if(ev.data?.type !== 'journal-delete-request') return;
-  if(ev.data?.kind !== 'lecture') return;
+  if(ev.data?.kind !== 'sleep') return;
   await deleteAllStudyRecords();
 });
 
@@ -3664,8 +3720,8 @@ async function refreshCloudStatus(){
 }
 
 
-function lectureCloudYm(ym){ const s=String(ym||''); return s.startsWith('L:') ? s : `L:${s}`; }
-function lectureLocalYm(v){ return String(v||'').startsWith('L:') ? String(v).slice(2) : null; }
+function sleepCloudYm(ym){ const s=String(ym||''); return s.startsWith('S:') ? s : `S:${s}`; }
+function sleepLocalYm(v){ return String(v||'').startsWith('S:') ? String(v).slice(2) : null; }
 
 async function cloudSaveMonth(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
@@ -3675,7 +3731,7 @@ async function cloudSaveMonth(ym){
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym)).limit(1);
+      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym)).limit(1);
     if(readErr){
       console.error('클라우드 저장 전 읽기 실패:', readErr);
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
@@ -3685,14 +3741,15 @@ async function cloudSaveMonth(ym){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
-        console.warn('삭제 마커 무시하고 되살림');
+        throw new Error('이 달의 기록이 다른 기기에서 삭제되었습니다.');
       }
       const nowIso2 = new Date(serverNowMs()).toISOString();
       let q2 = sbClient.from('study_months').update({data:local, deleted_at:null, updated_at:nowIso2})
-        .eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym));
+        .eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym));
       if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
       const {data:w2,error:wErr2} = await q2.select('updated_at');
       if(!wErr2 && w2 && w2.length){
+        // 저장 왕복 중 유저가 캐시에 쓴 값을 보존
         const current = ensureMonthSync(monthCache[ym] || {}, ym);
         monthCache[ym] = mergeMonths(local, current, ym);
         return;
@@ -3706,18 +3763,19 @@ async function cloudSaveMonth(ym){
     let writeOk=false;
     if(row){
       let q = sbClient.from('study_months').update({data:merged,updated_at:nowIso})
-        .eq('user_id',cloudUser.id).eq('ym',lectureCloudYm(ym));
+        .eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
-      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:lectureCloudYm(ym),data:merged,updated_at:nowIso});
+      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:sleepCloudYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
       else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
     if(writeOk){
+      // ★ 저장 왕복 중 유저가 캐시에 쓴 값이 있으면 그쪽을 살린다
       const current = ensureMonthSync(monthCache[ym] || {}, ym);
       monthCache[ym] = mergeMonths(merged, current, ym);
       return;
@@ -3752,16 +3810,16 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
-  // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 (L: 접두사)
-  const serverYms = new Set(lectureRows.map(r=>String(r.ym||'')));
+  const sleepRows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:'));
+  // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 (S: 접두사)
+  const serverYms = new Set(sleepRows.map(r=>String(r.ym||'')));
   Object.keys(monthCache).forEach(localYm => {
-    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has('L:'+localYm)){
+    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has('S:'+localYm)){
       delete monthCache[localYm];
     }
   });
-  for(const row of lectureRows){
-    const ym=lectureLocalYm(row.ym);
+  for(const row of sleepRows){
+    const ym=sleepLocalYm(row.ym);
     if(!ym) continue;
     if(false && row.deleted_at){
       delete monthCache[ym];
@@ -3789,12 +3847,12 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('L:'));
-  if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
-  if(!confirm('클라우드 기록으로 이 브라우저의 강의 기록을 교체할까요?')) return;
+  const sleepRows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:'));
+  if(sleepRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
+  if(!confirm('클라우드 기록으로 이 브라우저의 수면 기록을 교체할까요?')) return;
   monthCache={};
-  lectureRows.forEach(row=>{
-    const ym=lectureLocalYm(row.ym);
+  sleepRows.forEach(row=>{
+    const ym=sleepLocalYm(row.ym);
     if(ym) monthCache[ym]=ensureMonthSync(deepClone(row.data||{}),ym);
   });
   enforceStudyDayLimit();
@@ -3840,6 +3898,9 @@ $('#cloudGoogle').onclick = async () => {
     });
     if(error){ alert('Google 로그인 실패: ' + error.message); return; }
     if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    // OAuth PKCE verifier는 이 프레임의 Supabase client가 만들었으므로
+    // Android callback도 반드시 이 프레임에서 교환한다.
+    try{ window.top.__androidOAuthSource = 'sleep.html'; }catch(_e){}
     window.NativeAuth.openUrl(data.url);
     return;
   }
@@ -3928,7 +3989,7 @@ $('#cloudDownload').onclick = downloadAllFromCloud;
 $('#cloudSync').onclick = runManualCloudSync;
 
 
-// PWA Service Worker는 강의 횟수 하단에서 등록합니다.
+// PWA Service Worker는 수면 횟수 하단에서 등록합니다.
 
 initSupabase();
 
@@ -4014,7 +4075,7 @@ function activeTimerRowFingerprint(row){
 async function cloudStartActiveTimer(ym, dayKey, p, idx){
   if(!sbClient || !cloudUser) return null;
   const {data,error} = await sbClient.rpc('start_active_timer',{
-    p_ym: lectureCloudYm(ym),
+    p_ym: sleepCloudYm(ym),
     p_day_key: String(dayKey),
     p_period_id: String(p._id || ''),
     p_period_index: Number(idx || 0)
@@ -4031,7 +4092,7 @@ async function cloudStartActiveTimer(ym, dayKey, p, idx){
 async function cloudStopActiveTimer(ym, dayKey, periodId){
   if(!sbClient || !cloudUser) return null;
   const {data,error} = await sbClient.rpc('stop_active_timer',{
-    p_ym: ym ? lectureCloudYm(ym) : null,
+    p_ym: ym ? sleepCloudYm(ym) : null,
     p_day_key: dayKey != null ? String(dayKey) : null,
     p_period_id: periodId ? String(periodId) : null
   });
@@ -4046,7 +4107,7 @@ async function cloudStopActiveTimer(ym, dayKey, periodId){
 async function cloudResumeActiveTimer(ym, dayKey, p, idx){
   if(!sbClient || !cloudUser || !Number(p.timerStartedAt)) return null;
   const {data,error} = await sbClient.rpc('resume_active_timer',{
-    p_ym: lectureCloudYm(ym),
+    p_ym: sleepCloudYm(ym),
     p_day_key: String(dayKey),
     p_period_id: String(p._id || ''),
     p_period_index: Number(idx || 0),
@@ -4066,8 +4127,8 @@ async function cloudClearActiveTimer(){
   else activeTimerLastFingerprint = '';
 }
 
-// [DEL-FIX-3] 강의장 소유(ym = "L:YYYY-MM")인 경우에만 active_timer 삭제.
-//             공부(숫자) / 수면(S:) 타이머를 실수로 지우지 않도록 방어.
+// [DEL-FIX-3] 수면장 소유(ym = "S:YYYY-MM")인 경우에만 active_timer 삭제.
+//             공부(숫자) / 강의(L:) 타이머를 실수로 지우지 않도록 방어.
 async function cloudClearActiveTimerIfMine(){
   if(!sbClient || !cloudUser) return;
   try{
@@ -4075,7 +4136,7 @@ async function cloudClearActiveTimerIfMine(){
       .select('ym').eq('user_id',cloudUser.id).maybeSingle();
     if(readErr){ console.warn('active_timer 조회 실패:', readErr); return; }
     const ym = String(data?.ym || '');
-    if(!ym.startsWith('L:')) return;
+    if(!ym.startsWith('S:')) return;
     const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
     if(error) console.warn('서버 타이머 삭제 실패:', error);
     else activeTimerLastFingerprint = '';
@@ -4100,7 +4161,6 @@ function findPeriodForActiveTimer(row){
 
 async function applyActiveTimerRow(row){
   if(!row) return false;
-  if(!/^\d{4}-\d{2}$/.test(String(row.ym||''))) return false;
 
   let found = findPeriodForActiveTimer(row);
 
@@ -4116,7 +4176,8 @@ async function applyActiveTimerRow(row){
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
   if(!Number.isFinite(started)) return false;
 
-  // [FIX1] 서버 타이머 값을 시작/종료 일시에 함께 반영
+  const beforeApply = deepClone(found.p);
+  // [FIX1] 서버 타이머 값을 시작/기상 일시에 함께 반영
   const startDT = new Date(started);
   found.p.startDate = ymd(startDT);
   found.p.startTime = hm(startDT);
@@ -4135,11 +4196,13 @@ async function applyActiveTimerRow(row){
     }
   }
 
+  markChangedPeriodFields(found.p, beforeApply);
   // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
     // [FIX7] 입력 중이면 재렌더 미룸 (입력 필드 파괴 방지)
-    if(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing()){
+    if(typeof isPeriodInputEditing === 'function'
+       && (isPeriodInputEditing() || (typeof userActionCount === 'number' && userActionCount > 0))){
       periodRenderPending = true;
     }else{
       await renderCurrentView();
@@ -4241,7 +4304,7 @@ function collectBackupData(){
     if(/^\d{4}-\d{2}$/.test(ym)) months[ym]=monthCache[ym];
   });
   return {
-    app: 'lecture-log',
+    app: 'sleep-log',
     version: 1,
     exportedAt: new Date().toISOString(),
     settings: appSettings,
@@ -4249,13 +4312,13 @@ function collectBackupData(){
   };
 }
 
-/* [fix] 백업/복원 UI는 index가 소유. iframe 내부에는 요소가 없어
-   TypeError로 이후 초기화가 죽는 문제 방지. */
+/* [fix] 백업/복원 UI는 index가 소유. iframe 내 sleep.html에는 요소가 없어
+   TypeError로 이후 초기화(로그인/동기화)가 죽는 문제 방지. */
 (() => {
   const _b = document.getElementById('backupData');
   const _r = document.getElementById('restoreData');
   const _f = document.getElementById('restoreFile');
-  if (!_b || !_r || !_f) { console.info('[lecture] 백업/복원 UI 없음 — skip'); return; }
+  if (!_b || !_r || !_f) { console.info('[sleep] 백업/복원 UI 없음 — skip'); return; }
 
 $('#backupData').onclick = () => {
   const data = collectBackupData();
@@ -4263,7 +4326,7 @@ $('#backupData').onclick = () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `lecture-log-backup-${ymd(new Date())}.json`;
+  a.download = `sleep-log-backup-${ymd(new Date())}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4278,6 +4341,7 @@ $('#restoreFile').addEventListener('change', async (e) => {
   e.target.value = '';
 });
 })();
+
 renderDay();
 </script>
 
@@ -4294,8 +4358,8 @@ if ('serviceWorker' in navigator) {
 
 <script>
 (()=>{
- const KEY='lectureAlarm:device:v1', $=q=>document.querySelector(q);
- const LOCK_KEY='appAlarm:lock:v1', OWNER='lecture';
+ const KEY='sleepAlarm:device:v1', $=q=>document.querySelector(q);
+ const LOCK_KEY='appAlarm:lock:v1', OWNER='sleep';
  let ac=null,osc=null,gain=null,to=null,watch=null,ringing=false,file=null,fileAudio=null,vibe=null,autoStop=null;
  const pad=n=>String(n).padStart(2,'0');
  function get(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
@@ -4394,16 +4458,14 @@ if ('serviceWorker' in navigator) {
 
 
 
-
-
 <script id="lecture-after-end-labels">
 document.addEventListener('DOMContentLoaded',()=>{
   const rewrite=()=>{
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
     const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
     for(const n of nodes){
-      if(n.nodeValue.includes('낭비시간')) n.nodeValue=n.nodeValue.replaceAll('낭비시간','강의 종료 후 시간');
-      if(n.nodeValue.includes('낭비 시간')) n.nodeValue=n.nodeValue.replaceAll('낭비 시간','강의 종료 후 시간');
+      if(n.nodeValue.includes('낭비시간')) n.nodeValue=n.nodeValue.replaceAll('낭비시간','기상 후 경과시간');
+      if(n.nodeValue.includes('낭비 시간')) n.nodeValue=n.nodeValue.replaceAll('낭비 시간','기상 후 경과시간');
       if(n.nodeValue.includes('교시 선택')) n.nodeValue=n.nodeValue.replaceAll('교시 선택','강의 선택');
       if(n.nodeValue.includes('공부 선택')) n.nodeValue=n.nodeValue.replaceAll('공부 선택','강의 선택');
     }
@@ -4417,3 +4479,50 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
 </body>
 </html>
+
+<style id="sleep-summary-values-black-final">
+/* 합계 5개 값은 상태색 없이 모두 검정색으로 통일 */
+.summary-grid.sleep-summary-grid .summary-item b,
+.summary-grid.sleep-summary-grid .summary-item.ok b,
+.summary-grid.sleep-summary-grid .summary-item.warn b,
+#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumWaste{
+  color:#202A35!important;
+}
+</style>
+<style id="sleep-record-values-black-final">
+/* 수면 기록/기간별 기록의 강조 숫자는 모두 기본 검정색으로 통일 */
+.period-num,
+.stat b.study-color,
+.stat b.waste-color,
+.agg-nums b.study-color,
+.agg-nums b.waste-color{
+  color:var(--ink)!important;
+}
+</style>
+<style id="sleep-summary-primary-colors-final">
+/* 합계: 총 수면은 수면장 블루, 가장 긴 수면시간은 레드 계열 */
+#sumStudy{color:#456D96!important;}
+#sumLongest{color:#B5533C!important;}
+</style>
+<style id="sleep-record-duration-blue-final">
+/* 아래 수면 기록의 수면시간: 합계의 블루 계열보다 한 단계 진하게 */
+.stat b.study-color,
+.agg-nums b.study-color{
+  color:#355F8A!important;
+}
+</style>
+
+<style id="sleep-longest-duration-red-final">
+/* 주별·월별·연도별 가장 긴 수면시간 값은 합계와 같은 붉은 계열 */
+.agg-nums b.waste-color{
+  color:#B5533C!important;
+}
+</style>
+
+<style id="sleep-summary-value-size-14-final">
+/* 오늘 수면 합계 5개 값 글자 크기 */
+.summary-grid.sleep-summary-grid .summary-item b,
+#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumWaste{
+  font-size:14px!important;
+}
+</style>
