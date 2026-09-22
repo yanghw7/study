@@ -168,6 +168,12 @@ function openTab(which, skipSave){
     if(active && !item.frame.getAttribute('src') && item.frame.dataset.src){
       item.frame.src=item.frame.dataset.src;
     }
+    // [PAUSE] 안 보이는 iframe은 60초 폴링을 멈춘다. Realtime/메시지 핸들러는 유지.
+    try{
+      item.frame.contentWindow?.postMessage({
+        type: active ? 'journal-resume' : 'journal-pause'
+      }, location.origin);
+    }catch(e){}
   });
   if(!skipSave) saveLastTabToCloud(which);
 }
@@ -368,7 +374,7 @@ function initSharedSettingsUI(){
       const timer = setTimeout(() => {
         window.removeEventListener('message', onDone);
         resolve(false);
-      }, 8000);
+      }, 20000);
       function onDone(ev){
         if(ev.origin !== location.origin) return;
         if(ev.data?.type !== 'journal-delete-done') return;
@@ -401,7 +407,11 @@ function initSharedSettingsUI(){
 
     // [MOBILE-FIX] contentDocument 접근 대신 postMessage 사용
     // (Android WebView/PWA에서 iframe DOM 접근이 차단될 수 있음)
-    await waitChildReady(fr, 6000);
+    const ready = await waitChildReady(fr, 30000);
+    if(!ready){
+      console.warn(`[delete] ${kind} 프레임 준비 실패 — 스킵`);
+      return false;
+    }
 
     const win = fr.contentWindow;
     if(!win){ alert(`${JOURNAL_LABELS[kind]} 프레임을 찾지 못했습니다.`); return false; }
@@ -467,7 +477,9 @@ function initSharedSettingsUI(){
         }else{
           alert(`❌ 일부 기록 삭제 실패: ${failed.map(k => JOURNAL_LABELS[k]).join(', ')}\n다시 시도해주세요.`);
         }
-        location.reload();
+        del.dataset.busy = '0';
+        del.disabled = false;
+        del.textContent = originalText;
       })
       .catch((e) => {
         alert(`❌ 전체 삭제 중 오류: ${e?.message || e}`);
@@ -765,7 +777,11 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    sb = initSettingsClient();   // ★ 새로 만들지 않고 재사용
    return !!sb;
  }
- async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('sharedCloudStatus').textContent=$('sharedCloudStatus').textContent=user?'✅ '+user.email:'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;
+ async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
+// 서버 검증 추가: 실제 요청이 통과해야만 ✅
+let verified=false;
+if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
+$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;
 $('sharedCloudToggle').disabled=!!user;return user}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
