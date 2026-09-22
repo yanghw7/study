@@ -3889,7 +3889,7 @@ async function applyActiveTimerRow(row){
     await autoSyncFromCloud();
     found = findPeriodForActiveTimer(row);
   }
-  if(!found) return false;
+  if(!found){ console.warn('[orphan] 공부 타이머 정리'); try{ await cloudClearActiveTimerIfMine(); }catch(_){} if(window.parent !== window){ window.parent.postMessage({type:'exclusive-session-ended', kind:'study'}, location.origin); } return false; }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
