@@ -26,8 +26,8 @@ android {
         applicationId = "com.min.journal"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.15"
+        versionCode = 18
+        versionName = "1.18"
     }
 
     buildTypes {

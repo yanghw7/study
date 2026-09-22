@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
         // system UI, but the WebView itself is physically laid out only inside Android's
         // runtime safe area. No fixed dp/px and no HTML padding are used.
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        pendingAuthUri = intent?.data?.takeIf { it.scheme == "diary" && it.host == "login" }
+        pendingAuthUri = intent?.data?.takeIf { isAuthCallback(it) }
 
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.WHITE)
@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         web.webViewClient = object: WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
-                if (uri.scheme == "diary" && uri.host == "login") {
+                if (isAuthCallback(uri)) {
                     deliverAuthCallback(uri)
                     return true
                 }
@@ -79,7 +79,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         web.addJavascriptInterface(NativeAlarmBridge(this), "NativeAlarm")
-        web.addJavascriptInterface(NativeAuthBridge(this) { notifyOpenUrlFailed() }, "NativeAuth")
+        val authBridge = NativeAuthBridge(this) { notifyOpenUrlFailed() }
+        web.addJavascriptInterface(authBridge, "NativeAuth")
+        web.addJavascriptInterface(authBridge, "AndroidAuth")
         web.addJavascriptInterface(NativeUiBridge(this), "NativeUi")
         web.loadUrl("file:///android_asset/index.html")
         requestPowerfulRelevantPermissions()
@@ -89,8 +91,11 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.data?.takeIf { it.scheme == "diary" && it.host == "login" }?.let { deliverAuthCallback(it) }
+        intent.data?.takeIf { isAuthCallback(it) }?.let { deliverAuthCallback(it) }
     }
+
+    private fun isAuthCallback(uri: Uri): Boolean =
+        uri.scheme == "diary" && uri.host == "login"
 
     private fun deliverAuthCallback(uri: Uri) {
         // IMPORTANT: Supabase PKCE stores the code verifier in the WebView/frame that
@@ -172,6 +177,8 @@ class MainActivity : AppCompatActivity() {
 }
 
 class NativeAuthBridge(private val activity: Activity, private val onOpenFailed: () -> Unit) {
+    @JavascriptInterface fun openOAuth(url: String): Boolean = openUrl(url)
+
     @JavascriptInterface fun openUrl(url: String): Boolean {
         val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
         if (uri.scheme != "https" && uri.scheme != "http") return false

@@ -1564,7 +1564,7 @@ async function getRunningPeriodForBoundary(){
         .eq('user_id', cloudUser.id)
         .maybeSingle();
 
-      if(!error && data?.status === 'running'){
+      if(!error && data?.status === 'running' && String(data.ym || '').startsWith('S:')){
         const ym = String(data.ym || '');
         const dk = String(data.day_key || '');
 
@@ -1805,6 +1805,24 @@ window.addEventListener('pageshow', ()=>{
 let activeTimerPollId = null;
 let clockCalibrateId = null;
 let rolloverCheckId = null;
+
+// [PAUSE] 부모(공부장 홈)가 안 보이는 iframe의 폴링을 멈춘다.
+// Realtime 구독과 메시지 핸들러(exclusive-session, journal-delete)는 그대로 유지된다.
+let __journalPaused = false;
+window.addEventListener('message', (ev)=>{
+  if(ev.origin!==location.origin) return;
+  if(ev.data?.type === 'journal-pause'){
+    __journalPaused = true;
+  } else if(ev.data?.type === 'journal-resume'){
+    const wasPaused = __journalPaused;
+    __journalPaused = false;
+    if(wasPaused && cloudUser){
+      // 탭 전환 순간 즉시 최신화
+      void syncActiveTimerFromCloud(true);
+      void autoSyncFromCloud();
+    }
+  }
+});
 
 function startBackgroundSensitiveLoops(){
   // hidden 상태에서는 시작하지 않는다.
@@ -2530,7 +2548,7 @@ $('#periodList').addEventListener('input', async (e) => {
         if(k==='startPage'){
           p.timerEndedAt = null;
           if(cloudUser){
-            const row = null; void cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+            const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
             const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
             p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
             void calibrateServerClock(true);
@@ -2627,7 +2645,7 @@ async function locateRunningPeriod(){
   if(cloudUser && sbClient){
     try{
       const {data,error} = await sbClient.from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
-      if(!error && data?.status==='running'){
+      if(!error && data?.status==='running' && String(data.ym||'').startsWith('S:')){
         const ym=String(data.ym||''), dk=String(data.day_key||'');
         await loadMonth(ym);
         const day=monthCache[ym]?.[dk];
@@ -2698,7 +2716,7 @@ async function requestExclusiveSessionStart(atMs){
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='sleep')return;
-  window.parent.postMessage({type:'exclusive-session-stopped',kind:'sleep',req:ev.data.req,ok:true,stopped:true},location.origin);
+  
   let stopped=false;
   try{
     // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
@@ -2848,7 +2866,7 @@ $('#periodList').addEventListener('click', async (e) => {
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
       try{
-        const row = null; void cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
         const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
         if(Number.isFinite(ts) && ts > 0){
           if(!refetch()) return;
@@ -2951,7 +2969,7 @@ $('#periodList').addEventListener('focusout', (e) => {
     if(userActionCount > 0) return;
     periodRenderPending = false;
     await renderCurrentView();
-  }, 80);
+  }, 250);
 });
 
 // 수면 시작에서 엔터를 누르면 끝 수면 횟수로 포커스 이동
@@ -3610,6 +3628,11 @@ $('#settingsCancel').onclick = closeSettings;
 $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#settingsOverlay')) closeSettings(); });
 
 async function deleteAllStudyRecords(){
+  if(!cloudUser){
+    alert('클라우드 로그인 상태를 확인하지 못해 삭제를 중단했어요.\n잠시 후 다시 시도해주세요.');
+    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep'}, location.origin);
+    return;
+  }
   if(!window.__skipDeleteConfirm){
     if(!(await askConfirm('정말 모든 수면 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.', true))) return;
   }
@@ -3737,7 +3760,7 @@ async function cloudSaveMonth(ym){
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
-    if(false && row?.deleted_at){
+    if(row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
@@ -3805,23 +3828,17 @@ async function autoSyncFromCloud(lockOwned=false){
     fullCloudSyncRunning = true;
   }
   try{
-const {data,error} = await sbClient.from('study_months').select('ym,data,deleted_at').eq('user_id',cloudUser.id).order('ym');
+const {data,error} = await sbClient.from('study_months').select('ym,data,deleted_at').eq('user_id',cloudUser.id).like('ym','S:%').order('ym');
   if(error){
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
   const sleepRows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:'));
-  // [SYNC-FIX] 서버에 없는 월은 로컬 캐시에서 제거 (S: 접두사)
-  const serverYms = new Set(sleepRows.map(r=>String(r.ym||'')));
-  Object.keys(monthCache).forEach(localYm => {
-    if(/^\d{4}-\d{2}$/.test(localYm) && !serverYms.has('S:'+localYm)){
-      delete monthCache[localYm];
-    }
-  });
+
   for(const row of sleepRows){
     const ym=sleepLocalYm(row.ym);
     if(!ym) continue;
-    if(false && row.deleted_at){
+    if(row.deleted_at){
       delete monthCache[ym];
       continue;
     }
@@ -3888,7 +3905,7 @@ $('#cloudGoogle').onclick = async () => {
   }
 
   // Android APK: 외부 브라우저 Google OAuth -> diary://login -> WebView 세션 교환
-  if(window.NativeAuth && typeof window.NativeAuth.openUrl === 'function'){
+  if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
     const {data,error} = await sbClient.auth.signInWithOAuth({
       provider:'google',
       options:{
@@ -3898,10 +3915,8 @@ $('#cloudGoogle').onclick = async () => {
     });
     if(error){ alert('Google 로그인 실패: ' + error.message); return; }
     if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
-    // OAuth PKCE verifier는 이 프레임의 Supabase client가 만들었으므로
-    // Android callback도 반드시 이 프레임에서 교환한다.
     try{ window.top.__androidOAuthSource = 'sleep.html'; }catch(_e){}
-    (()=>{const opened=window.NativeAuth.openUrl(data.url);if(opened===false)alert('Google 로그인 화면을 열지 못했습니다.');})();
+    window.AndroidAuth.openOAuth(data.url);
     return;
   }
 
@@ -4250,23 +4265,58 @@ async function syncActiveTimerFromCloud(force=false){
   }
 }
 
+// [7단계] Realtime payload를 직접 monthCache에 병합 (전체 재조회 제거)
+let __rtRenderTimer = null;
+function __scheduleRtRender(){
+  if(__rtRenderTimer) return;
+  __rtRenderTimer = setTimeout(async ()=>{
+    __rtRenderTimer = null;
+    if(isPeriodInputEditing() || userActionCount > 0){
+      periodRenderPending = true;
+      return;
+    }
+    await renderCurrentView();
+  }, 250);
+}
+function applyRealtimeMonthRow(payload){
+  try{
+    const row = payload?.new;
+    if(!row){ autoSyncFromCloud(); return; }
+    const ymRaw = String(row.ym || '');
+    if(!ymRaw.startsWith('S:')) return;
+    const ym = ymRaw.slice(2);
+    if(!/^\d{4}-\d{2}$/.test(ym)) return;
+    if(row.deleted_at){ delete monthCache[ym]; __scheduleRtRender(); return; }
+    if(!row.data || typeof row.data !== 'object' || Array.isArray(row.data)){
+      autoSyncFromCloud(); return;
+    }
+    const remote = ensureMonthSync(deepClone(row.data || {}), ym);
+    const existing = monthCache[ym];
+    monthCache[ym] = existing ? mergeMonths(existing, remote, ym) : remote;
+    __scheduleRtRender();
+  }catch(e){
+    console.warn('[7단계] Realtime 병합 실패, 폴백:', e);
+    autoSyncFromCloud();
+  }
+}
 // Realtime이 활성화된 프로젝트에서는 즉시 반영.
 // 비활성 상태여도 2초 polling이 항상 동작한다.
 function startActiveTimerRealtime(){
   if(!sbClient || !cloudUser || activeTimerRealtimeChannel) return;
   try{
     activeTimerRealtimeChannel = sbClient
-      .channel(`gongbujang-active-${cloudUser.id}`)
+      .channel(`gongbujang-active-sleep-${cloudUser.id}`)
       .on(
         'postgres_changes',
         {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${cloudUser.id}`},
         ()=>syncActiveTimerFromCloud(true)
       )
       // [RT] study_months 변경도 서버가 즉시 밀어준다
+      // [7단계] payload의 new.data를 monthCache에 직접 병합
       .on(
         'postgres_changes',
         {event:'*',schema:'public',table:'study_months',filter:`user_id=eq.${cloudUser.id}`},
-        ()=>{ autoSyncFromCloud(); }
+        (payload)=>applyRealtimeMonthRow(payload)
       )
       .subscribe();
   }catch(e){
