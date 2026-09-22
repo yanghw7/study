@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
         // system UI, but the WebView itself is physically laid out only inside Android's
         // runtime safe area. No fixed dp/px and no HTML padding are used.
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        pendingAuthUri = intent?.data?.takeIf { isAuthCallback(it) }
+        pendingAuthUri = intent?.data?.takeIf { it.scheme == "yangstudy" && it.host == "auth" && it.path == "/callback" }
 
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.WHITE)
@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         web.webViewClient = object: WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
-                if (isAuthCallback(uri)) {
+                if (uri.scheme == "yangstudy" && uri.host == "auth" && uri.path == "/callback") {
                     deliverAuthCallback(uri)
                     return true
                 }
@@ -79,9 +79,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         web.addJavascriptInterface(NativeAlarmBridge(this), "NativeAlarm")
-        val authBridge = NativeAuthBridge(this) { notifyOpenUrlFailed() }
-        web.addJavascriptInterface(authBridge, "NativeAuth")
-        web.addJavascriptInterface(authBridge, "AndroidAuth")
+        web.addJavascriptInterface(AndroidAuthBridge(this) { notifyOpenUrlFailed() }, "AndroidAuth")
         web.addJavascriptInterface(NativeUiBridge(this), "NativeUi")
         web.loadUrl("file:///android_asset/index.html")
         requestPowerfulRelevantPermissions()
@@ -91,11 +89,8 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.data?.takeIf { isAuthCallback(it) }?.let { deliverAuthCallback(it) }
+        intent.data?.takeIf { it.scheme == "yangstudy" && it.host == "auth" && it.path == "/callback" }?.let { deliverAuthCallback(it) }
     }
-
-    private fun isAuthCallback(uri: Uri): Boolean =
-        uri.scheme == "diary" && uri.host == "login"
 
     private fun deliverAuthCallback(uri: Uri) {
         // IMPORTANT: Supabase PKCE stores the code verifier in the WebView/frame that
@@ -108,14 +103,9 @@ class MainActivity : AppCompatActivity() {
           const callbackUrl=$callbackUrl;
           const source=window.__androidOAuthSource||'index.html';
           if(source==='index.html'){
-            const u=new URL(callbackUrl), q=u.searchParams;
-            const h=new URLSearchParams((u.hash||'').replace(/^#/,''));
-            window.dispatchEvent(new CustomEvent('android-auth-callback',{detail:{
-              access_token:q.get('access_token')||h.get('access_token')||'',
-              refresh_token:q.get('refresh_token')||h.get('refresh_token')||'',
-              code:q.get('code')||h.get('code')||'',
-              error:q.get('error_description')||q.get('error')||h.get('error_description')||h.get('error')||''
-            }}));
+            if(typeof window.yangStudyHandleOAuthCallback==='function'){
+              window.yangStudyHandleOAuthCallback(callbackUrl);
+            }
             return;
           }
           const frames=[...document.querySelectorAll('iframe')];
@@ -142,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         web.post { web.evaluateJavascript(js, null) }
     }
 
-    // Called when NativeAuth.openUrl could not open any browser at all (Custom
+    // Called when AndroidAuth.openOAuth could not open any browser at all (Custom
     // Tabs AND the plain ACTION_VIEW fallback both failed). This always targets the
     // top page, regardless of which tab/frame the Google button was pressed from,
     // so the failure is never silently swallowed - the user always sees an alert.
@@ -176,10 +166,8 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java") override fun onBackPressed(){if(web.canGoBack())web.goBack() else super.onBackPressed()}
 }
 
-class NativeAuthBridge(private val activity: Activity, private val onOpenFailed: () -> Unit) {
-    @JavascriptInterface fun openOAuth(url: String): Boolean = openUrl(url)
-
-    @JavascriptInterface fun openUrl(url: String): Boolean {
+class AndroidAuthBridge(private val activity: Activity, private val onOpenFailed: () -> Unit) {
+    @JavascriptInterface fun openOAuth(url: String): Boolean {
         val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
         if (uri.scheme != "https" && uri.scheme != "http") return false
         Handler(Looper.getMainLooper()).post {
@@ -188,7 +176,7 @@ class NativeAuthBridge(private val activity: Activity, private val onOpenFailed:
                 CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(activity, uri)
                 true
             }.getOrElse { e ->
-                Log.w("NativeAuthBridge", "Custom Tabs launch failed", e)
+                Log.w("AndroidAuthBridge", "Custom Tabs launch failed", e)
                 false
             }
             val opened = customTabsOk || runCatching {
@@ -198,7 +186,7 @@ class NativeAuthBridge(private val activity: Activity, private val onOpenFailed:
                 })
                 true
             }.getOrElse { e ->
-                Log.w("NativeAuthBridge", "ACTION_VIEW browser launch failed", e)
+                Log.w("AndroidAuthBridge", "ACTION_VIEW browser launch failed", e)
                 false
             }
             if (!opened) {

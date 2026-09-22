@@ -790,8 +790,33 @@ $('sharedCloudToggle').disabled=!!user;return user}
   $('sharedCloudToggle').onclick=()=> $('sharedCloudSetup').classList.toggle('show');
   $('sharedCloudSignup').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const e=$('sharedCloudEmail').value.trim(),p=$('sharedCloudPassword').value;if(!e||p.length<6)return alert('이메일과 6자 이상 비밀번호를 확인해 주세요.');const {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert('회원가입 실패: '+error.message);await status();alert('회원가입 요청이 완료됐어요.')};
   $('sharedCloudLogin').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const {error}=await sb.auth.signInWithPassword({email:$('sharedCloudEmail').value.trim(),password:$('sharedCloudPassword').value});if(error)return alert('로그인 실패: '+error.message);await status();$('sharedCloudSetup').classList.remove('show')};
-  $('sharedCloudGoogle').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const isAndroid=!!(window.AndroidAuth&&typeof window.AndroidAuth.openOAuth==='function');const redirectTo=isAndroid?'diary://login':location.origin+location.pathname;const {data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,skipBrowserRedirect:isAndroid}});if(error)return alert('Google 로그인 실패: '+error.message);if(isAndroid&&data?.url){window.__androidOAuthSource='index.html';window.AndroidAuth.openOAuth(data.url)}};
-  window.addEventListener('android-auth-callback',async e=>{try{if(!init())throw new Error('클라우드 연결 실패');const d=e.detail||{};if(d.error)throw new Error(d.error);if(!d.code)throw new Error('Google 로그인 인증 코드가 없습니다.');const {error}=await sb.auth.exchangeCodeForSession(d.code);if(error)throw error;await status();$('sharedCloudSetup').classList.remove('show')}catch(err){alert('Google 로그인 실패: '+(err?.message||err))}});
+  $('sharedCloudGoogle').onclick=async()=>{
+  if(!init()) return alert('클라우드 연결 실패');
+
+  // Android APK 브리지
+  if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
+    const {data,error} = await sb.auth.signInWithOAuth({
+      provider:'google',
+      options:{
+        redirectTo:'yangstudy://auth/callback',
+        skipBrowserRedirect:true
+      }
+    });
+    if(error){ alert('Google 로그인 실패: '+error.message); return; }
+    if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    try{ window.top.__androidOAuthSource = 'index.html'; }catch(_e){}
+    window.AndroidAuth.openOAuth(data.url);
+    return;
+  }
+
+  // 일반 PWA / 브라우저
+  const redirectTo = location.origin + location.pathname;
+  const {error} = await sb.auth.signInWithOAuth({
+    provider:'google',
+    options:{redirectTo}
+  });
+  if(error) alert('Google 로그인 실패: '+error.message);
+};
   $('sharedCloudLogout').onclick=async()=>{if(init())await sb.auth.signOut();await status()};
   $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
   if(init()){
@@ -801,6 +826,30 @@ $('sharedCloudToggle').disabled=!!user;return user}
     });
   }
   await status();
+
+  // ★ Android 커스텀 스킴 콜백 처리
+  window.yangStudyHandleOAuthCallback = async function(callbackUrl){
+    try{
+      if(!init()) throw new Error('Supabase 연결 실패');
+      const u = new URL(callbackUrl);
+      const oauthError = u.searchParams.get('error_description') || u.searchParams.get('error');
+      if(oauthError) throw new Error(oauthError);
+
+      const code = u.searchParams.get('code');
+      if(!code) throw new Error('Google 로그인 인증 코드가 없습니다.');
+
+      const {data,error} = await sb.auth.exchangeCodeForSession(code);
+      if(error) throw error;
+
+      await status();
+      alert('Google 로그인이 완료됐어요');
+      return true;
+    }catch(e){
+      console.error('Google OAuth callback 실패:', e);
+      alert('Google 로그인 완료 처리 실패: ' + (e?.message || e));
+      return false;
+    }
+  };
  });
 })();
 </script>

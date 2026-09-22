@@ -41,7 +41,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="diary" android:host="login"/>
+                <data android:scheme="yangstudy" android:host="auth" android:path="/callback"/>
             </intent-filter>
         </activity>
         <receiver android:name=".AlarmReceiver" android:exported="false"/>
