@@ -3591,7 +3591,7 @@ $('#cloudGoogle').onclick = async () => {
     // OAuth PKCE verifier는 이 프레임의 Supabase client가 만들었으므로
     // Android callback도 반드시 이 프레임에서 교환한다.
     try{ window.top.__androidOAuthSource = 'study.html'; }catch(_e){}
-    window.NativeAuth.openUrl(data.url);
+    (()=>{const opened=window.NativeAuth.openUrl(data.url);if(opened===false)alert('Google 로그인 화면을 열지 못했습니다.');})();
     return;
   }
 

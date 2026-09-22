@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.browser.customtabs.CustomTabsIntent
 
 class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
@@ -157,8 +158,29 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java") override fun onBackPressed(){if(web.canGoBack())web.goBack() else super.onBackPressed()}
 }
 
-class NativeAuthBridge(private val context: Context) {
-    @JavascriptInterface fun openUrl(url: String) { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }
+class NativeAuthBridge(private val activity: Activity) {
+    @JavascriptInterface fun openUrl(url: String): Boolean {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+        if (uri.scheme != "https" && uri.scheme != "http") return false
+        Handler(Looper.getMainLooper()).post {
+            val opened = runCatching {
+                // Google OAuth must run in a real browser, never inside the WebView.
+                CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(activity, uri)
+                true
+            }.getOrElse {
+                runCatching {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                        addCategory(Intent.CATEGORY_BROWSABLE)
+                    })
+                    true
+                }.getOrDefault(false)
+            }
+            if (!opened) {
+                android.widget.Toast.makeText(activity, "Google 로그인 화면을 열지 못했습니다.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+        return true
+    }
 }
 class NativeAlarmBridge(private val context: Context) {
     @JavascriptInterface fun scheduleAfterMinutes(minutes:Int)=AlarmScheduler.schedule(context,System.currentTimeMillis()+minutes.coerceAtLeast(1)*60_000L)

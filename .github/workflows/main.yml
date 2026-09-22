@@ -6,6 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Seoul
 
     steps:
       - name: Checkout
@@ -22,13 +24,17 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
+      - name: Build signed release APK
         working-directory: apk
-        run: gradle assembleDebug
+        run: gradle :app:assembleRelease --no-daemon
+
+      - name: Set APK timestamp to KST build time
+        working-directory: apk
+        run: touch app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Study-APK
-          path: apk/app/build/outputs/apk/debug/app-debug.apk
+          path: apk/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
