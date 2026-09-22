@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.*
 import android.provider.Settings
+import android.util.Log
 import android.webkit.*
 import android.graphics.Color
 import android.widget.FrameLayout
@@ -78,7 +79,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         web.addJavascriptInterface(NativeAlarmBridge(this), "NativeAlarm")
-        web.addJavascriptInterface(NativeAuthBridge(this), "NativeAuth")
+        web.addJavascriptInterface(NativeAuthBridge(this) { notifyOpenUrlFailed() }, "NativeAuth")
         web.addJavascriptInterface(NativeUiBridge(this), "NativeUi")
         web.loadUrl("file:///android_asset/index.html")
         requestPowerfulRelevantPermissions()
@@ -136,6 +137,18 @@ class MainActivity : AppCompatActivity() {
         web.post { web.evaluateJavascript(js, null) }
     }
 
+    // Called when NativeAuth.openUrl could not open any browser at all (Custom
+    // Tabs AND the plain ACTION_VIEW fallback both failed). This always targets the
+    // top page, regardless of which tab/frame the Google button was pressed from,
+    // so the failure is never silently swallowed - the user always sees an alert.
+    private fun notifyOpenUrlFailed() {
+        web.post {
+            web.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('android-auth-open-failed'));", null
+            )
+        }
+    }
+
     private fun injectNativeAlarmBridge() {
         val js = """
         (()=>{if(window.__nativeAlarmHooked)return;window.__nativeAlarmHooked=true;
@@ -158,25 +171,32 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java") override fun onBackPressed(){if(web.canGoBack())web.goBack() else super.onBackPressed()}
 }
 
-class NativeAuthBridge(private val activity: Activity) {
+class NativeAuthBridge(private val activity: Activity, private val onOpenFailed: () -> Unit) {
     @JavascriptInterface fun openUrl(url: String): Boolean {
         val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
         if (uri.scheme != "https" && uri.scheme != "http") return false
         Handler(Looper.getMainLooper()).post {
-            val opened = runCatching {
+            val customTabsOk = runCatching {
                 // Google OAuth must run in a real browser, never inside the WebView.
                 CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(activity, uri)
                 true
-            }.getOrElse {
-                runCatching {
-                    activity.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
-                        addCategory(Intent.CATEGORY_BROWSABLE)
-                    })
-                    true
-                }.getOrDefault(false)
+            }.getOrElse { e ->
+                Log.w("NativeAuthBridge", "Custom Tabs launch failed", e)
+                false
+            }
+            val opened = customTabsOk || runCatching {
+                activity.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+                true
+            }.getOrElse { e ->
+                Log.w("NativeAuthBridge", "ACTION_VIEW browser launch failed", e)
+                false
             }
             if (!opened) {
                 android.widget.Toast.makeText(activity, "Google 로그인 화면을 열지 못했습니다.", android.widget.Toast.LENGTH_LONG).show()
+                onOpenFailed()
             }
         }
         return true
