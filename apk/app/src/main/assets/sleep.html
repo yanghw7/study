@@ -3915,6 +3915,7 @@ $('#cloudGoogle').onclick = async () => {
     });
     if(error){ alert('Google 로그인 실패: ' + error.message); return; }
     if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    try{ window.top.__androidOAuthSource = 'sleep.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
   }
