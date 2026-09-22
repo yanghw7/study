@@ -1262,7 +1262,7 @@ async function persistToday(){
   clearTimeout(saveTimers[ym]);
   return new Promise(resolve => {
     saveTimers[ym] = setTimeout(async () => {
-      await saveMonth(ym);
+      void saveMonth(ym);
       resolve();
     }, 400);
   });
@@ -1649,7 +1649,7 @@ async function splitRunningPeriodAtBoundary(running){
   oldP.timerEndedAt = boundaryMs;
 
   markChangedPeriodFields(oldP, beforeOld);
-  await saveMonth(running.ym);
+  void saveMonth(running.ym);
 
   // B. 다음 수면일 1강의 생성/복구
   const next = nextStudyDayKey(running.ym, running.dk);
@@ -2759,7 +2759,7 @@ window.addEventListener('message',async ev=>{
     if(cloudUser) void cloudResumeActiveTimer(ym, dk, p, idx);
     markChangedPeriodFields(p, before);
     autoSortPeriodsByStart(day);
-    await saveMonth(ym);
+    void saveMonth(ym);
     if(ym===ymKey(cur) && dk===dKey(cur)){
       renderPeriods();updateStudyTimer();updateWasteTimer();
     }
@@ -3958,7 +3958,7 @@ async function runManualCloudSync(fromSwipe=false){
   fullCloudSyncRunning = true;
   if(btn){ btn.disabled = true; btn.textContent = '↻ 동기화 중…'; }
   try{
-    await saveMonth(ymKey(cur));
+    void saveMonth(ymKey(cur));
     await refreshCloudStatus();
     if(!cloudUser){
       if(!fromSwipe) showToast('현재 기록 저장 완료 · 클라우드 로그인 필요');
