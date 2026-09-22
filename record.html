@@ -4123,7 +4123,8 @@ initSupabase();
 
 // 로그인 세션을 계속 유지하고, 세션이 복원/갱신될 때 자동으로 상태와 데이터를 맞춘다.
 if(sbClient){
-  sbClient.auth.onAuthStateChange(async (event, session) => {
+  sbClient.auth.onAuthStateChange((event, session) => {
+    setTimeout(async () => {
     cloudUser = session?.user || null;
     const status = $('#cloudStatus');
     if(status){
@@ -4153,6 +4154,7 @@ if(sbClient){
     } else if(!cloudUser){
       stopActiveTimerRealtime();
     }
+    }, 0);
   });
 }
 
