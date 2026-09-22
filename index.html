@@ -60,6 +60,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 <link rel="apple-touch-icon" href="./icon-192.png">
 <style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script></head>
 <body><button id="pwaInstallBtn" type="button">앱 설치</button>
+
 <div class="shell" id="shell">
   <div class="tabs">
     <button id="studyTab" class="active study">📚 공부 기록장</button>
@@ -126,6 +127,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
       <button id="sharedCloudUpload" type="button">전체 저장</button>
       <button id="sharedCloudDownload" type="button">전체 불러오기</button>
       <button id="sharedCloudLogout" class="cloudlogout" type="button">로그아웃</button>
+      
     </div>
     <div class="cloudsetup" id="sharedCloudSetup">
       <input id="sharedCloudEmail" type="email" placeholder="이메일">
@@ -763,7 +765,8 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    sb = initSettingsClient();   // ★ 새로 만들지 않고 재사용
    return !!sb;
  }
- async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('sharedCloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';return user}
+ async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('sharedCloudStatus').textContent=$('sharedCloudStatus').textContent=user?'✅ '+user.email:'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;
+$('sharedCloudToggle').disabled=!!user;return user}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
  async function all(action){if(!await status()){alert('먼저 홈에서 클라우드에 로그인해 주세요.');$('sharedCloudSetup').classList.add('show');return}const map=action==='upload'?{study:['cloudUpload'],lecture:['cloudUpload'],sleep:['cloudUpload'],record:['cloudUpload']}:{study:['cloudDownload'],lecture:['cloudDownload'],sleep:['cloudDownload'],record:['cloudDownload']};for(const kind of ['study','lecture','sleep','record']){try{await clickChild(kind,map[kind]);await new Promise(r=>setTimeout(r,180))}catch(e){console.error(kind,action,e)}}}
@@ -886,5 +889,6 @@ function initSharedBackupUI(){
 }
 initSharedBackupUI();
 </script>
+
 </body>
 </html>
