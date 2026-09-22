@@ -3681,11 +3681,11 @@ async function cloudSaveMonth(ym){
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
-    if(false && row?.deleted_at){
+    if(row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
-        console.warn('삭제 마커 무시하고 되살림');
+        throw new Error('이 달의 기록이 다른 기기에서 삭제되었습니다.');
       }
       const nowIso2 = new Date(serverNowMs()).toISOString();
       let q2 = sbClient.from('study_months').update({data:local, deleted_at:null, updated_at:nowIso2})
@@ -3763,7 +3763,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
   for(const row of lectureRows){
     const ym=lectureLocalYm(row.ym);
     if(!ym) continue;
-    if(false && row.deleted_at){
+    if(row.deleted_at){
       delete monthCache[ym];
       continue;
     }
@@ -3934,8 +3934,7 @@ initSupabase();
 
 // 로그인 세션을 계속 유지하고, 세션이 복원/갱신될 때 자동으로 상태와 데이터를 맞춘다.
 if(sbClient){
-  sbClient.auth.onAuthStateChange((event, session) => {
-    setTimeout(async () => {
+  sbClient.auth.onAuthStateChange(async (event, session) => {
     cloudUser = session?.user || null;
     const status = $('#cloudStatus');
     if(status){
@@ -3965,7 +3964,6 @@ if(sbClient){
     } else if(!cloudUser){
       stopActiveTimerRealtime();
     }
-    }, 0);
   });
 }
 
