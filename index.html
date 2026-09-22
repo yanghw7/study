@@ -455,7 +455,7 @@ function initSharedSettingsUI(){
     del.textContent = '삭제 중…';
     del.disabled = true;
 
-    (async()=>{try{const sb=initSettingsClient();if(!sb)throw new Error('클라우드 연결 실패');const {data:{session}}=await sb.auth.getSession();if(!session?.user)throw new Error('로그인 필요');const uid=session.user.id;const marker=new Date().toISOString();const {error:updErr}=await sb.from('study_months').update({data:{},deleted_at:marker,updated_at:marker}).eq('user_id',uid);if(updErr)throw updErr;await sb.from('active_timer').delete().eq('user_id',uid);alert('✅ 전체 삭제 완료');location.reload();}catch(e){alert('❌ 실패: '+(e?.message||e));del.dataset.busy='0';del.disabled=false;del.textContent='데이터 전체 삭제';}})();
+    Promise.allSettled(['study','lecture','sleep','record'].map(k => deleteOneJournal(k)))
       .then((results) => {
         const failed = results
           .map((r, i) => (r.status === 'fulfilled' && r.value === true) ? null : ['study','lecture','sleep','record'][i])
