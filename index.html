@@ -781,7 +781,7 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 // 서버 검증 추가: 실제 요청이 통과해야만 ✅
 let verified=false;
 if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
-$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;
+$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
 $('sharedCloudToggle').disabled=!!user;return user}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
@@ -799,11 +799,13 @@ $('sharedCloudToggle').disabled=!!user;return user}
       provider:'google',
       options:{
         redirectTo:'yangstudy://auth/callback',
-        skipBrowserRedirect:true
+        skipBrowserRedirect:true,
+        queryParams:{ prompt:'select_account' }
       }
     });
     if(error){ alert('Google 로그인 실패: '+error.message); return; }
     if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    try{ window.top.__androidOAuthSource = 'index.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
   }
@@ -812,7 +814,7 @@ $('sharedCloudToggle').disabled=!!user;return user}
   const redirectTo = location.origin + location.pathname;
   const {error} = await sb.auth.signInWithOAuth({
     provider:'google',
-    options:{redirectTo}
+    options:{redirectTo, queryParams:{ prompt:'select_account' }}
   });
   if(error) alert('Google 로그인 실패: '+error.message);
 };
@@ -835,10 +837,17 @@ $('sharedCloudToggle').disabled=!!user;return user}
       if(oauthError) throw new Error(oauthError);
 
       const code = u.searchParams.get('code');
-      if(!code) throw new Error('Google 로그인 인증 코드가 없습니다.');
-
-      const {data,error} = await sb.auth.exchangeCodeForSession(code);
-      if(error) throw error;
+      if(code){
+        const {data,error} = await sb.auth.exchangeCodeForSession(code);
+        if(error) throw error;
+      } else {
+        const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
+        const access_token = frag.get('access_token');
+        const refresh_token = frag.get('refresh_token');
+        if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
+        const {data,error} = await sb.auth.setSession({access_token, refresh_token});
+        if(error) throw error;
+      }
 
       await status();
       alert('Google 로그인이 완료됐어요');
