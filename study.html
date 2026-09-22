@@ -2382,7 +2382,7 @@ window.addEventListener('message',async ev=>{
       if(cloudUser){
         void cloudStopActiveTimer(ym, dk, p._id).then(row=>{
           const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-          if(Number.isFinite(ts)){ p.timerEndedAt=ts; p._updatedAt=syncNow(); await saveMonth(ym); }
+          if(Number.isFinite(ts)){ p.timerEndedAt=ts; p._updatedAt=syncNow(); void saveMonth(ym); }
         }).catch(()=>{});
       }
       markChangedPeriodFields(p, before);
@@ -2395,7 +2395,7 @@ window.addEventListener('message',async ev=>{
           renderPeriods();updateStudyTimer();updateWasteTimer();
         }
       }
-      await saveMonth(ym);
+      void saveMonth(ym);
       try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(e){console.log('렌더에러:',e);}
       stopped=true;
     }
@@ -3514,7 +3514,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
   });
   for(const row of studyRows){
     const ym=row.ym;
-    if(row.deleted_at){
+    if(false && row.deleted_at){
       delete monthCache[ym];
       continue;
     }

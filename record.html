@@ -3875,7 +3875,7 @@ async function cloudSaveMonth(ym){
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
-    if(row?.deleted_at){
+    if(false && row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
@@ -3952,7 +3952,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
   for(const row of lectureRows){
     const ym=recordLocalYm(row.ym);
     if(!ym) continue;
-    if(row.deleted_at){
+    if(false && row.deleted_at){
       delete monthCache[ym];
       continue;
     }

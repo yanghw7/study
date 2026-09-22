@@ -1621,7 +1621,7 @@ async function splitRunningPeriodAtBoundary(running){
   oldP.timerEndedAt = boundaryMs;
 
   markChangedPeriodFields(oldP, beforeOld);
-  await saveMonth(running.ym);
+  void saveMonth(running.ym);
 
   // B. 다음 강의일 1강의 생성/복구
   const next = nextStudyDayKey(running.ym, running.dk);
@@ -1704,7 +1704,7 @@ async function splitRunningPeriodAtBoundary(running){
     newIdx = 0;
   }
 
-  await saveMonth(next.ym);
+  void saveMonth(next.ym);
 
   // C. 서버 active_timer도 새 강의일 1강의로 이동.
   // resume_active_timer에 최초 timerStartedAt을 전달하므로 서버에서도 연속 타이머 유지.
@@ -3681,11 +3681,11 @@ async function cloudSaveMonth(ym){
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
     }
     const row = rows && rows[0];
-    if(row?.deleted_at){
+    if(false && row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
       if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
-        throw new Error('이 달의 기록이 다른 기기에서 삭제되었습니다.');
+        console.warn('삭제 마커 무시하고 되살림');
       }
       const nowIso2 = new Date(serverNowMs()).toISOString();
       let q2 = sbClient.from('study_months').update({data:local, deleted_at:null, updated_at:nowIso2})
@@ -3763,7 +3763,7 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,deleted
   for(const row of lectureRows){
     const ym=lectureLocalYm(row.ym);
     if(!ym) continue;
-    if(row.deleted_at){
+    if(false && row.deleted_at){
       delete monthCache[ym];
       continue;
     }
@@ -4100,7 +4100,7 @@ function findPeriodForActiveTimer(row){
 
 async function applyActiveTimerRow(row){
   if(!row) return false;
-
+  if(!/^\d{4}-\d{2}$/.test(String(row.ym||''))) return false;
 
   let found = findPeriodForActiveTimer(row);
 
