@@ -9,7 +9,7 @@
 html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;background:#f5f7f6}
 .shell{height:100dvh;display:flex;flex-direction:column}
 .tabs{
-  flex:0 0 46px;height:46px;display:grid;grid-template-columns:1fr 1fr 1fr 38px;
+  flex:0 0 46px;height:46px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr 38px;
   gap:5px;padding:5px 8px;background:#f7f9f8;border-bottom:1px solid #dde5e1;
   position:sticky;top:0;z-index:999;
 }
@@ -17,6 +17,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .tabs button.active.study{background:#285f50;color:#fff}
 .tabs button.active.lecture{background:#67538b;color:#fff}
 .tabs button.active.sleep{background:#456d96;color:#fff}
+.tabs button.active.record{background:#B86F7D;color:#fff}
 .tabs button.recording::before{content:'';display:inline-block;width:10px;height:10px;margin-right:5px;border-radius:50%;background:#ff3b30;vertical-align:-1px;box-shadow:0 0 0 2px rgba(255,59,48,.12)}
 
 .frame{display:none;flex:1 1 auto;width:100%;min-height:0;border:0;background:#fff}
@@ -29,12 +30,15 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 .alarmline .unit{font-size:11px;font-weight:700;color:#6b7773;margin-left:-3px}
 .alarmline select{height:30px;width:92px;min-width:72px;max-width:92px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 5px;font-size:10.5px;font-weight:800;color:#34423d}
 .alarmline button{height:30px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 6px;font-size:10.5px;font-weight:800;white-space:nowrap;color:#34423d}
+#alarmStart{margin-left:auto}
+#alarmStart,#alarmCancel{width:54px;min-width:0;flex:0 1 54px;padding:0 5px}
+#alarmCancel{margin-right:0}
 .alarmline button.primary{background:#285f50;border-color:#285f50;color:#fff}
 .alarmline button.danger{display:none!important;background:#b42318;border-color:#b42318;color:#fff}
 .alarmline button.danger.show{display:inline-block!important}
 #alarmFileName{min-width:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#77827e}
 .alarmstatusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;min-height:30px}.alarmstatusline:has(#alarmStatus:empty){display:none}#alarmStatus{display:block;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}.alarmstatusline #alarmStop{display:none;height:27px;padding:0 8px;border:1px solid #b42318;border-radius:8px;background:#b42318;color:#fff;font-size:10.5px;font-weight:800;white-space:nowrap}.alarmstatusline #alarmStop.show{display:inline-block}
-@media(max-width:560px){.alarmbar{padding:5px 6px}.alarmline{gap:4px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{font-size:13px}}
+@media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{font-size:13px}}
 
 .cloudbar{flex:0 0 auto;margin:4px 8px 0;padding:4px 6px;border:1px solid #dbe4e0;border-radius:10px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font:700 10px Inter,system-ui,sans-serif;color:#34423d}.cloudline{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:nowrap}.cloudline strong{font-size:11px;white-space:nowrap}.cloudline button{height:27px;border:1px solid #dbe4e0;border-radius:7px;background:#fff;padding:0 6px;font:800 9px Inter,system-ui,sans-serif;white-space:nowrap;color:#34423d}.cloudline button.primary{background:#285f50;border-color:#285f50;color:#fff}.cloudline input{height:27px;min-width:90px;flex:1;border:1px solid #dbe4e0;border-radius:7px;padding:0 6px;font:700 10px Inter,system-ui,sans-serif}.cloudstatus{margin-left:0;font-size:9px;color:#60706a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.cloudsetup{display:none;margin-top:4px;gap:4px;align-items:center}.cloudsetup.show{display:flex}.cloudlogout{display:none!important}.cloudlogout.show{display:inline-block!important}@media(max-width:560px){.cloudbar{padding:4px 5px}.cloudline{gap:3px}.cloudline strong{font-size:10px}.cloudline button{padding:0 5px;font-size:8.5px}.cloudsetup{flex-wrap:wrap}.cloudsetup input{min-width:0;width:calc(50% - 2px);flex:auto}.cloudstatus{font-size:8.5px}}
 
@@ -54,13 +58,15 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
 <meta name="theme-color" content="#285f50">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script></head>
 <body><button id="pwaInstallBtn" type="button">앱 설치</button>
+
 <div class="shell" id="shell">
   <div class="tabs">
     <button id="studyTab" class="active study">📚 공부 기록장</button>
     <button id="lectureTab" class="lecture">🎓 강의 기록장</button>
     <button id="sleepTab" class="sleep">🌙 수면 기록장</button>
+    <button id="recordTab" class="record">📝 기타 기록장</button>
     <button id="sharedSettingsBtn" class="shared-settings-btn" type="button" aria-label="공통 설정" title="공통 설정">⚙</button>
   </div>
   <div id="sharedSettingsPanel" class="shared-settings-panel" aria-hidden="true">
@@ -72,7 +78,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
       <option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option>
     </select></label>
     <div class="shared-settings-note">선택한 요일부터 한 주가 시작되며 주간 통계에 공통 적용됩니다.</div>
-    <div class="shared-settings-note">공통 설정은 공부 · 강의 · 수면 기록장에 모두 적용됩니다.</div>
+    <div class="shared-settings-note">공통 설정은 공부 · 강의 · 수면 · 기타 기록장에 모두 적용됩니다.</div>
     <div class="shared-data-actions">
       <button id="sharedBackupBtn" class="shared-data-btn" type="button">데이터 백업</button>
       <button id="sharedRestoreBtn" class="shared-data-btn" type="button">데이터 복원</button>
@@ -94,9 +100,10 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
         <button id="sharedDeleteStudy" class="shared-delete-one" type="button">공부 기록장 데이터 전체 삭제</button>
         <button id="sharedDeleteLecture" class="shared-delete-one" type="button">강의 기록장 데이터 전체 삭제</button>
         <button id="sharedDeleteSleep" class="shared-delete-one" type="button">수면 기록장 데이터 전체 삭제</button>
+        <button id="sharedDeleteRecord" class="shared-delete-one" type="button">기타 기록장 데이터 전체 삭제</button>
       </div>
       <button id="sharedDeleteAll" class="shared-delete-all" type="button">데이터 전체 삭제</button>
-      <div class="shared-settings-note">공부 · 강의 · 수면 기록장의 데이터를 모두 삭제합니다.</div>
+      <div class="shared-settings-note">공부 · 강의 · 수면 · 기타 기록장의 데이터를 모두 삭제합니다.</div>
     </div>
   </div>
   <div class="alarmbar" id="sharedAlarmBar">
@@ -120,6 +127,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
       <button id="sharedCloudUpload" type="button">전체 저장</button>
       <button id="sharedCloudDownload" type="button">전체 불러오기</button>
       <button id="sharedCloudLogout" class="cloudlogout" type="button">로그아웃</button>
+      
     </div>
     <div class="cloudsetup" id="sharedCloudSetup">
       <input id="sharedCloudEmail" type="email" placeholder="이메일">
@@ -132,13 +140,24 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
   <iframe id="studyFrame" class="frame active" src="study.html"></iframe>
   <iframe id="lectureFrame" class="frame" data-src="lecture.html"></iframe>
   <iframe id="sleepFrame" class="frame" data-src="sleep.html"></iframe>
+  <iframe id="recordFrame" class="frame" data-src="record.html"></iframe>
 </div>
 <script>
+// ★ [1단계] 부모 창 전체에서 단 하나의 클라이언트만 생성하도록 상수 분리
+const SUPABASE_URL = 'https://nvpvxtwebzefhgulswsv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
+
+// ★ TDZ 방지: sbSettingsClient를 가장 먼저 선언해야
+//   그 아래 어디서든 initSettingsClient()를 안전하게 호출할 수 있다.
+let sbSettingsClient = null;
+let __sbCreating = false;
+
 const shell=document.getElementById('shell');
 const tabs={
  study:{button:document.getElementById('studyTab'),frame:document.getElementById('studyFrame')},
  lecture:{button:document.getElementById('lectureTab'),frame:document.getElementById('lectureFrame')},
- sleep:{button:document.getElementById('sleepTab'),frame:document.getElementById('sleepFrame')}
+ sleep:{button:document.getElementById('sleepTab'),frame:document.getElementById('sleepFrame')},
+ record:{button:document.getElementById('recordTab'),frame:document.getElementById('recordFrame')}
 };
 
 function openTab(which, skipSave){
@@ -149,6 +168,12 @@ function openTab(which, skipSave){
     if(active && !item.frame.getAttribute('src') && item.frame.dataset.src){
       item.frame.src=item.frame.dataset.src;
     }
+    // [PAUSE] 안 보이는 iframe은 60초 폴링을 멈춘다. Realtime/메시지 핸들러는 유지.
+    try{
+      item.frame.contentWindow?.postMessage({
+        type: active ? 'journal-resume' : 'journal-pause'
+      }, location.origin);
+    }catch(e){}
   });
   if(!skipSave) saveLastTabToCloud(which);
 }
@@ -161,19 +186,21 @@ restoreLastTabFromCloud().then(tab=>{ if(tab && tab!==first && tabs[tab]) openTa
 const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
 let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
 let sharedSettingsLoaded=false;
-let sbSettingsClient=null;
+window.getSupabaseClient = () => initSettingsClient();
 function initSettingsClient(){
   if(sbSettingsClient) return sbSettingsClient;
+  if(__sbCreating) return null;
+  __sbCreating = true;
   try{
-    sbSettingsClient=window.supabase.createClient(
-      'https://nvpvxtwebzefhgulswsv.supabase.co',
-      'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo',
-      {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}}
+    sbSettingsClient = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY,
+      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } }
     );
     return sbSettingsClient;
   }catch(e){ return null; }
+  finally{ __sbCreating = false; }
 }
-window.getSupabaseClient=function(){ return initSettingsClient(); };
 async function loadSharedSettingsFromCloud(){
   const sb=initSettingsClient();
   if(!sb) return {...SHARED_SETTINGS_DEFAULT};
@@ -303,13 +330,22 @@ function initSharedSettingsUI(){
 
   const sb=initSettingsClient();
   if(sb){
-    sb.auth.onAuthStateChange(async()=>{
-      sharedSettingsLoaded=false;
-      await loadSharedSettingsFromCloud();
-      paint();
-      notifySharedSettings(sharedSettingsCache);
-      const t=await restoreLastTabFromCloud();
-      if(t && tabs[t]) openTab(t, true);
+    let __authBusy=false;
+    // ★ supabase 락 안에서 getSession() 을 호출하면 재귀가 발생하므로
+    //   콜백은 즉시 반환하고 실제 작업은 다음 tick 으로 미룬다.
+    sb.auth.onAuthStateChange((event)=>{
+      if(event === 'TOKEN_REFRESHED') return;
+      setTimeout(async()=>{
+        if(__authBusy) return; __authBusy=true;
+        try{
+          sharedSettingsLoaded=false;
+          await loadSharedSettingsFromCloud();
+          paint();
+          notifySharedSettings(sharedSettingsCache);
+          const t=await restoreLastTabFromCloud();
+          if(t && tabs[t]) openTab(t, true);
+        } finally { __authBusy=false; }
+      }, 0);
     });
   }
 
@@ -331,14 +367,14 @@ function initSharedSettingsUI(){
     }
     return fr;
   }
-  const JOURNAL_LABELS = { study:'공부 기록장', lecture:'강의 기록장', sleep:'수면 기록장' };
+  const JOURNAL_LABELS = { study:'공부 기록장', lecture:'강의 기록장', sleep:'수면 기록장', record:'기타 기록장' };
 
   function waitDeleteDone(kind){
     return new Promise(resolve => {
       const timer = setTimeout(() => {
         window.removeEventListener('message', onDone);
         resolve(false);
-      }, 8000);
+      }, 20000);
       function onDone(ev){
         if(ev.origin !== location.origin) return;
         if(ev.data?.type !== 'journal-delete-done') return;
@@ -368,14 +404,17 @@ function initSharedSettingsUI(){
 
   async function deleteOneJournal(kind){
     const fr = await ensureDeleteFrame(kind);
-    const childBtn = fr.contentDocument?.getElementById('deleteAllRecords');
-    if(!childBtn){ alert(`${JOURNAL_LABELS[kind]}의 삭제 기능을 찾지 못했습니다.`); return false; }
+
+    // [MOBILE-FIX] contentDocument 접근 대신 postMessage 사용
+    // (Android WebView/PWA에서 iframe DOM 접근이 차단될 수 있음)
+    const ready = await waitChildReady(fr, 30000);
+    if(!ready){
+      console.warn(`[delete] ${kind} 프레임 준비 실패 — 스킵`);
+      return false;
+    }
 
     const win = fr.contentWindow;
-    if(!win) return false;
-
-    // [DEL-FIX-2] 자식이 클라우드 준비될 때까지 대기
-    await waitChildReady(fr, 6000);
+    if(!win){ alert(`${JOURNAL_LABELS[kind]} 프레임을 찾지 못했습니다.`); return false; }
 
     try{
       win.__skipDeleteConfirm = true;
@@ -384,7 +423,7 @@ function initSharedSettingsUI(){
     }catch(e){}
 
     const wait = waitDeleteDone(kind);
-    childBtn.click();
+    win.postMessage({type:'journal-delete-request', kind}, location.origin);
     return wait.finally(() => {
       try{
         win.confirm = win.__nativeConfirm || win.confirm;
@@ -396,14 +435,24 @@ function initSharedSettingsUI(){
   const oneButtons = {
     study:   document.getElementById('sharedDeleteStudy'),
     lecture: document.getElementById('sharedDeleteLecture'),
-    sleep:   document.getElementById('sharedDeleteSleep')
+    sleep:   document.getElementById('sharedDeleteSleep'),
+    record:  document.getElementById('sharedDeleteRecord')
   };
   Object.entries(oneButtons).forEach(([kind, btn]) => {
     btn.addEventListener('click', async () => {
       if(btn.dataset.busy === '1') return;
       if(!confirm(`${JOURNAL_LABELS[kind]} 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.`)) return;
       btn.dataset.busy = '1';
-      try{ await deleteOneJournal(kind); }
+      try{
+        const ok = await deleteOneJournal(kind);
+        if(ok){
+          alert(`✅ ${JOURNAL_LABELS[kind]} 데이터가 삭제되었습니다.`);
+        }else{
+          alert(`❌ ${JOURNAL_LABELS[kind]} 삭제에 실패했습니다.\n다시 시도해주세요.`);
+        }
+      }catch(e){
+        alert(`❌ ${JOURNAL_LABELS[kind]} 삭제 중 오류: ${e?.message || e}`);
+      }
       finally{ setTimeout(()=>{ btn.dataset.busy = '0'; }, 500); }
     });
   });
@@ -411,16 +460,29 @@ function initSharedSettingsUI(){
   const del = document.getElementById('sharedDeleteAll');
   del.addEventListener('click', () => {
     if(del.dataset.busy === '1') return;
-    if(!confirm('공부 · 강의 · 수면 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.')) return;
+    if(!confirm('공부 · 강의 · 수면 · 기타 기록 데이터를 모두 삭제하시겠습니까?\n\n삭제한 기록은 복구할 수 없습니다.')) return;
 
     del.dataset.busy = '1';
     const originalText = del.textContent;
     del.textContent = '삭제 중…';
     del.disabled = true;
 
-    Promise.allSettled(['study','lecture','sleep'].map(k => deleteOneJournal(k)))
-      .then(() => { location.reload(); })
-      .catch(() => {
+    Promise.allSettled(['study','lecture','sleep','record'].map(k => deleteOneJournal(k)))
+      .then((results) => {
+        const failed = results
+          .map((r, i) => (r.status === 'fulfilled' && r.value === true) ? null : ['study','lecture','sleep','record'][i])
+          .filter(Boolean);
+        if(failed.length === 0){
+          alert('✅ 공부 · 강의 · 수면 · 기타 기록이 모두 삭제되었습니다.');
+        }else{
+          alert(`❌ 일부 기록 삭제 실패: ${failed.map(k => JOURNAL_LABELS[k]).join(', ')}\n다시 시도해주세요.`);
+        }
+        del.dataset.busy = '0';
+        del.disabled = false;
+        del.textContent = originalText;
+      })
+      .catch((e) => {
+        alert(`❌ 전체 삭제 중 오류: ${e?.message || e}`);
         del.dataset.busy = '0';
         del.disabled = false;
         del.textContent = originalText;
@@ -439,8 +501,8 @@ loadSharedSettingsFromCloud()
   .catch(e => console.warn('[FIX3] 초기 설정 브로드캐스트 실패', e));
 
 
-const baseTabLabels={study:'📚 공부 기록장',lecture:'🎓 강의 기록장',sleep:'🌙 수면 기록장'};
-const recordingTabLabels={study:'공부 기록장',lecture:'강의 기록장',sleep:'수면 기록장'};
+const baseTabLabels={study:'📚 공부 기록장',lecture:'🎓 강의 기록장',sleep:'🌙 수면 기록장',record:'📝 기타 기록장'};
+const recordingTabLabels={study:'공부 기록장',lecture:'강의 기록장',sleep:'수면 기록장',record:'기타 기록장'};
 function setExclusiveTabStatus(kind){
   Object.entries(tabs).forEach(([key,item])=>{
     item.button.textContent=key===kind?recordingTabLabels[key]:baseTabLabels[key];
@@ -458,6 +520,7 @@ let exclusiveQueue=Promise.resolve();
     const s = String(ym||'');
     if(s.startsWith('L:')) return 'lecture';
     if(s.startsWith('S:')) return 'sleep';
+    if(s.startsWith('R:')) return null;
     if(/^\d{4}-\d{2}$/.test(s)) return 'study';
     return null;
   }
@@ -485,7 +548,13 @@ let exclusiveQueue=Promise.resolve();
       }
       return;
     }
-    // stopped 이거나 null(삭제) → 원복
+    // stopped 이거나 null(삭제) 처리.
+    // 같은 기기에서 시작 요청으로 이미 진행 중인 탭은 RPC 처리 중 active_timer가
+    // 잠깐 null/stopped로 보이더라도 탭 표시를 지우지 않는다.
+    // 실제 종료는 자식 화면의 exclusive-session-ended 메시지로 즉시 반영된다.
+    if(exclusiveActive){
+      return;
+    }
     exclusiveActive = null;
     setExclusiveTabStatus(null);
   }
@@ -528,8 +597,9 @@ let exclusiveQueue=Promise.resolve();
   fetchOnce();
 
   const sb = initSettingsClient();
-  if(sb) sb.auth.onAuthStateChange(()=>{
-    if(ch){ try{ sb.removeChannel(ch); }catch(e){} ch = null; }
+  if(sb) sb.auth.onAuthStateChange((event)=>{
+    if(event === 'TOKEN_REFRESHED') return;
+    // [FIX] removeChannel 제거 — 채널 churn 방지. startRealtime은 ch 있으면 재사용.
     setTimeout(startRealtime, 300);
     setTimeout(fetchOnce, 400);
   });
@@ -539,6 +609,12 @@ let exclusiveQueue=Promise.resolve();
     if(document.visibilityState === 'visible') fetchOnce();
   });
   window.addEventListener('pageshow', ()=>{ fetchOnce(); });
+
+  // [RT-FALLBACK] 10초 폴링 안전망 — Realtime 이벤트를 놓쳐도 최대 10초 안에 반영
+  setInterval(()=>{
+    if(document.visibilityState !== 'visible') return;
+    fetchOnce();
+  }, 10000);
 })();
 
 // 시작 전환 하나의 기록: 새로 시작된 kind와, 그로 인해 자동 종료된 이전 kind.
@@ -692,23 +768,38 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 
 <script id="v128-shared-cloud">
 (()=>{
- const URL='https://nvpvxtwebzefhgulswsv.supabase.co', KEY='sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
  const $=id=>document.getElementById(id); let sb=null,user=null;
- function init(){if(sb)return true;try{sb=initSettingsClient();return !!sb}catch(e){return false}}
- async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;$('sharedCloudStatus').textContent=user?`연결됨 · ${user.email||'사용자'}`:'로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';return user}
+ // ★ [2단계] 부모의 싱글톤(initSettingsClient)을 재사용한다.
+ //   여기서 createClient 를 새로 호출하면 같은 storage key 를 공유하는
+ //   GoTrueClient 가 2개가 되어 "Multiple GoTrueClient instances" 경고가 발생한다.
+ function init(){
+   if(sb) return true;
+   sb = initSettingsClient();   // ★ 새로 만들지 않고 재사용
+   return !!sb;
+ }
+ async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
+// 서버 검증 추가: 실제 요청이 통과해야만 ✅
+let verified=false;
+if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
+$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;
+$('sharedCloudToggle').disabled=!!user;return user}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
- async function all(action){if(!await status()){alert('먼저 홈에서 클라우드에 로그인해 주세요.');$('sharedCloudSetup').classList.add('show');return}const map=action==='upload'?{study:['cloudUpload'],lecture:['cloudUpload'],sleep:['cloudUpload']}:{study:['cloudDownload'],lecture:['cloudDownload'],sleep:['cloudDownload']};for(const kind of ['study','lecture','sleep']){try{await clickChild(kind,map[kind]);await new Promise(r=>setTimeout(r,180))}catch(e){console.error(kind,action,e)}}}
+ async function all(action){if(!await status()){alert('먼저 홈에서 클라우드에 로그인해 주세요.');$('sharedCloudSetup').classList.add('show');return}const map=action==='upload'?{study:['cloudUpload'],lecture:['cloudUpload'],sleep:['cloudUpload'],record:['cloudUpload']}:{study:['cloudDownload'],lecture:['cloudDownload'],sleep:['cloudDownload'],record:['cloudDownload']};for(const kind of ['study','lecture','sleep','record']){try{await clickChild(kind,map[kind]);await new Promise(r=>setTimeout(r,180))}catch(e){console.error(kind,action,e)}}}
  window.addEventListener('DOMContentLoaded',async()=>{
   $('sharedCloudToggle').onclick=()=> $('sharedCloudSetup').classList.toggle('show');
   $('sharedCloudSignup').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const e=$('sharedCloudEmail').value.trim(),p=$('sharedCloudPassword').value;if(!e||p.length<6)return alert('이메일과 6자 이상 비밀번호를 확인해 주세요.');const {error}=await sb.auth.signUp({email:e,password:p});if(error)return alert('회원가입 실패: '+error.message);await status();alert('회원가입 요청이 완료됐어요.')};
   $('sharedCloudLogin').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const {error}=await sb.auth.signInWithPassword({email:$('sharedCloudEmail').value.trim(),password:$('sharedCloudPassword').value});if(error)return alert('로그인 실패: '+error.message);await status();$('sharedCloudSetup').classList.remove('show')};
-  $('sharedCloudGoogle').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const isAndroid=!!window.NativeAuth;const redirectTo=isAndroid?'diary://login':location.origin+location.pathname;const {data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,skipBrowserRedirect:isAndroid}});if(error)return alert('Google 로그인 실패: '+error.message);if(isAndroid&&data?.url){window.__androidOAuthSource='index.html';(()=>{const opened=window.NativeAuth.openUrl(data.url);if(opened===false)alert('Google 로그인 화면을 열지 못했습니다.');})()}};
-  window.addEventListener('android-auth-callback',async(ev)=>{if(!init())return;try{const d=ev.detail||{};if(d.error)throw new Error(d.error);if(d.code){const {error}=await sb.auth.exchangeCodeForSession(d.code);if(error)throw error;await status();$('sharedCloudSetup').classList.remove('show')}else if(d.access_token&&d.refresh_token){const {error}=await sb.auth.setSession({access_token:d.access_token,refresh_token:d.refresh_token});if(error)throw error;await status();$('sharedCloudSetup').classList.remove('show')}}catch(e){alert('Google 로그인 처리 실패: '+e.message)}});
-  window.addEventListener('android-auth-open-failed',()=>{alert('Google 로그인 화면을 열지 못했습니다. 기본 브라우저 앱(Chrome 등)이 설치·활성화되어 있는지 확인한 뒤 다시 시도해 주세요.')});
+  $('sharedCloudGoogle').onclick=async()=>{if(!init())return alert('클라우드 연결 실패');const redirectTo=location.origin+location.pathname;const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo}});if(error)alert('Google 로그인 실패: '+error.message)};
   $('sharedCloudLogout').onclick=async()=>{if(init())await sb.auth.signOut();await status()};
   $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
-  if(init())sb.auth.onAuthStateChange(()=>setTimeout(status,0));await status();
+  if(init()){
+    sb.auth.onAuthStateChange((event)=>{
+      if(event === 'TOKEN_REFRESHED') return;
+      setTimeout(status, 0);
+    });
+  }
+  await status();
  });
 })();
 </script>
@@ -814,5 +905,6 @@ function initSharedBackupUI(){
 }
 initSharedBackupUI();
 </script>
+
 </body>
 </html>
