@@ -756,23 +756,6 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 <script id="v128-shared-cloud">
 (()=>{
  const $=id=>document.getElementById(id); let sb=null,user=null;
- // Android OAuth diagnostic panel (only shown inside APK)
- function oauthDiag(msg){
-   if(!(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function')) return;
-   let box=document.getElementById('androidOAuthDiag');
-   if(!box){
-     box=document.createElement('div'); box.id='androidOAuthDiag';
-     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.45 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008';
-     document.body.appendChild(box);
-   }
-   const line=new Date().toLocaleTimeString()+'  '+msg;
-   const prev=(box.dataset.log||'').split('\n').filter(Boolean);
-   prev.push(line);
-   while(prev.length>10) prev.shift();
-   box.dataset.log=prev.join('\n');
-   box.textContent='OAuth 진단\n'+box.dataset.log;
- }
- window.yangStudyOAuthDiag=oauthDiag;
  // ★ [2단계] 부모의 싱글톤(initSettingsClient)을 재사용한다.
  //   여기서 createClient 를 새로 호출하면 같은 storage key 를 공유하는
  //   GoTrueClient 가 2개가 되어 "Multiple GoTrueClient instances" 경고가 발생한다.
@@ -799,7 +782,6 @@ $('sharedCloudToggle').disabled=!!user;return user}
 
   // Android APK 브리지
   if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
-    oauthDiag('① Google 로그인 주소 생성 중');
     const {data,error} = await sb.auth.signInWithOAuth({
       provider:'google',
       options:{
@@ -809,8 +791,7 @@ $('sharedCloudToggle').disabled=!!user;return user}
       }
     });
     if(error){ alert('Google 로그인 실패: '+error.message); return; }
-    if(!data?.url){ oauthDiag('❌ 로그인 URL 생성 실패'); alert('Google 로그인 주소를 만들지 못했어요.'); return; }
-    oauthDiag('② Google 계정 선택창 열기');
+    if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
     try{ window.top.__androidOAuthSource = 'index.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
@@ -827,7 +808,6 @@ $('sharedCloudToggle').disabled=!!user;return user}
   $('sharedCloudLogout').classList.add('show');
   $('sharedCloudLogout').disabled=false;
   $('sharedCloudLogout').onclick=()=>{
-    oauthDiag('L1 로그아웃 버튼 터치');
     user=null;
     $('sharedCloudStatus').textContent='❌ 로그인 필요';
     $('sharedCloudLogout').classList.add('show');
@@ -839,20 +819,14 @@ $('sharedCloudToggle').disabled=!!user;return user}
     Promise.race([
       sb.auth.signOut(),
       new Promise((_,reject)=>setTimeout(()=>reject(new Error('signOut 5초 타임아웃')),5000))
-    ]).then(({error}={})=>{
-      if(error) oauthDiag('L3 signOut 오류: '+error.message);
-      else oauthDiag('L3 signOut 반환 성공');
-    }).catch(e=>oauthDiag('L2 '+(e?.message||e)));
+    ]).catch(e=>console.error('로그아웃 실패:',e));
   };
   $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
   if(init()){
     sb.auth.onAuthStateChange((event, session)=>{
-      // v27: 여기서는 getSession/status 등 Supabase API를 호출하지 않는다.
+      // Auth 이벤트에서는 Supabase API를 다시 호출하지 않고 전달된 session만 반영한다.
       user = session?.user || null;
-      window.__yangStudyLastAuthEvent = event;
-      window.__yangStudyLastAuthSession = session || null;
-      oauthDiag('A1 auth event='+event+' / session='+(session?'있음':'없음')+' / user='+(user?.email||'없음'));
-      $('sharedCloudStatus').textContent=user?'⚠️ '+user.email+' (이벤트 수신)':'❌ 로그인 필요';
+      if(!user) $('sharedCloudStatus').textContent='❌ 로그인 필요';
       $('sharedCloudLogout').classList.add('show');
       $('sharedCloudLogout').disabled=false;
       $('sharedCloudToggle').textContent=user?'계정':'로그인';
@@ -862,11 +836,9 @@ $('sharedCloudToggle').disabled=!!user;return user}
   }
   await status();
 
-  // ★ Android 커스텀 스킴 콜백 처리 - v26 세분화 진단
+  // Android 커스텀 스킴 OAuth 콜백 처리
   window.yangStudyHandleOAuthCallback = async function(callbackUrl){
-    const diag = oauthDiag;
     try{
-      diag('④-1 콜백 함수 진입');
       if(!init()) throw new Error('Supabase 연결 실패');
       const u = new URL(callbackUrl);
       const oauthError = u.searchParams.get('error_description') || u.searchParams.get('error');
@@ -874,68 +846,64 @@ $('sharedCloudToggle').disabled=!!user;return user}
 
       const code = u.searchParams.get('code');
       if(code){
-        diag('⑤ PKCE code 방식 - exchangeCodeForSession 시작');
-        const p=sb.auth.exchangeCodeForSession(code);
-        p.then(r=>diag(r?.error?'E2 exchange 오류: '+r.error.message:'E2 exchange 반환 성공'))
-         .catch(e=>diag('E2 exchange 예외: '+(e?.message||e)));
+        const {data,error}=await sb.auth.exchangeCodeForSession(code);
+        if(error) throw error;
+        const sess=data?.session||null;
+        user=sess?.user||null;
+        if(user){
+          $('sharedCloudStatus').textContent='✅ '+user.email;
+          $('sharedCloudToggle').textContent='계정';
+          $('sharedCloudToggle').disabled=true;
+          $('sharedCloudSetup').classList.remove('show');
+        }
+        $('sharedCloudLogout').classList.add('show');
+        $('sharedCloudLogout').disabled=false;
         return true;
       }
 
       const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
       const access_token = frag.get('access_token');
       const refresh_token = frag.get('refresh_token');
-      diag('⑤-1 fragment access='+(access_token?'있음':'없음')+', refresh='+(refresh_token?'있음':'없음'));
       if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
 
-      // v28 D1: Supabase auth lock을 거치지 않고 access token 자체가 서버에서 유효한지 확인
-      diag('D1 access token 서버 검증 시작');
-      fetch(SUPABASE_URL+'/auth/v1/user',{
-        headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+access_token}
-      }).then(async r=>{
-        let body=null; try{body=await r.json()}catch(_e){}
-        diag('D2 /auth/v1/user HTTP '+r.status+' / user='+(body?.email||'없음'));
-      }).catch(e=>diag('D2 token 검증 fetch 실패: '+(e?.message||e)));
+      // setSession 중 auth 이벤트가 먼저 오는 경우가 있으므로 Promise를 막지 않고 시작한다.
+      sb.auth.setSession({access_token, refresh_token}).then(({data,error})=>{
+        if(error){console.error('setSession 실패:',error);return;}
+        const sess=data?.session||null;
+        if(sess?.user){
+          user=sess.user;
+          $('sharedCloudStatus').textContent='✅ '+user.email;
+          $('sharedCloudToggle').textContent='계정';
+          $('sharedCloudToggle').disabled=true;
+          $('sharedCloudSetup').classList.remove('show');
+        }
+        $('sharedCloudLogout').classList.add('show');
+        $('sharedCloudLogout').disabled=false;
+      }).catch(e=>console.error('setSession 예외:',e));
 
-      diag('⑤-2 setSession 호출');
-      const setP = sb.auth.setSession({access_token, refresh_token});
-      let setDone=false;
-      setP.then(result=>{
-        setDone=true;
-        if(result?.error){diag('⑤-3 setSession 오류: '+result.error.message);return;}
-        const sess=result?.data?.session||null;
-        user=sess?.user||null;
-        diag('⑤-3 setSession 반환 성공 / user='+(user?.email||'없음'));
-      }).catch(e=>{setDone=true;diag('⑤-3 setSession 예외: '+(e?.message||e));});
-
-      setTimeout(()=>diag('D3 3초 확인 / setSession 반환='+(setDone?'예':'아니오')+' / 마지막 auth event='+(window.__yangStudyLastAuthEvent||'없음')),3000);
-
-      // v28 D4: callback/auth event가 끝난 뒤 별도 시점에 저장된 session 조회 시도
+      // auth 이벤트 처리와 분리된 시점에서 저장된 세션을 한 번 확인한다.
       setTimeout(()=>{
-        diag('D4 getSession 별도 검증 시작');
         Promise.race([
           sb.auth.getSession(),
           new Promise((_,reject)=>setTimeout(()=>reject(new Error('getSession 5초 타임아웃')),5000))
         ]).then(({data,error})=>{
-          if(error){diag('D5 getSession 오류: '+error.message);return;}
-          const sess=data?.session||null;
-          const u2=sess?.user||null;
-          diag('D5 getSession 반환 / session='+(sess?'있음':'없음')+' / user='+(u2?.email||'없음'));
+          if(error) return;
+          const u2=data?.session?.user||null;
           if(u2){
             user=u2;
-            $('sharedCloudStatus').textContent='✅ '+u2.email+' (getSession 확인)';
+            $('sharedCloudStatus').textContent='✅ '+u2.email;
             $('sharedCloudToggle').textContent='계정';
             $('sharedCloudToggle').disabled=true;
             $('sharedCloudSetup').classList.remove('show');
           }
           $('sharedCloudLogout').classList.add('show');
           $('sharedCloudLogout').disabled=false;
-        }).catch(e=>diag('D5 '+(e?.message||e)));
+        }).catch(e=>console.error('세션 확인 실패:',e));
       },4000);
 
       return true;
     }catch(e){
       console.error('Google OAuth callback 실패:', e);
-      diag('❌ '+(e?.message || e));
       $('sharedCloudLogout').classList.add('show');
       $('sharedCloudLogout').disabled=false;
       return false;

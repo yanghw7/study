@@ -11,7 +11,6 @@ import android.util.Log
 import android.webkit.*
 import android.graphics.Color
 import android.widget.FrameLayout
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -119,12 +118,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun deliverAuthCallback(uri: Uri) {
-        Toast.makeText(this, "OAuth 진단 ③: 앱이 콜백을 받았습니다", Toast.LENGTH_LONG).show()
         val callbackUrl = org.json.JSONObject.quote(uri.toString())
         val js = """
         (function(){
           const callbackUrl=$callbackUrl;
-          if(typeof window.yangStudyOAuthDiag==='function'){ window.yangStudyOAuthDiag('③ 앱에서 WebView로 콜백 전달됨'); }
           if(typeof window.yangStudyHandleOAuthCallback==='function'){
             window.yangStudyHandleOAuthCallback(callbackUrl);
             return;
