@@ -330,22 +330,10 @@ function initSharedSettingsUI(){
 
   const sb=initSettingsClient();
   if(sb){
-    let __authBusy=false;
-    // ★ supabase 락 안에서 getSession() 을 호출하면 재귀가 발생하므로
-    //   콜백은 즉시 반환하고 실제 작업은 다음 tick 으로 미룬다.
-    sb.auth.onAuthStateChange((event)=>{
-      if(event === 'TOKEN_REFRESHED') return;
-      setTimeout(async()=>{
-        if(__authBusy) return; __authBusy=true;
-        try{
-          sharedSettingsLoaded=false;
-          await loadSharedSettingsFromCloud();
-          paint();
-          notifySharedSettings(sharedSettingsCache);
-          const t=await restoreLastTabFromCloud();
-          if(t && tabs[t]) openTab(t, true);
-        } finally { __authBusy=false; }
-      }, 0);
+    // v27: auth callback 안에서는 Supabase API를 다시 호출하지 않는다.
+    sb.auth.onAuthStateChange((event, session)=>{
+      window.__yangStudyLastAuthEvent = event;
+      window.__yangStudyLastAuthSession = session || null;
     });
   }
 
@@ -597,11 +585,10 @@ let exclusiveQueue=Promise.resolve();
   fetchOnce();
 
   const sb = initSettingsClient();
-  if(sb) sb.auth.onAuthStateChange((event)=>{
-    if(event === 'TOKEN_REFRESHED') return;
-    // [FIX] removeChannel 제거 — 채널 churn 방지. startRealtime은 ch 있으면 재사용.
-    setTimeout(startRealtime, 300);
-    setTimeout(fetchOnce, 400);
+  if(sb) sb.auth.onAuthStateChange((event, session)=>{
+    // v27: auth callback에서는 상태만 기록한다. Supabase API 호출 금지.
+    window.__yangStudyLastAuthEvent = event;
+    window.__yangStudyLastAuthSession = session || null;
   });
 
   // 백그라운드에서 돌아올 때만 1회 (하루 몇 번 수준, 무시 가능)
@@ -832,12 +819,19 @@ $('sharedCloudToggle').disabled=!!user;return user}
   });
   if(error) alert('Google 로그인 실패: '+error.message);
 };
-  $('sharedCloudLogout').onclick=async()=>{if(init())await sb.auth.signOut();await status()};
+  $('sharedCloudLogout').onclick=async()=>{if(!init())return;const {error}=await sb.auth.signOut();if(error)return alert('로그아웃 실패: '+error.message);user=null;$('sharedCloudStatus').textContent='❌ 로그인 필요';$('sharedCloudLogout').classList.remove('show');$('sharedCloudToggle').textContent='로그인';$('sharedCloudToggle').disabled=false;$('sharedCloudSetup').classList.add('show')};
   $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
   if(init()){
-    sb.auth.onAuthStateChange((event)=>{
-      if(event === 'TOKEN_REFRESHED') return;
-      setTimeout(status, 0);
+    sb.auth.onAuthStateChange((event, session)=>{
+      // v27: 여기서는 getSession/status 등 Supabase API를 호출하지 않는다.
+      user = session?.user || null;
+      window.__yangStudyLastAuthEvent = event;
+      window.__yangStudyLastAuthSession = session || null;
+      $('sharedCloudStatus').textContent=user?'✅ '+user.email:'❌ 로그인 필요';
+      $('sharedCloudLogout').classList.toggle('show',!!user);
+      $('sharedCloudToggle').textContent=user?'계정':'로그인';
+      $('sharedCloudToggle').disabled=!!user;
+      $('sharedCloudSetup').classList.toggle('show',!user);
     });
   }
   await status();
@@ -856,6 +850,7 @@ $('sharedCloudToggle').disabled=!!user;return user}
       if(oauthError) throw new Error(oauthError);
 
       const code = u.searchParams.get('code');
+      let authResult = null;
       if(code){
         diag('⑤-1 PKCE code 발견');
         diag('⑤-2 exchangeCodeForSession 호출 직전');
@@ -865,6 +860,7 @@ $('sharedCloudToggle').disabled=!!user;return user}
         ]);
         diag('⑤-3 exchangeCodeForSession 반환됨');
         if(result?.error) throw result.error;
+        authResult = result;
         diag('⑤-4 exchangeCodeForSession 성공');
       } else {
         const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
@@ -880,31 +876,20 @@ $('sharedCloudToggle').disabled=!!user;return user}
         ]);
         diag('⑤-3 setSession 반환됨');
         if(result?.error) throw result.error;
+        authResult = result;
         diag('⑤-4 setSession 성공 / user='+(result?.data?.user?.email || '없음'));
       }
 
-      diag('⑥-1 getSession 호출 직전');
-      const gs = await Promise.race([
-        sb.auth.getSession(),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error('getSession 10초 타임아웃')),10000))
-      ]);
-      diag('⑥-2 getSession 반환 / session='+(gs?.data?.session?'있음':'없음')+(gs?.error?' / error='+gs.error.message:''));
-      if(gs?.error) throw gs.error;
-
-      diag('⑥-3 getUser 호출 직전');
-      const gu = await Promise.race([
-        sb.auth.getUser(),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error('getUser 10초 타임아웃')),10000))
-      ]);
-      diag('⑥-4 getUser 반환 / user='+(gu?.data?.user?.email || '없음')+(gu?.error?' / error='+gu.error.message:''));
-      if(gu?.error) throw gu.error;
-
-      diag('⑦-1 status UI 갱신 직전');
-      const checkedUser = await Promise.race([
-        status(),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error('status 10초 타임아웃')),10000))
-      ]);
-      diag(checkedUser ? '⑦-2 로그인 성공: '+checkedUser.email : '❌ status 후 사용자 없음');
+      // v27: setSession 성공 후 auth callback 재진입 없이 반환된 session으로 UI만 갱신
+      const session = authResult?.data?.session || window.__yangStudyLastAuthSession || null;
+      user = session?.user || null;
+      diag('⑥ session 직접 반영 / user='+(user?.email || '없음'));
+      $('sharedCloudStatus').textContent=user?'✅ '+user.email:'❌ 로그인 필요';
+      $('sharedCloudLogout').classList.toggle('show',!!user);
+      $('sharedCloudToggle').textContent=user?'계정':'로그인';
+      $('sharedCloudToggle').disabled=!!user;
+      $('sharedCloudSetup').classList.toggle('show',!user);
+      diag(user ? '⑦ 로그인 성공: '+user.email : '❌ 반환 session에 사용자 없음');
       return true;
     }catch(e){
       console.error('Google OAuth callback 실패:', e);
