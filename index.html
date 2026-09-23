@@ -330,22 +330,10 @@ function initSharedSettingsUI(){
 
   const sb=initSettingsClient();
   if(sb){
-    let __authBusy=false;
-    // ★ supabase 락 안에서 getSession() 을 호출하면 재귀가 발생하므로
-    //   콜백은 즉시 반환하고 실제 작업은 다음 tick 으로 미룬다.
-    sb.auth.onAuthStateChange((event)=>{
-      if(event === 'TOKEN_REFRESHED') return;
-      setTimeout(async()=>{
-        if(__authBusy) return; __authBusy=true;
-        try{
-          sharedSettingsLoaded=false;
-          await loadSharedSettingsFromCloud();
-          paint();
-          notifySharedSettings(sharedSettingsCache);
-          const t=await restoreLastTabFromCloud();
-          if(t && tabs[t]) openTab(t, true);
-        } finally { __authBusy=false; }
-      }, 0);
+    // v27: auth callback 안에서는 Supabase API를 다시 호출하지 않는다.
+    sb.auth.onAuthStateChange((event, session)=>{
+      window.__yangStudyLastAuthEvent = event;
+      window.__yangStudyLastAuthSession = session || null;
     });
   }
 
@@ -597,11 +585,10 @@ let exclusiveQueue=Promise.resolve();
   fetchOnce();
 
   const sb = initSettingsClient();
-  if(sb) sb.auth.onAuthStateChange((event)=>{
-    if(event === 'TOKEN_REFRESHED') return;
-    // [FIX] removeChannel 제거 — 채널 churn 방지. startRealtime은 ch 있으면 재사용.
-    setTimeout(startRealtime, 300);
-    setTimeout(fetchOnce, 400);
+  if(sb) sb.auth.onAuthStateChange((event, session)=>{
+    // v27: auth callback에서는 상태만 기록한다. Supabase API 호출 금지.
+    window.__yangStudyLastAuthEvent = event;
+    window.__yangStudyLastAuthSession = session || null;
   });
 
   // 백그라운드에서 돌아올 때만 1회 (하루 몇 번 수준, 무시 가능)
@@ -781,7 +768,7 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 // 서버 검증 추가: 실제 요청이 통과해야만 ✅
 let verified=false;
 if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
-$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
+$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.add('show');$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
 $('sharedCloudToggle').disabled=!!user;return user}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
@@ -818,17 +805,38 @@ $('sharedCloudToggle').disabled=!!user;return user}
   });
   if(error) alert('Google 로그인 실패: '+error.message);
 };
-  $('sharedCloudLogout').onclick=async()=>{if(init())await sb.auth.signOut();await status()};
+  $('sharedCloudLogout').classList.add('show');
+  $('sharedCloudLogout').disabled=false;
+  $('sharedCloudLogout').onclick=()=>{
+    user=null;
+    $('sharedCloudStatus').textContent='❌ 로그인 필요';
+    $('sharedCloudLogout').classList.add('show');
+    $('sharedCloudLogout').disabled=false;
+    $('sharedCloudToggle').textContent='로그인';
+    $('sharedCloudToggle').disabled=false;
+    $('sharedCloudSetup').classList.add('show');
+    if(!init())return;
+    Promise.race([
+      sb.auth.signOut(),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('signOut 5초 타임아웃')),5000))
+    ]).catch(e=>console.error('로그아웃 실패:',e));
+  };
   $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
   if(init()){
-    sb.auth.onAuthStateChange((event)=>{
-      if(event === 'TOKEN_REFRESHED') return;
-      setTimeout(status, 0);
+    sb.auth.onAuthStateChange((event, session)=>{
+      // Auth 이벤트에서는 Supabase API를 다시 호출하지 않고 전달된 session만 반영한다.
+      user = session?.user || null;
+      if(!user) $('sharedCloudStatus').textContent='❌ 로그인 필요';
+      $('sharedCloudLogout').classList.add('show');
+      $('sharedCloudLogout').disabled=false;
+      $('sharedCloudToggle').textContent=user?'계정':'로그인';
+      $('sharedCloudToggle').disabled=!!user;
+      $('sharedCloudSetup').classList.toggle('show',!user);
     });
   }
   await status();
 
-  // ★ Android 커스텀 스킴 콜백 처리
+  // Android 커스텀 스킴 OAuth 콜백 처리
   window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     try{
       if(!init()) throw new Error('Supabase 연결 실패');
@@ -838,23 +846,66 @@ $('sharedCloudToggle').disabled=!!user;return user}
 
       const code = u.searchParams.get('code');
       if(code){
-        const {data,error} = await sb.auth.exchangeCodeForSession(code);
+        const {data,error}=await sb.auth.exchangeCodeForSession(code);
         if(error) throw error;
-      } else {
-        const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
-        const access_token = frag.get('access_token');
-        const refresh_token = frag.get('refresh_token');
-        if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
-        const {data,error} = await sb.auth.setSession({access_token, refresh_token});
-        if(error) throw error;
+        const sess=data?.session||null;
+        user=sess?.user||null;
+        if(user){
+          $('sharedCloudStatus').textContent='✅ '+user.email;
+          $('sharedCloudToggle').textContent='계정';
+          $('sharedCloudToggle').disabled=true;
+          $('sharedCloudSetup').classList.remove('show');
+        }
+        $('sharedCloudLogout').classList.add('show');
+        $('sharedCloudLogout').disabled=false;
+        return true;
       }
 
-      await status();
-      alert('Google 로그인이 완료됐어요');
+      const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
+      const access_token = frag.get('access_token');
+      const refresh_token = frag.get('refresh_token');
+      if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
+
+      // setSession 중 auth 이벤트가 먼저 오는 경우가 있으므로 Promise를 막지 않고 시작한다.
+      sb.auth.setSession({access_token, refresh_token}).then(({data,error})=>{
+        if(error){console.error('setSession 실패:',error);return;}
+        const sess=data?.session||null;
+        if(sess?.user){
+          user=sess.user;
+          $('sharedCloudStatus').textContent='✅ '+user.email;
+          $('sharedCloudToggle').textContent='계정';
+          $('sharedCloudToggle').disabled=true;
+          $('sharedCloudSetup').classList.remove('show');
+        }
+        $('sharedCloudLogout').classList.add('show');
+        $('sharedCloudLogout').disabled=false;
+      }).catch(e=>console.error('setSession 예외:',e));
+
+      // auth 이벤트 처리와 분리된 시점에서 저장된 세션을 한 번 확인한다.
+      setTimeout(()=>{
+        Promise.race([
+          sb.auth.getSession(),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error('getSession 5초 타임아웃')),5000))
+        ]).then(({data,error})=>{
+          if(error) return;
+          const u2=data?.session?.user||null;
+          if(u2){
+            user=u2;
+            $('sharedCloudStatus').textContent='✅ '+u2.email;
+            $('sharedCloudToggle').textContent='계정';
+            $('sharedCloudToggle').disabled=true;
+            $('sharedCloudSetup').classList.remove('show');
+          }
+          $('sharedCloudLogout').classList.add('show');
+          $('sharedCloudLogout').disabled=false;
+        }).catch(e=>console.error('세션 확인 실패:',e));
+      },4000);
+
       return true;
     }catch(e){
       console.error('Google OAuth callback 실패:', e);
-      alert('Google 로그인 완료 처리 실패: ' + (e?.message || e));
+      $('sharedCloudLogout').classList.add('show');
+      $('sharedCloudLogout').disabled=false;
       return false;
     }
   };
