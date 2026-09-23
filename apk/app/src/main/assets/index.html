@@ -769,6 +769,18 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 <script id="v128-shared-cloud">
 (()=>{
  const $=id=>document.getElementById(id); let sb=null,user=null;
+ // Android OAuth diagnostic panel (only shown inside APK)
+ function oauthDiag(msg){
+   if(!(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function')) return;
+   let box=document.getElementById('androidOAuthDiag');
+   if(!box){
+     box=document.createElement('div'); box.id='androidOAuthDiag';
+     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.45 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008';
+     document.body.appendChild(box);
+   }
+   box.textContent='OAuth 진단: '+msg;
+ }
+ window.yangStudyOAuthDiag=oauthDiag;
  // ★ [2단계] 부모의 싱글톤(initSettingsClient)을 재사용한다.
  //   여기서 createClient 를 새로 호출하면 같은 storage key 를 공유하는
  //   GoTrueClient 가 2개가 되어 "Multiple GoTrueClient instances" 경고가 발생한다.
@@ -781,7 +793,7 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 // 서버 검증 추가: 실제 요청이 통과해야만 ✅
 let verified=false;
 if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
-$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;
+$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
 $('sharedCloudToggle').disabled=!!user;return user}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
@@ -795,15 +807,18 @@ $('sharedCloudToggle').disabled=!!user;return user}
 
   // Android APK 브리지
   if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
+    oauthDiag('① Google 로그인 주소 생성 중');
     const {data,error} = await sb.auth.signInWithOAuth({
       provider:'google',
       options:{
         redirectTo:'yangstudy://auth/callback',
-        skipBrowserRedirect:true
+        skipBrowserRedirect:true,
+        queryParams:{ prompt:'select_account' }
       }
     });
     if(error){ alert('Google 로그인 실패: '+error.message); return; }
-    if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    if(!data?.url){ oauthDiag('❌ 로그인 URL 생성 실패'); alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    oauthDiag('② Google 계정 선택창 열기');
     try{ window.top.__androidOAuthSource = 'index.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
@@ -813,7 +828,7 @@ $('sharedCloudToggle').disabled=!!user;return user}
   const redirectTo = location.origin + location.pathname;
   const {error} = await sb.auth.signInWithOAuth({
     provider:'google',
-    options:{redirectTo}
+    options:{redirectTo, queryParams:{ prompt:'select_account' }}
   });
   if(error) alert('Google 로그인 실패: '+error.message);
 };
@@ -831,21 +846,34 @@ $('sharedCloudToggle').disabled=!!user;return user}
   window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     try{
       if(!init()) throw new Error('Supabase 연결 실패');
+      oauthDiag('④ WebView가 OAuth 콜백 처리 시작');
       const u = new URL(callbackUrl);
       const oauthError = u.searchParams.get('error_description') || u.searchParams.get('error');
       if(oauthError) throw new Error(oauthError);
 
       const code = u.searchParams.get('code');
-      if(!code) throw new Error('Google 로그인 인증 코드가 없습니다.');
+      if(code){
+        oauthDiag('⑤ code 확인 → exchangeCodeForSession 실행');
+        const {data,error} = await sb.auth.exchangeCodeForSession(code);
+        if(error) throw error;
+      } else {
+        const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
+        const access_token = frag.get('access_token');
+        const refresh_token = frag.get('refresh_token');
+        oauthDiag('⑤ fragment 확인: access_token='+(access_token?'있음':'없음')+', refresh_token='+(refresh_token?'있음':'없음'));
+        if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
+        const {data,error} = await sb.auth.setSession({access_token, refresh_token});
+        if(error) throw error;
+      }
 
-      const {data,error} = await sb.auth.exchangeCodeForSession(code);
-      if(error) throw error;
-
-      await status();
+      oauthDiag('⑥ Supabase 세션 설정 성공 → 사용자 확인 중');
+      const checkedUser = await status();
+      oauthDiag(checkedUser ? '⑦ 로그인 성공: '+checkedUser.email : '❌ 세션 설정 후 사용자 없음');
       alert('Google 로그인이 완료됐어요');
       return true;
     }catch(e){
       console.error('Google OAuth callback 실패:', e);
+      oauthDiag('❌ 콜백 처리 실패: '+(e?.message || e));
       alert('Google 로그인 완료 처리 실패: ' + (e?.message || e));
       return false;
     }

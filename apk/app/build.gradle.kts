@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.min.journal"
+    namespace = "com.yanghw.app"
     compileSdk = 35
 
     compileOptions {
@@ -23,11 +23,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.min.journal"
+        applicationId = "com.yanghw.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "1.19"
+        versionCode = 23
+        versionName = "1.23"
     }
 
     buildTypes {
@@ -44,4 +44,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("androidx.browser:browser:1.8.0")
+    implementation("androidx.webkit:webkit:1.12.1")
 }

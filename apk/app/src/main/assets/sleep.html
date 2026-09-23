@@ -3910,12 +3910,12 @@ $('#cloudGoogle').onclick = async () => {
       provider:'google',
       options:{
         redirectTo:'yangstudy://auth/callback',
-        skipBrowserRedirect:true
+        skipBrowserRedirect:true,
+        queryParams:{ prompt:'select_account' }
       }
     });
     if(error){ alert('Google 로그인 실패: ' + error.message); return; }
     if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
-    try{ window.top.__androidOAuthSource = 'sleep.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
   }
@@ -3924,7 +3924,7 @@ $('#cloudGoogle').onclick = async () => {
   const redirectTo = window.location.origin + window.location.pathname;
   const {error} = await sbClient.auth.signInWithOAuth({
     provider:'google',
-    options:{redirectTo}
+    options:{redirectTo, queryParams:{ prompt:'select_account' }}
   });
   if(error) alert('Google 로그인 실패: ' + error.message);
 };
@@ -3937,12 +3937,24 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     if(oauthError) throw new Error(oauthError);
 
     const code = u.searchParams.get('code');
-    if(!code) throw new Error('Google 로그인 인증 코드가 없습니다.');
+    let authData = null;
+    if(code){
+      const {data,error} = await sbClient.auth.exchangeCodeForSession(code);
+      if(error) throw error;
+      authData = data;
+    } else {
+      const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
+      const fragError = frag.get('error_description') || frag.get('error');
+      if(fragError) throw new Error(fragError);
+      const access_token = frag.get('access_token');
+      const refresh_token = frag.get('refresh_token');
+      if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
+      const {data,error} = await sbClient.auth.setSession({access_token, refresh_token});
+      if(error) throw error;
+      authData = data;
+    }
 
-    const {data,error} = await sbClient.auth.exchangeCodeForSession(code);
-    if(error) throw error;
-
-    cloudUser = data?.session?.user || data?.user || null;
+    cloudUser = authData?.session?.user || authData?.user || null;
     await refreshCloudStatus();
 
     if(cloudUser){
@@ -4185,7 +4197,7 @@ async function applyActiveTimerRow(row){
     await autoSyncFromCloud();
     found = findPeriodForActiveTimer(row);
   }
-  if(!found) return false;
+  if(!found){ console.warn('[orphan] 수면 타이머 정리'); try{ await cloudClearActiveTimerIfMine(); }catch(_){} if(window.parent !== window){ window.parent.postMessage({type:'exclusive-session-ended', kind:'sleep'}, location.origin); } return false; }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
