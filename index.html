@@ -151,6 +151,13 @@ const SUPABASE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
 //   그 아래 어디서든 initSettingsClient()를 안전하게 호출할 수 있다.
 let sbSettingsClient = null;
 let __sbCreating = false;
+let __initialAuthResolved = false;
+let __resolveInitialAuth;
+const __initialAuthReady = new Promise(resolve => { __resolveInitialAuth = resolve; });
+async function waitForInitialAuth(){
+  if(__initialAuthResolved) return;
+  await __initialAuthReady;
+}
 
 const shell=document.getElementById('shell');
 const tabs={
@@ -195,8 +202,16 @@ function initSettingsClient(){
     sbSettingsClient = window.supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY,
-      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false } }
+      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl: location.hostname !== 'appassets.androidplatform.net' } }
     );
+    // PWA OAuth callback 복원이 끝나기 전에 다른 초기화 코드가 getSession()을
+    // 동시에 호출하지 않도록 INITIAL_SESSION까지만 기다린다. 콜백 안에서는 API 호출 금지.
+    sbSettingsClient.auth.onAuthStateChange((event)=>{
+      if(event === 'INITIAL_SESSION' && !__initialAuthResolved){
+        __initialAuthResolved = true;
+        __resolveInitialAuth();
+      }
+    });
     return sbSettingsClient;
   }catch(e){ return null; }
   finally{ __sbCreating = false; }
@@ -204,6 +219,7 @@ function initSettingsClient(){
 async function loadSharedSettingsFromCloud(){
   const sb=initSettingsClient();
   if(!sb) return {...SHARED_SETTINGS_DEFAULT};
+  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user){
     sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
@@ -257,6 +273,7 @@ window.addEventListener('message', async (ev)=>{
 async function writeSharedSettingsToCloud(patch){
   const sb=initSettingsClient();
   if(!sb) throw new Error('클라우드 연결 실패');
+  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user) throw new Error('로그인이 필요합니다. 설정은 클라우드에만 저장됩니다.');
   const current=await readSharedSettings();
@@ -277,6 +294,7 @@ async function writeSharedSettingsToCloud(patch){
 async function saveLastTabToCloud(tab){
   const sb=initSettingsClient();
   if(!sb) return;
+  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user) return;
   await sb.from('journal_settings').upsert({
@@ -288,6 +306,7 @@ async function saveLastTabToCloud(tab){
 async function restoreLastTabFromCloud(){
   const sb=initSettingsClient();
   if(!sb) return null;
+  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user) return null;
   const {data}=await sb.from('journal_settings')
@@ -542,7 +561,8 @@ let exclusiveQueue=Promise.resolve();
     const sb = initSettingsClient();
     if(!sb) return;
     try{
-      const {data:{session}} = await sb.auth.getSession();
+      await waitForInitialAuth();
+       const {data:{session}} = await sb.auth.getSession();
       const user = session?.user;
       if(!user) return;
       const {data:row} = await sb.from('active_timer')
@@ -554,7 +574,7 @@ let exclusiveQueue=Promise.resolve();
   function startRealtime(){
     const sb = initSettingsClient();
     if(!sb || ch) return;
-    sb.auth.getSession().then(({data:{session}})=>{
+    waitForInitialAuth().then(()=>sb.auth.getSession()).then(({data:{session}})=>{
       const user = session?.user;
       if(!user || ch) return;
       ch = sb.channel(`gongbujang-tab-${user.id}`)
@@ -766,7 +786,8 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    return !!sb;
  }
  let __statusBusy=false;
- async function status(){if(__statusBusy)return user;__statusBusy=true;try{if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
+ async function status(){if(__statusBusy)return user;__statusBusy=true;try{if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }await waitForInitialAuth();
+  const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
 $('sharedCloudStatus').textContent=user?('✅ '+user.email):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
 return user}finally{__statusBusy=false}}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
