@@ -794,7 +794,7 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 let verified=false;
 if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
 $('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
-$('sharedCloudToggle').disabled=!!user;$('sharedCloudUpload').disabled=!user;$('sharedCloudDownload').disabled=!user;$('sharedCloudLogout').disabled=!user;return user}
+$('sharedCloudToggle').disabled=!!user;return user}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
  async function all(action){if(!await status()){alert('먼저 홈에서 클라우드에 로그인해 주세요.');$('sharedCloudSetup').classList.add('show');return}const map=action==='upload'?{study:['cloudUpload'],lecture:['cloudUpload'],sleep:['cloudUpload'],record:['cloudUpload']}:{study:['cloudDownload'],lecture:['cloudDownload'],sleep:['cloudDownload'],record:['cloudDownload']};for(const kind of ['study','lecture','sleep','record']){try{await clickChild(kind,map[kind]);await new Promise(r=>setTimeout(r,180))}catch(e){console.error(kind,action,e)}}}
@@ -842,39 +842,73 @@ $('sharedCloudToggle').disabled=!!user;$('sharedCloudUpload').disabled=!user;$('
   }
   await status();
 
-  // ★ Android 커스텀 스킴 콜백 처리
+  // ★ Android 커스텀 스킴 콜백 처리 - v26 세분화 진단
   window.yangStudyHandleOAuthCallback = async function(callbackUrl){
+    const diag = oauthDiag;
     try{
+      diag('④-1 콜백 함수 진입');
       if(!init()) throw new Error('Supabase 연결 실패');
-      oauthDiag('④ WebView가 OAuth 콜백 처리 시작');
+      diag('④-2 Supabase client 준비 완료');
+
       const u = new URL(callbackUrl);
+      diag('④-3 callback URL 파싱 완료');
       const oauthError = u.searchParams.get('error_description') || u.searchParams.get('error');
       if(oauthError) throw new Error(oauthError);
 
       const code = u.searchParams.get('code');
       if(code){
-        oauthDiag('⑤ code 확인 → exchangeCodeForSession 실행');
-        const {data,error} = await sb.auth.exchangeCodeForSession(code);
-        if(error) throw error;
+        diag('⑤-1 PKCE code 발견');
+        diag('⑤-2 exchangeCodeForSession 호출 직전');
+        const result = await Promise.race([
+          sb.auth.exchangeCodeForSession(code),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error('exchangeCodeForSession 15초 타임아웃')),15000))
+        ]);
+        diag('⑤-3 exchangeCodeForSession 반환됨');
+        if(result?.error) throw result.error;
+        diag('⑤-4 exchangeCodeForSession 성공');
       } else {
         const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
         const access_token = frag.get('access_token');
         const refresh_token = frag.get('refresh_token');
-        oauthDiag('⑤ fragment 확인: access_token='+(access_token?'있음':'없음')+', refresh_token='+(refresh_token?'있음':'없음'));
+        diag('⑤-1 fragment: access='+(access_token?'있음':'없음')+', refresh='+(refresh_token?'있음':'없음'));
         if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
-        const {data,error} = await sb.auth.setSession({access_token, refresh_token});
-        if(error) throw error;
+
+        diag('⑤-2 setSession 호출 직전');
+        const result = await Promise.race([
+          sb.auth.setSession({access_token, refresh_token}),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error('setSession 15초 타임아웃')),15000))
+        ]);
+        diag('⑤-3 setSession 반환됨');
+        if(result?.error) throw result.error;
+        diag('⑤-4 setSession 성공 / user='+(result?.data?.user?.email || '없음'));
       }
 
-      oauthDiag('⑥ Supabase 세션 설정 성공 → 사용자 확인 중');
-      const checkedUser = await status();
-      oauthDiag(checkedUser ? '⑦ 로그인 성공: '+checkedUser.email : '❌ 세션 설정 후 사용자 없음');
-      alert('Google 로그인이 완료됐어요');
+      diag('⑥-1 getSession 호출 직전');
+      const gs = await Promise.race([
+        sb.auth.getSession(),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('getSession 10초 타임아웃')),10000))
+      ]);
+      diag('⑥-2 getSession 반환 / session='+(gs?.data?.session?'있음':'없음')+(gs?.error?' / error='+gs.error.message:''));
+      if(gs?.error) throw gs.error;
+
+      diag('⑥-3 getUser 호출 직전');
+      const gu = await Promise.race([
+        sb.auth.getUser(),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('getUser 10초 타임아웃')),10000))
+      ]);
+      diag('⑥-4 getUser 반환 / user='+(gu?.data?.user?.email || '없음')+(gu?.error?' / error='+gu.error.message:''));
+      if(gu?.error) throw gu.error;
+
+      diag('⑦-1 status UI 갱신 직전');
+      const checkedUser = await Promise.race([
+        status(),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('status 10초 타임아웃')),10000))
+      ]);
+      diag(checkedUser ? '⑦-2 로그인 성공: '+checkedUser.email : '❌ status 후 사용자 없음');
       return true;
     }catch(e){
       console.error('Google OAuth callback 실패:', e);
-      oauthDiag('❌ 콜백 처리 실패: '+(e?.message || e));
-      alert('Google 로그인 완료 처리 실패: ' + (e?.message || e));
+      diag('❌ '+(e?.message || e));
       return false;
     }
   };
