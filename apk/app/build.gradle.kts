@@ -26,8 +26,8 @@ android {
         applicationId = "com.yanghw.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.24"
+        versionCode = 25
+        versionName = "1.25"
     }
 
     buildTypes {
