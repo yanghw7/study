@@ -192,10 +192,11 @@ function initSettingsClient(){
   if(__sbCreating) return null;
   __sbCreating = true;
   try{
+    const isAndroidApp = location.hostname === 'appassets.androidplatform.net';
     sbSettingsClient = window.supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY,
-      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false } }
+      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:!isAndroidApp } }
     );
     return sbSettingsClient;
   }catch(e){ return null; }
@@ -690,12 +691,23 @@ window.addEventListener('message',ev=>{
 
     const previousActive = exclusiveActive!==kind ? exclusiveActive : null;
 
-    // 다른 기록장들 먼저 정지
-    await Promise.all(
+    // 다른 기록장들 먼저 정지. 하나라도 정지 확인에 실패하면 새 타이머 시작을 허용하지 않는다.
+    const stopResults = await Promise.all(
       Object.keys(exclusiveFrames)
         .filter(other=>other!==kind)
         .map(k=>stopExclusive(k, atMs))
     );
+    if(stopResults.some(ok=>ok===false)){
+      if(previousActive){
+        exclusiveFrames[previousActive]?.contentWindow?.postMessage(
+          {type:'exclusive-session-undo-stop', atMs}, location.origin);
+        exclusiveActive = previousActive;
+        setExclusiveTabStatus(previousActive);
+      }
+      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
+      if(pendingStart?.req===req) pendingStart=null;
+      return;
+    }
 
     // 정지시키는 동안 취소가 왔으면 → 방금 정지시킨 것을 되돌림
     if(pendingStart?.req !== req || pendingStart.aborted){
@@ -746,7 +758,7 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    let box=document.getElementById('androidOAuthDiag');
    if(!box){
      box=document.createElement('div'); box.id='androidOAuthDiag';
-     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:8px 10px;border-radius:10px;font:12px/1.35 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008;max-height:150px;overflow-y:auto';
+     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.45 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008';
      document.body.appendChild(box);
    }
    const line=new Date().toLocaleTimeString()+'  '+msg;
