@@ -4207,6 +4207,7 @@ async function applyActiveTimerRow(row){
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
   if(!Number.isFinite(started)) return false;
 
+  const beforeApply = deepClone(found.p);
   // [FIX1] 서버 타이머 값을 시작/종료 일시에 함께 반영
   const startDT = new Date(started);
   found.p.startDate = ymd(startDT);
@@ -4226,6 +4227,7 @@ async function applyActiveTimerRow(row){
     }
   }
 
+  markChangedPeriodFields(found.p, beforeApply);
   // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
