@@ -2365,7 +2365,7 @@ async function requestExclusiveSessionStart(atMs){
   try{
     const req='study-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     return await new Promise(resolve=>{
-      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(false)},3500);
+      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
       function onMsg(ev){
         if(ev.source!==window.parent || ev.data?.type!=='exclusive-session-result' || ev.data?.req!==req) return;
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
@@ -2373,7 +2373,7 @@ async function requestExclusiveSessionStart(atMs){
       window.addEventListener('message',onMsg);
       window.parent.postMessage({type:'exclusive-session-start',kind:'study',req,at:atMs},location.origin);
     });
-  }catch(e){return false}
+  }catch(e){return true}
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='study') return;
@@ -3886,12 +3886,61 @@ function findPeriodForActiveTimer(row){
   return {ym, dk, day, p:day.periods[idx], idx};
 }
 
+// [CROSS-DEVICE-END] 다른 종류의 타이머가 서버에서 시작되면
+// 이 페이지에 남아 있는 실행 중 기록을 그 시작 시각으로 종료해 클라우드에 저장한다.
+async function closeLocalRunningPeriodsForForeignTimer(row){
+  if(!row || row.status !== 'running') return false;
+  const boundaryMs = Date.parse(row.started_at);
+  if(!Number.isFinite(boundaryMs)) return false;
+
+  const endDT = new Date(boundaryMs);
+  const touched = new Set();
+  let changed = false;
+
+  for(const [ym, month] of Object.entries(monthCache || {})){
+    if(!month || typeof month !== 'object') continue;
+    for(const [dk, day] of Object.entries(month)){
+      if(!day || !Array.isArray(day.periods)) continue;
+      for(const p of day.periods){
+        const st = Number(p?.timerStartedAt);
+        const en = Number(p?.timerEndedAt);
+        if(!(Number.isFinite(st) && st > 0) || (Number.isFinite(en) && en >= st)) continue;
+        // 서버의 새 시작이 이 기록보다 과거인 비정상 이벤트는 무시한다.
+        if(boundaryMs < st) continue;
+
+        const before = deepClone(p);
+        p.endDate = ymd(endDT);
+        p.endTime = hm(endDT);
+        p.timerEndedAt = Math.round(boundaryMs);
+        markChangedPeriodFields(p, before);
+        touched.add(ym);
+        changed = true;
+      }
+    }
+  }
+
+  if(!changed) return false;
+
+  // 종료값을 먼저 서버 기록에 남긴 뒤 화면 타이머를 갱신한다.
+  for(const ym of touched) await saveMonth(ym);
+  try{ await renderCurrentView(); }catch(_){ updateStudyTimer(); }
+  syncAndroidTimer();
+  if(window.parent !== window){
+    window.parent.postMessage({type:'exclusive-session-ended', kind:'study'}, location.origin);
+  }
+  return true;
+}
+
 async function applyActiveTimerRow(row){
   if(!row) return false;
 
   // study는 자신의 ym(YYYY-MM)만 반영한다. 강의(L:)·수면(S:)은 무시.
   const rowYm = String(row.ym || '');
-  if(!/^\d{4}-\d{2}$/.test(rowYm)) return false;
+  if(!/^\d{4}-\d{2}$/.test(rowYm)){
+    // 다른 종류의 active_timer가 running이면 기존 study 기록을 같은 시각에 종료한다.
+    await closeLocalRunningPeriodsForForeignTimer(row);
+    return true;
+  }
 
   let found = findPeriodForActiveTimer(row);
 
