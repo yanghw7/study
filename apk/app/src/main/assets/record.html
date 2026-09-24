@@ -4151,10 +4151,9 @@ $('#cloudSync').onclick = runManualCloudSync;
 
 initSupabase();
 
-// 로그인 세션 이벤트 콜백은 반드시 동기적으로 즉시 반환한다.
-// Supabase API/DB 동기화는 별도의 message task에서 실행해 Auth lock 재진입을 피한다.
+// 로그인 세션을 계속 유지하고, 세션이 복원/갱신될 때 자동으로 상태와 데이터를 맞춘다.
 if(sbClient){
-  sbClient.auth.onAuthStateChange((event, session) => {
+  sbClient.auth.onAuthStateChange(async (event, session) => {
     cloudUser = session?.user || null;
     const status = $('#cloudStatus');
     if(status){
@@ -4163,32 +4162,26 @@ if(sbClient){
     const logoutBtn = $('#cloudLogout');
     if(logoutBtn) logoutBtn.style.display = cloudUser ? '' : 'none';
 
-    if(!cloudUser){
-      stopActiveTimerRealtime();
-      return;
-    }
-    if(event === 'SIGNED_IN' || event === 'INITIAL_SESSION'){
-      // postMessage는 현재 auth callback이 반환된 뒤 별도 task에서 처리된다.
-      window.postMessage({type:'journal-auth-session-ready', event}, location.origin);
-    }
-  });
+    // 새 로그인이나 기존 로그인 세션 복원 시 클라우드 최신 기록을 자동으로 불러온다.
+    if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')){
+      try{
+        void calibrateServerClock(true);
+        await autoSyncFromCloud();
+        enforceStudyDayLimit();
+        await renderCurrentView();
+        startActiveTimerRealtime();
+        await syncActiveTimerFromCloud(true);
 
-  window.addEventListener('message', async (ev) => {
-    if(ev.source !== window || ev.origin !== location.origin) return;
-    if(ev.data?.type !== 'journal-auth-session-ready') return;
-    if(!cloudUser) return;
-    try{
-      void calibrateServerClock(true);
-      await autoSyncFromCloud();
-      enforceStudyDayLimit();
-      await renderCurrentView();
-      startActiveTimerRealtime();
-      await syncActiveTimerFromCloud(true);
-      await checkStudyDayBoundaryRollover();
-    }catch(e){
-      console.error('세션 자동 동기화 실패:', e);
-      enforceStudyDayLimit();
-      await renderCurrentView();
+        // v9.5: 로그인/세션 복원 완료 직후 소급 분할 검사.
+        // 앱이 기준시점 동안 완전히 종료되어 있었던 경우를 처리한다.
+        await checkStudyDayBoundaryRollover();
+      }catch(e){
+        console.error('세션 자동 동기화 실패:', e);
+        enforceStudyDayLimit();
+        await renderCurrentView();
+      }
+    } else if(!cloudUser){
+      stopActiveTimerRealtime();
     }
   });
 }

@@ -746,7 +746,7 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    let box=document.getElementById('androidOAuthDiag');
    if(!box){
      box=document.createElement('div'); box.id='androidOAuthDiag';
-     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.45 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008';
+     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:8px 10px;border-radius:10px;font:12px/1.35 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008;max-height:150px;overflow-y:auto';
      document.body.appendChild(box);
    }
    const line=new Date().toLocaleTimeString()+'  '+msg;
