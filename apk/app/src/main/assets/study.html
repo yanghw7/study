@@ -882,6 +882,34 @@ function mergePeriods(localP, remoteP){
     out._fieldUpdatedAt[k]=Math.max(Number(l._fieldUpdatedAt?.[k]||0),Number(r._fieldUpdatedAt?.[k]||0));
   });
   out._updatedAt=Math.max(Number(l._updatedAt||0),Number(r._updatedAt||0),...Object.values(out._fieldUpdatedAt).map(Number));
+
+  // [SERVER-AUTH-END] 서버에서 종료된 Study 기록은 종료 관련 필드를 서버값으로 확정한다.
+  // 다른 기기의 오래된 로컬 running 값/빈 종료값이 서버 종료값을 다시 덮지 못하게 한다.
+  const remoteEnded = Number(r.timerEndedAt);
+  if(Number.isFinite(remoteEnded) && remoteEnded > 0){
+    out.timerEndedAt = remoteEnded;
+    out.endDate = String(r.endDate || '');
+    out.endTime = String(r.endTime || '');
+    const remoteEndPage = String(r.endPage ?? '').trim();
+    const startPage = String(r.startPage ?? l.startPage ?? '').trim();
+    out.endPage = remoteEndPage || startPage;
+
+    const endTs = Math.max(
+      remoteEnded,
+      Number(r._updatedAt || 0),
+      Number(r._fieldUpdatedAt?.timerEndedAt || 0),
+      Number(r._fieldUpdatedAt?.endDate || 0),
+      Number(r._fieldUpdatedAt?.endTime || 0),
+      Number(r._fieldUpdatedAt?.endPage || 0)
+    );
+    out._fieldUpdatedAt.timerEndedAt = Math.max(Number(out._fieldUpdatedAt.timerEndedAt || 0), endTs);
+    out._fieldUpdatedAt.endDate = Math.max(Number(out._fieldUpdatedAt.endDate || 0), endTs);
+    out._fieldUpdatedAt.endTime = Math.max(Number(out._fieldUpdatedAt.endTime || 0), endTs);
+    if(startPage){
+      out._fieldUpdatedAt.endPage = Math.max(Number(out._fieldUpdatedAt.endPage || 0), endTs);
+    }
+    out._updatedAt = Math.max(Number(out._updatedAt || 0), endTs);
+  }
   return out;
 }
 function mergeDays(localDay, remoteDay, ym='', dk=''){
@@ -2413,6 +2441,7 @@ window.addEventListener('message',async ev=>{
         }
       }
       void saveMonth(ym);
+      try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(e){console.log('렌더에러:',e);}
       stopped=true;
     }
   }catch(e){console.warn('자동 공부 종료 실패',e)}
@@ -3886,59 +3915,49 @@ function findPeriodForActiveTimer(row){
   return {ym, dk, day, p:day.periods[idx], idx};
 }
 
-// [CROSS-DEVICE-END] 다른 종류의 타이머가 서버에서 시작되면
-// 이 페이지에 남아 있는 실행 중 기록을 그 시작 시각으로 종료해 클라우드에 저장한다.
-async function closeLocalRunningPeriodsForForeignTimer(row){
-  if(!row || row.status !== 'running') return false;
-  const boundaryMs = Date.parse(row.started_at);
-  if(!Number.isFinite(boundaryMs)) return false;
+async function closeLocalRunningStudyForForeignTimer(row){
+  if(!row) return false;
+  const rowYm = String(row.ym || '');
+  if(/^\d{4}-\d{2}$/.test(rowYm)) return false;
 
-  const endDT = new Date(boundaryMs);
-  const touched = new Set();
-  let changed = false;
+  // [SERVER-AUTH-END] 강의/수면 시작 시 기존 Study 종료는 start_active_timer RPC가
+  // 서버 study_months에 먼저 기록한다. 여기서 로컬 값을 만들어 다시 저장하지 않는다.
+  // active_timer Realtime이 study_months보다 먼저 도착할 수 있으므로 서버값을 짧게 재조회한다.
+  const foundBefore = await locateRunningPeriod();
+  const targetId = String(foundBefore?.p?._id || '');
 
-  for(const [ym, month] of Object.entries(monthCache || {})){
-    if(!month || typeof month !== 'object') continue;
-    for(const [dk, day] of Object.entries(month)){
-      if(!day || !Array.isArray(day.periods)) continue;
-      for(const p of day.periods){
-        const st = Number(p?.timerStartedAt);
-        const en = Number(p?.timerEndedAt);
-        if(!(Number.isFinite(st) && st > 0) || (Number.isFinite(en) && en >= st)) continue;
-        // 서버의 새 시작이 이 기록보다 과거인 비정상 이벤트는 무시한다.
-        if(boundaryMs < st) continue;
+  for(let attempt=0; attempt<4; attempt++){
+    await autoSyncFromCloud();
+    if(!targetId) return true;
 
-        const before = deepClone(p);
-        p.endDate = ymd(endDT);
-        p.endTime = hm(endDT);
-        p.timerEndedAt = Math.round(boundaryMs);
-        markChangedPeriodFields(p, before);
-        touched.add(ym);
-        changed = true;
+    let ended = false;
+    for(const month of Object.values(monthCache)){
+      if(!month || typeof month !== 'object') continue;
+      for(const day of Object.values(month)){
+        if(!day || !Array.isArray(day.periods)) continue;
+        const p = day.periods.find(x => String(x?._id || '') === targetId);
+        if(p && Number(p.timerEndedAt) > 0){ ended = true; break; }
       }
+      if(ended) break;
     }
+    if(ended){
+      updateStudyTimer();
+      syncAndroidTimer();
+      return true;
+    }
+    if(attempt < 3) await new Promise(r=>setTimeout(r,120 * (attempt + 1)));
   }
 
-  if(!changed) return false;
-
-  // 종료값을 먼저 서버 기록에 남긴 뒤 화면 타이머를 갱신한다.
-  for(const ym of touched) await saveMonth(ym);
-  try{ await renderCurrentView(); }catch(_){ updateStudyTimer(); }
-  syncAndroidTimer();
-  if(window.parent !== window){
-    window.parent.postMessage({type:'exclusive-session-ended', kind:'study'}, location.origin);
-  }
-  return true;
+  // 서버 종료값이 아직 보이지 않으면 로컬 종료값을 임의 저장하지 않고 다음 poll/Realtime에 맡긴다.
+  return false;
 }
-
 async function applyActiveTimerRow(row){
   if(!row) return false;
 
-  // study는 자신의 ym(YYYY-MM)만 반영한다. 강의(L:)·수면(S:)은 무시.
+  // 다른 기기에서 강의(L:)·수면(S:)이 시작되면 이 기기의 실행 중 공부도 즉시 종료 처리한다.
   const rowYm = String(row.ym || '');
   if(!/^\d{4}-\d{2}$/.test(rowYm)){
-    // 다른 종류의 active_timer가 running이면 기존 study 기록을 같은 시각에 종료한다.
-    await closeLocalRunningPeriodsForForeignTimer(row);
+    await closeLocalRunningStudyForForeignTimer(row);
     return true;
   }
 
