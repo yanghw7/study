@@ -192,10 +192,11 @@ function initSettingsClient(){
   if(__sbCreating) return null;
   __sbCreating = true;
   try{
+    const isAndroidApp = location.hostname === 'appassets.androidplatform.net';
     sbSettingsClient = window.supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY,
-      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false } }
+      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:!isAndroidApp } }
     );
     return sbSettingsClient;
   }catch(e){ return null; }
