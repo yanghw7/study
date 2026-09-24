@@ -2661,7 +2661,7 @@ async function requestExclusiveSessionStart(atMs){
   try{
     const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     return await new Promise(resolve=>{
-      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
+      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(false)},3500);
       function onMsg(ev){
         if(ev.source!==window.parent || ev.data?.type!=='exclusive-session-result' || ev.data?.req!==req)return;
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
@@ -2669,7 +2669,7 @@ async function requestExclusiveSessionStart(atMs){
       window.addEventListener('message',onMsg);
       window.parent.postMessage({type:'exclusive-session-start',kind:'lecture',req,at:atMs},location.origin);
     });
-  }catch(e){return true}
+  }catch(e){return false}
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
