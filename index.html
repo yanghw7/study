@@ -151,13 +151,6 @@ const SUPABASE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
 //   그 아래 어디서든 initSettingsClient()를 안전하게 호출할 수 있다.
 let sbSettingsClient = null;
 let __sbCreating = false;
-let __initialAuthResolved = false;
-let __resolveInitialAuth;
-const __initialAuthReady = new Promise(resolve => { __resolveInitialAuth = resolve; });
-async function waitForInitialAuth(){
-  if(__initialAuthResolved) return;
-  await __initialAuthReady;
-}
 
 const shell=document.getElementById('shell');
 const tabs={
@@ -202,16 +195,8 @@ function initSettingsClient(){
     sbSettingsClient = window.supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY,
-      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl: location.hostname !== 'appassets.androidplatform.net' } }
+      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false } }
     );
-    // PWA OAuth callback 복원이 끝나기 전에 다른 초기화 코드가 getSession()을
-    // 동시에 호출하지 않도록 INITIAL_SESSION까지만 기다린다. 콜백 안에서는 API 호출 금지.
-    sbSettingsClient.auth.onAuthStateChange((event)=>{
-      if(event === 'INITIAL_SESSION' && !__initialAuthResolved){
-        __initialAuthResolved = true;
-        __resolveInitialAuth();
-      }
-    });
     return sbSettingsClient;
   }catch(e){ return null; }
   finally{ __sbCreating = false; }
@@ -219,7 +204,6 @@ function initSettingsClient(){
 async function loadSharedSettingsFromCloud(){
   const sb=initSettingsClient();
   if(!sb) return {...SHARED_SETTINGS_DEFAULT};
-  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user){
     sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
@@ -273,7 +257,6 @@ window.addEventListener('message', async (ev)=>{
 async function writeSharedSettingsToCloud(patch){
   const sb=initSettingsClient();
   if(!sb) throw new Error('클라우드 연결 실패');
-  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user) throw new Error('로그인이 필요합니다. 설정은 클라우드에만 저장됩니다.');
   const current=await readSharedSettings();
@@ -294,7 +277,6 @@ async function writeSharedSettingsToCloud(patch){
 async function saveLastTabToCloud(tab){
   const sb=initSettingsClient();
   if(!sb) return;
-  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user) return;
   await sb.from('journal_settings').upsert({
@@ -306,7 +288,6 @@ async function saveLastTabToCloud(tab){
 async function restoreLastTabFromCloud(){
   const sb=initSettingsClient();
   if(!sb) return null;
-  await waitForInitialAuth();
   const {data:{session}}=await sb.auth.getSession();
   if(!session?.user) return null;
   const {data}=await sb.from('journal_settings')
@@ -561,8 +542,7 @@ let exclusiveQueue=Promise.resolve();
     const sb = initSettingsClient();
     if(!sb) return;
     try{
-      await waitForInitialAuth();
-       const {data:{session}} = await sb.auth.getSession();
+      const {data:{session}} = await sb.auth.getSession();
       const user = session?.user;
       if(!user) return;
       const {data:row} = await sb.from('active_timer')
@@ -574,7 +554,7 @@ let exclusiveQueue=Promise.resolve();
   function startRealtime(){
     const sb = initSettingsClient();
     if(!sb || ch) return;
-    waitForInitialAuth().then(()=>sb.auth.getSession()).then(({data:{session}})=>{
+    sb.auth.getSession().then(({data:{session}})=>{
       const user = session?.user;
       if(!user || ch) return;
       ch = sb.channel(`gongbujang-tab-${user.id}`)
@@ -766,7 +746,7 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    let box=document.getElementById('androidOAuthDiag');
    if(!box){
      box=document.createElement('div'); box.id='androidOAuthDiag';
-     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.45 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008';
+     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:8px 10px;border-radius:10px;font:12px/1.35 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008;max-height:150px;overflow-y:auto';
      document.body.appendChild(box);
    }
    const line=new Date().toLocaleTimeString()+'  '+msg;
@@ -786,10 +766,12 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    return !!sb;
  }
  let __statusBusy=false;
- async function status(){if(__statusBusy)return user;__statusBusy=true;try{if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }await waitForInitialAuth();
-  const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
-$('sharedCloudStatus').textContent=user?('✅ '+user.email):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
-return user}finally{__statusBusy=false}}
+ async function status(){if(__statusBusy)return user;__statusBusy=true;try{if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
+// 서버 검증 추가: 실제 요청이 통과해야만 ✅
+let verified=false;
+if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
+$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.add('show');$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
+$('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
  async function all(action){if(!await status()){alert('먼저 홈에서 클라우드에 로그인해 주세요.');$('sharedCloudSetup').classList.add('show');return}const map=action==='upload'?{study:['cloudUpload'],lecture:['cloudUpload'],sleep:['cloudUpload'],record:['cloudUpload']}:{study:['cloudDownload'],lecture:['cloudDownload'],sleep:['cloudDownload'],record:['cloudDownload']};for(const kind of ['study','lecture','sleep','record']){try{await clickChild(kind,map[kind]);await new Promise(r=>setTimeout(r,180))}catch(e){console.error(kind,action,e)}}}
@@ -830,11 +812,16 @@ return user}finally{__statusBusy=false}}
   $('sharedCloudLogout').classList.add('show');
   $('sharedCloudLogout').disabled=false;
   $('sharedCloudLogout').onclick=async()=>{
-    if(!confirm('정말 로그아웃하시겠습니까?')) return;
-    if(!init()) return;
+    if(!confirm('정말 로그아웃하시겠습니까?')){ oauthDiag('L0 로그아웃 취소'); return; }
+    oauthDiag('L1 로그아웃 확인');
+    if(!init())return;
     const {error}=await sb.auth.signOut();
-    if(error){ oauthDiag('signOut 오류: '+error.message); return; }
-    // SIGNED_OUT 이벤트가 onAuthStateChange 콜백에서 UI를 갱신함.
+    if(error){oauthDiag('L3 signOut 오류: '+error.message);return;}
+    oauthDiag('L3 signOut 반환 성공');
+    await new Promise(r=>setTimeout(r,800));
+    await status();
+    $('sharedCloudLogout').classList.add('show');
+    $('sharedCloudLogout').disabled=false;
   };
   $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
   if(init()){
@@ -842,30 +829,9 @@ return user}finally{__statusBusy=false}}
       window.__yangStudyLastAuthEvent = event;
       window.__yangStudyLastAuthSession = session || null;
       oauthDiag('A1 auth event='+event+' / session='+(session?'있음':'없음')+' / user='+(session?.user?.email||'없음'));
-
-      // Auth 이벤트 콜백에서는 Supabase API를 호출하지 않고 전달받은 session으로 UI만 갱신한다.
       if(event === 'TOKEN_REFRESHED') return;
-
-      if(event === 'SIGNED_OUT'){
-        user = null;
-        $('sharedCloudStatus').textContent='❌ 로그인 필요';
-        $('sharedCloudLogout').classList.remove('show');
-        $('sharedCloudLogout').disabled=false;
-        $('sharedCloudToggle').textContent='로그인';
-        $('sharedCloudToggle').disabled=false;
-        $('sharedCloudSetup').classList.add('show');
-        return;
-      }
-
-      if(session?.user){
-        user = session.user;
-        $('sharedCloudStatus').textContent='✅ '+session.user.email;
-        $('sharedCloudLogout').classList.add('show');
-        $('sharedCloudLogout').disabled=false;
-        $('sharedCloudToggle').textContent='계정';
-        $('sharedCloudToggle').disabled=true;
-        $('sharedCloudSetup').classList.remove('show');
-      }
+      if(event === 'SIGNED_OUT') return;
+      setTimeout(status, 500);
     });
   }
   // 초기 세션 UI는 onAuthStateChange의 INITIAL_SESSION으로 복원한다.
@@ -883,9 +849,9 @@ return user}finally{__statusBusy=false}}
       const code = u.searchParams.get('code');
       if(code){
         diag('⑤ PKCE code 방식 - exchangeCodeForSession 시작');
-        const {data, error} = await sb.auth.exchangeCodeForSession(code);
-        if(error) throw error;
-        diag('E2 exchange 반환 성공');
+        const p=sb.auth.exchangeCodeForSession(code);
+        p.then(r=>diag(r?.error?'E2 exchange 오류: '+r.error.message:'E2 exchange 반환 성공'))
+         .catch(e=>diag('E2 exchange 예외: '+(e?.message||e)));
         return true;
       }
 
@@ -895,19 +861,43 @@ return user}finally{__statusBusy=false}}
       diag('⑤-1 fragment access='+(access_token?'있음':'없음')+', refresh='+(refresh_token?'있음':'없음'));
       if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
 
-      diag('⑤-2 setSession 호출');
-      const {data, error} = await sb.auth.setSession({access_token, refresh_token});
-      if(error) throw error;
-      const sess = data?.session || null;
-      user = sess?.user || null;
-      diag('⑤-3 setSession 반환 성공 / user='+(user?.email||'없음'));
+      // v28 D1: Supabase auth lock을 거치지 않고 access token 자체가 서버에서 유효한지 확인
+      diag('D1 access token 서버 검증 시작');
+      fetch(SUPABASE_URL+'/auth/v1/user',{
+        headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+access_token}
+      }).then(async r=>{
+        let body=null; try{body=await r.json()}catch(_e){}
+        diag('D2 /auth/v1/user HTTP '+r.status+' / user='+(body?.email||'없음'));
+      }).catch(e=>diag('D2 token 검증 fetch 실패: '+(e?.message||e)));
 
-      // setSession 직후 status()/getSession을 재호출하지 않는다.
-      // SIGNED_IN 이벤트의 session으로 UI를 갱신한다.
+      diag('⑤-2 setSession 호출');
+      const setP = sb.auth.setSession({access_token, refresh_token});
+      let setDone=false;
+      setP.then(result=>{
+        setDone=true;
+        if(result?.error){diag('⑤-3 setSession 오류: '+result.error.message);return;}
+        const sess=result?.data?.session||null;
+        user=sess?.user||null;
+        diag('⑤-3 setSession 반환 성공 / user='+(user?.email||'없음'));
+        setTimeout(()=>{ status(); },800);
+        if(user){
+          $('sharedCloudStatus').textContent='✅ '+user.email+' (setSession 확인)';
+          $('sharedCloudToggle').textContent='계정';
+          $('sharedCloudToggle').disabled=true;
+          $('sharedCloudSetup').classList.remove('show');
+        }
+        $('sharedCloudLogout').classList.add('show');
+        $('sharedCloudLogout').disabled=false;
+      }).catch(e=>{setDone=true;diag('⑤-3 setSession 예외: '+(e?.message||e));});
+
+      setTimeout(()=>diag('D3 3초 확인 / setSession 반환='+(setDone?'예':'아니오')+' / 마지막 auth event='+(window.__yangStudyLastAuthEvent||'없음')),3000);
+
       return true;
     }catch(e){
       console.error('Google OAuth callback 실패:', e);
       diag('❌ '+(e?.message || e));
+      $('sharedCloudLogout').classList.add('show');
+      $('sharedCloudLogout').disabled=false;
       return false;
     }
   };
