@@ -2413,7 +2413,6 @@ window.addEventListener('message',async ev=>{
         }
       }
       void saveMonth(ym);
-      try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(e){console.log('렌더에러:',e);}
       stopped=true;
     }
   }catch(e){console.warn('자동 공부 종료 실패',e)}
