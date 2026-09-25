@@ -3955,7 +3955,13 @@ async function closeLocalRunningStudyForForeignTimer(row){
       if(ended) break;
     }
     if(ended){
-      updateStudyTimer();
+      // 서버에서 받은 종료시간/종료페이지가 현재 화면 입력칸에도 즉시 보이도록 다시 렌더한다.
+      if(typeof isPeriodInputEditing === 'function'
+         && (isPeriodInputEditing() || (typeof userActionCount === 'number' && userActionCount > 0))){
+        periodRenderPending = true;
+      }else{
+        await renderCurrentView();
+      }
       syncAndroidTimer();
       return true;
     }
@@ -3971,8 +3977,7 @@ async function applyActiveTimerRow(row){
   // 다른 기기에서 강의(L:)·수면(S:)이 시작되면 이 기기의 실행 중 공부도 즉시 종료 처리한다.
   const rowYm = String(row.ym || '');
   if(!/^\d{4}-\d{2}$/.test(rowYm)){
-    await closeLocalRunningStudyForForeignTimer(row);
-    return true;
+    return await closeLocalRunningStudyForForeignTimer(row);
   }
 
   let found = findPeriodForActiveTimer(row);
@@ -3983,10 +3988,7 @@ async function applyActiveTimerRow(row){
     await autoSyncFromCloud();
     found = findPeriodForActiveTimer(row);
   }
-  if(!found){
-  console.warn('[pending] 교시 데이터 대기 중 (재시도 예정)');
-  return false;
-}
+  if(!found){ console.warn('[orphan] 공부 타이머 정리'); try{ await cloudClearActiveTimerIfMine(); }catch(_){} if(window.parent !== window){ window.parent.postMessage({type:'exclusive-session-ended', kind:'study'}, location.origin); } return false; }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
