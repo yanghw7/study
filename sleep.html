@@ -2774,7 +2774,7 @@ window.addEventListener('message',async ev=>{
     const {ym,dk,day,p,idx}=found;
     const before=deepClone(p);
     p.endDate=''; p.endTime=''; p.timerEndedAt=null;
-    if(cloudUser) void cloudResumeActiveTimer(ym, dk, p, idx);
+    if(cloudUser) await cloudResumeActiveTimer(ym, dk, p, idx);
     markChangedPeriodFields(p, before);
     autoSortPeriodsByStart(day);
     await saveMonth(ym);
@@ -2854,7 +2854,6 @@ $('#periodList').addEventListener('click', async (e) => {
   const beforeSync = deepClone(p);
 
   if(action === 'start'){
-    if(!(await requestExclusiveSessionStart(now.getTime()))) return;
     if(!refetch()) return;
     p.startDate = ymd(now);
     p.startTime = hm(now);
@@ -2915,10 +2914,8 @@ $('#periodList').addEventListener('click', async (e) => {
     markChangedPeriodFields(p, beforeSync);
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
-      try{ await cloudClearActiveTimer(); }catch(_){}
+      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), p._id); }catch(_){}
     }
-    // 방금 시작했던 타이머를 취소하는 것이므로, 그로 인해 자동 종료됐던
-    // 다른 기록장(공부/강의)의 기록을 되돌려 달라고 알린다.
     if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'sleep'},location.origin);
     showToast('시작 기록을 취소했어요');
   }else if(action === 'cancel-end'){
@@ -2930,13 +2927,10 @@ $('#periodList').addEventListener('click', async (e) => {
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
-        void cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
-        void calibrateServerClock(true);
+        await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+        await calibrateServerClock(true);
         if(!refetch()) return;
       }catch(_){}
-    }
-    if(window.parent!==window){
-      try{ await requestExclusiveSessionStart(serverNowMs()); }catch(_){}
     }
     showToast('종료 기록을 취소했어요');
   }else{
@@ -4144,6 +4138,22 @@ async function cloudResumeActiveTimer(ym, dayKey, p, idx){
     console.error('서버 타이머 재개 실패:', error);
     return null;
   }
+  return data || null;
+}
+
+async function cloudCancelActiveTimerStart(ym, dayKey, periodId){
+  if(!sbClient || !cloudUser) return null;
+  const {data,error} = await sbClient.rpc('cancel_active_timer_start',{
+    p_ym: String(ym || ''),
+    p_day_key: String(dayKey ?? ''),
+    p_period_id: String(periodId || '')
+  });
+  if(error){
+    console.error('서버 타이머 시작 취소 실패:', error);
+    showToast('서버 타이머 시작 취소 실패');
+    throw error;
+  }
+  activeTimerLastFingerprint = '';
   return data || null;
 }
 
