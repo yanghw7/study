@@ -528,13 +528,7 @@ let exclusiveQueue=Promise.resolve();
       }
       return;
     }
-    // stopped 이거나 null(삭제) 처리.
-    // 같은 기기에서 시작 요청으로 이미 진행 중인 탭은 RPC 처리 중 active_timer가
-    // 잠깐 null/stopped로 보이더라도 탭 표시를 지우지 않는다.
-    // 실제 종료는 자식 화면의 exclusive-session-ended 메시지로 즉시 반영된다.
-    if(exclusiveActive){
-      return;
-    }
+    // 서버 active_timer가 유일한 기준이다. stopped/null이면 즉시 표시 해제.
     exclusiveActive = null;
     setExclusiveTabStatus(null);
   }
@@ -571,6 +565,9 @@ let exclusiveQueue=Promise.resolve();
         });
     });
   }
+
+  // index 바깥 메시지 핸들러도 서버 상태만 다시 읽을 수 있게 공개
+  window.refreshExclusiveServerState = fetchOnce;
 
   // realtime 연결 + 앱 시작할 때 딱 1회만 확인
   startRealtime();
@@ -636,98 +633,19 @@ async function stopExclusive(kind, atMs){
 }
 window.addEventListener('message',ev=>{
   if(ev.origin!==location.origin)return;
-  if(ev.data?.type==='exclusive-session-ended'){
-    if(exclusiveActive===ev.data.kind){ exclusiveActive=null; setExclusiveTabStatus(null); }
-    if(lastTransition?.startedKind===ev.data.kind) lastTransition=null;
-    if(pendingStart?.kind===ev.data.kind) pendingStart=null;
+  const type=ev.data?.type;
+  // 자식 화면의 로컬 메시지는 탭 색을 직접 바꾸지 않는다.
+  // active_timer 서버 상태를 다시 읽는 트리거로만 사용한다.
+  if(type==='exclusive-session-ended' || type==='exclusive-session-cancel-start'){
+    window.refreshExclusiveServerState?.();
     return;
   }
-  if(ev.data?.type==='exclusive-session-cancel-start'){
-    const kind=ev.data.kind;
-
-    // 아직 큐에서 처리 안 된 시작 요청이면 → 무효화만 하고 끝
-    // (2단계에서 aborted 감지해서 알아서 되돌림)
-    if(pendingStart && pendingStart.kind===kind && pendingStart.aborted===false){
-      pendingStart.aborted = true;
-      if(exclusiveActive!==kind && !lastTransition){
-        exclusiveActive=null;
-        setExclusiveTabStatus(null);
-      }
-      return;
-    }
-
-    // 이미 활성화된 상태에서 취소된 경우
-    exclusiveQueue=exclusiveQueue.then(async()=>{
-      const canUndo = lastTransition && lastTransition.startedKind===kind && lastTransition.previousKind;
-      if(canUndo){
-        const {previousKind:target, atMs}=lastTransition;
-        exclusiveFrames[target]?.contentWindow?.postMessage(
-          {type:'exclusive-session-undo-stop', atMs}, location.origin);
-        exclusiveActive=target;
-        setExclusiveTabStatus(target);
-      }else if(exclusiveActive===kind){
-        exclusiveActive=null;
-        setExclusiveTabStatus(null);
-      }
-      lastTransition=null;
-    });
-    return;
-  }
-  if(ev.data?.type!=='exclusive-session-start')return;
-  const kind=ev.data.kind, req=ev.data.req;
-  const atMs=Number.isFinite(ev.data.at)?ev.data.at:Date.now();
-  if(!exclusiveFrames[kind])return;
-
-  // 이전에 대기 중이던 시작 요청은 무효화
-  if(pendingStart) pendingStart.aborted = true;
-  pendingStart = {kind, req, atMs, aborted:false};
-
-  exclusiveQueue=exclusiveQueue.then(async()=>{
-    // 큐에 들어와서 실행할 시점에 이미 취소됐는지 확인
-    if(pendingStart?.req !== req || pendingStart.aborted){
-      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
-      return;
-    }
-
-    const previousActive = exclusiveActive!==kind ? exclusiveActive : null;
-
-    // 다른 기록장들 먼저 정지. 하나라도 정지 확인에 실패하면 새 타이머 시작을 허용하지 않는다.
-    const stopResults = await Promise.all(
-      Object.keys(exclusiveFrames)
-        .filter(other=>other!==kind)
-        .map(k=>stopExclusive(k, atMs))
-    );
-    if(stopResults.some(ok=>ok===false)){
-      if(previousActive){
-        exclusiveFrames[previousActive]?.contentWindow?.postMessage(
-          {type:'exclusive-session-undo-stop', atMs}, location.origin);
-        exclusiveActive = previousActive;
-        setExclusiveTabStatus(previousActive);
-      }
-      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
-      if(pendingStart?.req===req) pendingStart=null;
-      return;
-    }
-
-    // 정지시키는 동안 취소가 왔으면 → 방금 정지시킨 것을 되돌림
-    if(pendingStart?.req !== req || pendingStart.aborted){
-      if(previousActive){
-        exclusiveFrames[previousActive]?.contentWindow?.postMessage(
-          {type:'exclusive-session-undo-stop', atMs}, location.origin);
-        exclusiveActive = previousActive;
-        setExclusiveTabStatus(previousActive);
-      }
-      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
-      return;
-    }
-
-    // 정상 시작 확정
-    exclusiveActive=kind;
-    setExclusiveTabStatus(kind);
-    lastTransition = previousActive ? {startedKind:kind, previousKind:previousActive, atMs} : null;
-    ev.source?.postMessage({type:'exclusive-session-result',req,ok:true},location.origin);
-    if(pendingStart?.req===req) pendingStart=null;
-  });
+  if(type!=='exclusive-session-start')return;
+  const req=ev.data?.req;
+  // 시작 허용 여부도 로컬 iframe 정지 작업으로 결정하지 않는다.
+  // 실제 단일화는 start_active_timer RPC가 서버에서 원자적으로 처리한다.
+  ev.source?.postMessage({type:'exclusive-session-result',req,ok:true},location.origin);
+  window.refreshExclusiveServerState?.();
 });
 
 </script>
@@ -752,8 +670,23 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 <script id="v128-shared-cloud">
 (()=>{
  const $=id=>document.getElementById(id); let sb=null,user=null;
- // OAuth diagnostic overlay removed for release build.
- function oauthDiag(_msg){}
+ // Android OAuth diagnostic panel (only shown inside APK)
+ function oauthDiag(msg){
+   if(!(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function')) return;
+   let box=document.getElementById('androidOAuthDiag');
+   if(!box){
+     box=document.createElement('div'); box.id='androidOAuthDiag';
+     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.45 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008';
+     document.body.appendChild(box);
+   }
+   const line=new Date().toLocaleTimeString()+'  '+msg;
+   const prev=(box.dataset.log||'').split('\n').filter(Boolean);
+   prev.push(line);
+   while(prev.length>10) prev.shift();
+   box.dataset.log=prev.join('\n');
+   box.textContent='OAuth 진단\n'+box.dataset.log;
+ }
+ window.yangStudyOAuthDiag=oauthDiag;
  // ★ [2단계] 부모의 싱글톤(initSettingsClient)을 재사용한다.
  //   여기서 createClient 를 새로 호출하면 같은 storage key 를 공유하는
  //   GoTrueClient 가 2개가 되어 "Multiple GoTrueClient instances" 경고가 발생한다.
