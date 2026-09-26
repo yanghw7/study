@@ -2716,33 +2716,66 @@ async function requestExclusiveSessionStart(atMs){
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='sleep')return;
-  
+
   let stopped=false;
   try{
-    // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
-    // 이 강의의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
     const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
     const now=new Date(atMs);
     const found=await locateRunningPeriod();
     if(found){
-      const {ym,dk,day,p}=found;
-      const before=deepClone(p);
-      p.endDate=ymd(now);p.endTime=hm(now);
-      p.timerEndedAt=Math.round(atMs);
-      lastAutoStoppedId=p._id;
-      lastAutoStoppedAt=atMs;
-      if(cloudUser){
-        const row=await cloudStopActiveTimer(ym, dk, p._id);
-const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
-      }else p.timerEndedAt=Math.round(atMs);
-      markChangedPeriodFields(p, before);
-      autoSortPeriodsByStart(day);
-      // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
-      void saveMonth(ym);
-      if(ym===ymKey(cur) && dk===dKey(cur)){
-        renderPeriods();updateStudyTimer();updateWasteTimer();
+      const {ym,dk,day}=found;
+      const pid=found.p._id;
+
+      // ① 로컬 확정 + 마킹 + 정렬 (await 이전)
+      {
+        const p=found.p;
+        const before=deepClone(p);
+        p.endDate=ymd(now);
+        p.endTime=hm(now);
+        p.timerEndedAt=Math.round(atMs);
+        lastAutoStoppedId=pid;
+        lastAutoStoppedAt=atMs;
+        markChangedPeriodFields(p, before);
+        autoSortPeriodsByStart(day);
       }
+
+      if(ym===ymKey(cur) && dk===dKey(cur)){
+        if(isPeriodInputEditing() || userActionCount > 0){
+          periodRenderPending = true;
+        }else{
+          renderPeriods();updateStudyTimer();updateWasteTimer();
+        }
+      }
+
+      // ② 저장 확정
+      await saveMonth(ym);
+
+      // ③ 서버 RPC + refetch + 재마킹
+      if(cloudUser){
+        try{
+          const row=await cloudStopActiveTimer(ym, dk, pid);
+          const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
+          if(Number.isFinite(ts)){
+            const day2=monthCache[ym]?.[dk];
+            const idx2=day2?.periods?.findIndex(x=>String(x._id||'')===String(pid));
+            if(idx2>=0){
+              const p2=day2.periods[idx2];
+              const before2=deepClone(p2);
+              p2.timerEndedAt=ts;
+              markChangedPeriodFields(p2, before2);
+              await saveMonth(ym);
+              if(ym===ymKey(cur) && dk===dKey(cur)){
+                if(!(isPeriodInputEditing() || userActionCount > 0)){
+                  renderPeriods();updateStudyTimer();updateWasteTimer();
+                } else {
+                  periodRenderPending = true;
+                }
+              }
+            }
+          }
+        }catch(_){}
+      }
+
       stopped=true;
     }
   }catch(e){console.warn('자동 기상 실패',e)}
@@ -4200,49 +4233,43 @@ function findPeriodForActiveTimer(row){
 // 이 페이지에 남아 있는 실행 중 기록을 그 시작 시각으로 종료해 클라우드에 저장한다.
 async function closeLocalRunningPeriodsForForeignTimer(row){
   if(!row || row.status !== 'running') return false;
-
-  // 다른 종류의 타이머가 시작되면 서버 start_active_timer()가
-  // 기존 Sleep 기록의 종료값을 study_months에 먼저 기록한다.
-  // 로컬에서 종료값을 임의 생성/저장하지 않고 서버값이 보일 때까지 재동기화한다.
-  for(let attempt=0; attempt<4; attempt++){
-    await autoSyncFromCloud();
-
-    let ended = false;
-    for(const month of Object.values(monthCache || {})){
-      if(!month || typeof month !== 'object') continue;
-      for(const day of Object.values(month)){
-        if(!day || !Array.isArray(day.periods)) continue;
-        for(const p of day.periods){
-          const st = Number(p?.timerStartedAt);
-          const en = Number(p?.timerEndedAt);
-          if(Number.isFinite(st) && st > 0 && Number.isFinite(en) && en >= st){
-            ended = true;
-            break;
-          }
-        }
-        if(ended) break;
+  const boundaryMs = Date.parse(row.started_at);
+  if(!Number.isFinite(boundaryMs)) return false;
+  const endDT = new Date(boundaryMs);
+  const touched = new Set();
+  let changed = false;
+  for(const [ym, month] of Object.entries(monthCache || {})){
+    if(!month || typeof month !== 'object') continue;
+    for(const day of Object.values(month)){
+      if(!day || !Array.isArray(day.periods)) continue;
+      for(const p of day.periods){
+        const st = Number(p?.timerStartedAt);
+        const en = Number(p?.timerEndedAt);
+        if(!(Number.isFinite(st) && st > 0) || (Number.isFinite(en) && en >= st)) continue;
+        if(boundaryMs < st) continue;
+        const before = deepClone(p);
+        p.endDate = ymd(endDT);
+        p.endTime = hm(endDT);
+        p.timerEndedAt = Math.round(boundaryMs);
+        markChangedPeriodFields(p, before);
+        touched.add(ym);
+        changed = true;
       }
-      if(ended) break;
     }
-
-    if(ended){
-      periodRenderPending = false;
-      await renderCurrentView();
-      syncAndroidTimer();
-      if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
-      return true;
-    }
-    if(attempt < 3) await new Promise(r=>setTimeout(r,120 * (attempt + 1)));
   }
-
-  console.warn('[pending] 수면 종료 데이터 대기 중 (재시도 예정)');
-  return false;
+  if(!changed) return false;
+  for(const ym of touched) await saveMonth(ym);
+  try{ await renderCurrentView(); }catch(_){ updateStudyTimer(); }
+  syncAndroidTimer();
+  if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
+  return true;
 }
 
 async function applyActiveTimerRow(row){
   if(!row) return false;
   if(!(String(row.ym||'').startsWith('S:'))){
-    return await closeLocalRunningPeriodsForForeignTimer(row);
+    await closeLocalRunningPeriodsForForeignTimer(row);
+    return true;
   }
 
   let found = findPeriodForActiveTimer(row);
@@ -4253,10 +4280,7 @@ async function applyActiveTimerRow(row){
     await autoSyncFromCloud();
     found = findPeriodForActiveTimer(row);
   }
-  if(!found){
-    console.warn('[pending] 수면 데이터 대기 중 (재시도 예정)');
-    return false;
-  }
+  if(!found){ console.warn('[orphan] 수면 타이머 정리'); try{ await cloudClearActiveTimerIfMine(); }catch(_){} if(window.parent !== window){ window.parent.postMessage({type:'exclusive-session-ended', kind:'sleep'}, location.origin); } return false; }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
