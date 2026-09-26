@@ -4355,14 +4355,81 @@ window.yangStudyAppResume = async function(){
 
 
 // ---------- 전체 데이터 백업 / 복원 ----------
-function collectBackupData(){
+// ---------- 백업 복원 (index 요청 시 실행) ----------
+async function applyBackupRestore(backup){
+  if(!sbClient || !cloudUser) throw new Error('클라우드 로그인이 필요합니다');
+  const months = backup?.months || {};
+  const yms = Object.keys(months).filter(ym => /^\d{4}-\d{2}$/.test(ym));
+  let applied = 0;
+  for(const ym of yms){
+    const normalized = ensureMonthSync(deepClone(months[ym]), ym);
+    monthCache[ym] = normalized;
+    const cloudYm = ym;
+    const nowIso = new Date((typeof serverNowMs==='function'?serverNowMs():Date.now())).toISOString();
+    const {data:rows,error:readErr} = await sbClient.from('study_months')
+      .select('updated_at').eq('user_id', cloudUser.id).eq('ym', cloudYm).limit(1);
+    if(readErr) throw readErr;
+    if(rows && rows[0]){
+      const {error:updErr} = await sbClient.from('study_months')
+        .update({data: normalized, deleted_at: null, updated_at: nowIso})
+        .eq('user_id', cloudUser.id).eq('ym', cloudYm);
+      if(updErr) throw updErr;
+    } else {
+      const {error:insErr} = await sbClient.from('study_months')
+        .insert({user_id: cloudUser.id, ym: cloudYm, data: normalized, updated_at: nowIso});
+      if(insErr) throw insErr;
+    }
+    applied++;
+  }
+  return applied;
+}
+
+window.addEventListener('message', async (ev) => {
+  if(ev.origin !== location.origin) return;
+  if(ev.data?.type !== 'journal-restore-request') return;
+  if(ev.data?.kind !== 'study') return;
+  try{
+    const n = await applyBackupRestore(ev.data.data);
+    try{ await renderCurrentView(); }catch(_){}
+    window.parent.postMessage({type:'journal-restore-done', kind:'study', ok:true, months:n}, location.origin);
+  }catch(e){
+    console.error('[study restore 실패]', e);
+    window.parent.postMessage({type:'journal-restore-done', kind:'study', ok:false, error:String(e?.message||e)}, location.origin);
+  }
+});
+
+async function collectBackupData(){
   const months = {};
-  Object.keys(monthCache).forEach(ym=>{
-    if(/^\d{4}-\d{2}$/.test(ym)) months[ym]=monthCache[ym];
-  });
+  if(sbClient && cloudUser){
+    try{
+      const {data,error} = await sbClient.from('study_months')
+        .select('ym,data,deleted_at')
+        .eq('user_id', cloudUser.id)
+        .not('ym','like','L:%')
+        .not('ym','like','S:%')
+        .not('ym','like','R:%');
+      if(error) throw error;
+      (data||[]).forEach(row=>{
+        const ym = String(row.ym||'');
+        if(!/^\d{4}-\d{2}$/.test(ym)) return;
+        if(row.deleted_at) return;
+        months[ym] = ensureMonthSync(deepClone(row.data||{}), ym);
+      });
+      console.log('[study backup] 클라우드에서', Object.keys(months).length, '개월 읽음');
+    }catch(e){
+      console.warn('[study backup] 클라우드 읽기 실패, 캐시로 폴백:', e);
+      Object.keys(monthCache).forEach(ym=>{
+        if(/^\d{4}-\d{2}$/.test(ym)) months[ym]=monthCache[ym];
+      });
+    }
+  } else {
+    Object.keys(monthCache).forEach(ym=>{
+      if(/^\d{4}-\d{2}$/.test(ym)) months[ym]=monthCache[ym];
+    });
+  }
   return {
     app: 'study-log',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     settings: appSettings,
     months

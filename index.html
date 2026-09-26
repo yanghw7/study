@@ -43,7 +43,7 @@
     .cloudbar{flex:0 0 auto;margin:4px 8px 0;padding:4px 6px;border:1px solid #dbe4e0;border-radius:10px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font:700 10px Inter,system-ui,sans-serif;color:#34423d}.cloudline{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:nowrap}.cloudline strong{font-size:11px;white-space:nowrap}.cloudline button{height:27px;border:1px solid #dbe4e0;border-radius:7px;background:#fff;padding:0 6px;font:800 9px Inter,system-ui,sans-serif;white-space:nowrap;color:#34423d}.cloudline button.primary{background:#285f50;border-color:#285f50;color:#fff}.cloudline input{height:27px;min-width:90px;flex:1;border:1px solid #dbe4e0;border-radius:7px;padding:0 6px;font:700 10px Inter,system-ui,sans-serif}.cloudstatus{margin-left:0;font-size:9px;color:#60706a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.cloudsetup{display:none;margin-top:4px;gap:4px;align-items:center}.cloudsetup.show{display:flex}.cloudlogout{display:none!important}.cloudlogout.show{display:inline-block!important}@media(max-width:560px){.cloudbar{padding:4px 5px}.cloudline{gap:3px}.cloudline strong{font-size:10px}.cloudline button{padding:0 5px;font-size:8.5px}.cloudsetup{flex-wrap:wrap}.cloudsetup input{min-width:0;width:calc(50% - 2px);flex:auto}.cloudstatus{font-size:8.5px}}
 
     .shared-settings-btn{font-size:17px!important;padding:0!important;background:#e8eeeb!important;color:#53615c!important}
-    .shared-settings-panel{display:none;position:fixed;top:50px;right:8px;z-index:10050;width:min(290px,calc(100vw - 16px));padding:12px;border:1px solid #dbe4e0;border-radius:12px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.16);color:#34423d}
+    .shared-settings-panel{display:none;position:fixed;top:50px;right:8px;z-index:10050;width:min(290px,calc(100vw - 16px));padding:12px;border:1px solid #dbe4e0;border-radius:12px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.16);color:#34423d;max-height:calc(100dvh - 60px);overflow-y:auto;-webkit-overflow-scrolling:touch}
     .shared-settings-panel.show{display:block}
     .shared-settings-title{font-size:14px;font-weight:900;margin-bottom:10px}
     .shared-settings-row{display:grid;grid-template-columns:1fr 116px auto;align-items:center;gap:10px;margin:8px 0;font-size:12px;font-weight:800}
@@ -88,15 +88,20 @@
     <button id="sharedBackupLocationBtn" class="shared-backup-location" type="button">백업파일 저장 위치 설정</button>
     <div id="sharedBackupLocationStatus" class="shared-backup-location-status">저장 위치: 기본 다운로드 폴더</div>
     <div id="sharedBackupChoice" class="backup-choice" aria-hidden="true">
-      <div class="backup-choice-title">백업할 기록장을 선택하세요</div>
+      <div class="backup-choice-title">전체 기록장을 백업합니다</div>
       <div class="backup-choice-grid">
-        <button class="backup-choice-btn" data-backup-kind="study" type="button">공부 기록장 백업</button>
-        <button class="backup-choice-btn" data-backup-kind="lecture" type="button">강의 기록장 백업</button>
-        <button class="backup-choice-btn" data-backup-kind="sleep" type="button">수면 기록장 백업</button>
-        <button class="backup-choice-btn" data-backup-kind="all" type="button">전체 기록장 백업</button>
+
+
+
+        <button class="backup-choice-btn" data-backup-kind="all" type="button">전체 기록장 백업 (공부 · 강의 · 수면 · 기타)</button>
       </div>
     </div>
     <input id="sharedRestoreFile" type="file" accept="application/json,.json">
+    <button id="sharedSnapshotBtn" class="shared-backup-location" type="button">🔄 스냅샷에서 복원</button>
+    <div id="sharedSnapshotPanel" class="backup-choice" aria-hidden="true">
+      <div class="backup-choice-title">복원할 시점을 선택하세요</div>
+      <div id="sharedSnapshotList" class="backup-choice-grid"></div>
+    </div>
     <div class="shared-danger-zone">
       <div class="shared-delete-grid">
         <button id="sharedDeleteStudy" class="shared-delete-one" type="button">공부 기록장 데이터 전체 삭제</button>
@@ -126,8 +131,8 @@
     <div class="cloudline">
       <strong>☁ 클라우드</strong><span id="sharedCloudStatus" class="cloudstatus">로그인 확인 중…</span>
       <button id="sharedCloudToggle" type="button">로그인</button>
-      <button id="sharedCloudUpload" type="button">전체 저장</button>
-      <button id="sharedCloudDownload" type="button">전체 불러오기</button>
+
+
       <button id="sharedCloudLogout" class="cloudlogout" type="button">로그아웃</button>
 
     </div>
@@ -386,7 +391,10 @@
       if(show)paint();
     });
     panel.addEventListener('click',e=>e.stopPropagation());
-    document.addEventListener('click',()=>{panel.classList.remove('show');panel.setAttribute('aria-hidden','true')});
+    document.addEventListener('click',()=>{
+      try{ document.activeElement?.blur?.(); }catch(_){}
+      panel.classList.remove('show');panel.setAttribute('aria-hidden','true');
+    });
     hour.addEventListener('change',async()=>{
       const newHour=+hour.value;
       const current=await readSharedSettings();
@@ -844,7 +852,7 @@
       await new Promise(r=>setTimeout(r,800));
       await status();
     };
-    $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
+    
     if(init()){
       sb.auth.onAuthStateChange((event, session)=>{
         window.__yangStudyLastAuthEvent = event;
@@ -943,10 +951,24 @@
     return new Promise((resolve,reject)=>{
       const frame=tabs[kind]?.frame;
       if(!frame)return reject(new Error('frame not found'));
-      if(frame.contentWindow && frame.contentDocument?.readyState==='complete')return resolve(frame);
+      const ready=()=>{
+        try{
+          return !!frame.getAttribute('src')
+            && frame.contentWindow?.location?.href!=='about:blank'
+            && typeof frame.contentWindow?.collectBackupData==='function'
+            && typeof frame.contentWindow?.applyBackupRestore==='function';
+        }catch(e){ return false; }
+      };
+      if(ready()) return resolve(frame);
       if(!frame.getAttribute('src') && frame.dataset.src) frame.src=frame.dataset.src;
-      const timer=setTimeout(()=>reject(new Error('load timeout')),8000);
-      frame.addEventListener('load',()=>{clearTimeout(timer);resolve(frame)},{once:true});
+      const start=Date.now();
+      (function tick(){
+        if(ready()) return resolve(frame);
+        if(Date.now()-start>15000){
+          return reject(new Error('['+kind+'] collectBackupData 함수를 찾지 못했습니다 (타임아웃)'));
+        }
+        setTimeout(tick,120);
+      })();
     });
   }
   let sharedBackupDirectoryHandle=null;
@@ -974,7 +996,7 @@
     const frame=await ensureFrameLoaded(kind);
     const fn=frame.contentWindow?.collectBackupData;
     if(typeof fn!=='function')throw new Error('backup function unavailable');
-    return fn.call(frame.contentWindow);
+    return await fn.call(frame.contentWindow);
   }
   function initSharedBackupUI(){
     const main=document.getElementById('sharedBackupBtn'),choice=document.getElementById('sharedBackupChoice');
@@ -992,8 +1014,8 @@
       const kind=btn.dataset.backupKind;
       try{
         if(kind==='all'){
-          const [study,lecture,sleep]=await Promise.all(['study','lecture','sleep'].map(getJournalBackup));
-          downloadJSON({app:'journal-all',version:1,exportedAt:new Date().toISOString(),study,lecture,sleep},`journal-all-backup-${backupDate()}.json`);
+          const [study,lecture,sleep,record]=await Promise.all(['study','lecture','sleep','record'].map(getJournalBackup));
+          downloadJSON({app:'journal-all',version:2,exportedAt:new Date().toISOString(),study,lecture,sleep,record},`journal-all-backup-${backupDate()}.json`);
         }else{
           const data=await getJournalBackup(kind);
           const names={study:'study-log',lecture:'lecture-log',sleep:'sleep-log'};
@@ -1003,9 +1025,176 @@
       }catch(e){alert('백업 파일을 만들지 못했습니다. 잠시 후 다시 시도해주세요.');}
     }));
     restore.addEventListener('click',()=>file.click());
-    file.addEventListener('change',()=>{alert('복원 선택 메뉴는 다음 단계에서 연결할 수 있습니다.');file.value='';});
+    file.addEventListener('change', async () => {
+      const f = file.files?.[0];
+      if(!f) return;
+      file.value = '';
+      try{
+        const text = await f.text();
+        const backup = JSON.parse(text);
+        if(backup?.app !== 'journal-all'){
+          alert('전체 백업 파일이 아닙니다. (journal-all-backup-*.json 만 지원)');
+          return;
+        }
+        const sections = ['study','lecture','sleep','record'];
+        const labels = {study:'공부',lecture:'강의',sleep:'수면',record:'기타'};
+        const counts = sections.map(k => `${labels[k]} ${Object.keys(backup[k]?.months||{}).length}개월`).join('\n');
+        const totalMonths = sections.reduce((s,k)=>s+Object.keys(backup[k]?.months||{}).length, 0);
+        if(!totalMonths){ alert('백업 파일에 기록이 없습니다.'); return; }
+        if(!confirm(`⚠️ 이 백업 파일로 현재 기록을 교체합니다.\n\n파일 내용:\n${counts}\n\n계속할까요?`)) return;
+
+        const results = {};
+        for(const kind of sections){
+          try{
+            const frame = await ensureFrameLoaded(kind);
+            const done = await new Promise((resolve) => {
+              const timer = setTimeout(()=>{
+                window.removeEventListener('message', onDone);
+                resolve({ok:false, error:'응답 시간 초과'});
+              }, 60000);
+              function onDone(ev){
+                if(ev.origin !== location.origin) return;
+                if(ev.data?.type !== 'journal-restore-done') return;
+                if(ev.data?.kind !== kind) return;
+                clearTimeout(timer);
+                window.removeEventListener('message', onDone);
+                resolve(ev.data);
+              }
+              window.addEventListener('message', onDone);
+              frame.contentWindow.postMessage({
+                type:'journal-restore-request',
+                kind,
+                data: backup[kind] || { months: {} }
+              }, location.origin);
+            });
+            results[kind] = done;
+          }catch(e){
+            results[kind] = {ok:false, error:String(e?.message||e)};
+          }
+        }
+        const failed = sections.filter(k => !results[k]?.ok);
+        if(failed.length === 0){
+          alert('✅ 복원 완료\n\n' + sections.map(k => `${labels[k]} ${results[k].months||0}개월`).join('\n'));
+        }else{
+          alert('⚠️ 일부 복원 실패\n\n' + failed.map(k => `${labels[k]}: ${results[k]?.error||'알 수 없음'}`).join('\n'));
+        }
+      }catch(e){
+        console.error('[restore] 실패', e);
+        alert('복원 파일을 읽지 못했습니다: ' + (e?.message||e));
+      }
+    });
   }
   initSharedBackupUI();
+
+  // ============================================================
+  // 스냅샷 복원 (자동 백업)
+  // ============================================================
+  (function initSnapshotUI(){
+    const btn    = document.getElementById('sharedSnapshotBtn');
+    const panel  = document.getElementById('sharedSnapshotPanel');
+    const list   = document.getElementById('sharedSnapshotList');
+    if(!btn || !panel || !list) return;
+
+    async function getSb(){
+      const sb = initSettingsClient();
+      if(!sb) throw new Error('클라우드 연결 실패');
+      const {data:{session}} = await sb.auth.getSession();
+      if(!session?.user) throw new Error('로그인이 필요합니다');
+      return { sb, user: session.user };
+    }
+
+    async function loadSnapshots(){
+      list.innerHTML = '<div style="padding:10px;text-align:center;font-size:11px;color:#6b7773;">불러오는 중…</div>';
+      try{
+        const { sb, user } = await getSb();
+        const { data, error } = await sb.from('study_months_snapshots')
+          .select('snapshot_at')
+          .eq('user_id', user.id)
+          .order('snapshot_at', { ascending: false });
+        if(error) throw error;
+
+        if(!data || !data.length){
+          list.innerHTML = '<div style="padding:14px 8px;text-align:center;font-size:11px;color:#6b7773;line-height:1.5;">아직 스냅샷이 없습니다.<br>매주 일요일 새벽 3시에 자동 생성됩니다.</div>';
+          return;
+        }
+        const counts = {};
+        data.forEach(r => { counts[r.snapshot_at] = (counts[r.snapshot_at] || 0) + 1; });
+        const dates = Object.keys(counts).sort().reverse();
+
+        list.innerHTML = dates.map(dt => {
+          const d = new Date(dt);
+          const label = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+          return `<button class="backup-choice-btn" data-snap="${dt}" type="button">${label}</button>`;
+        }).join('');
+
+        list.querySelectorAll('[data-snap]').forEach(b => {
+          b.addEventListener('click', () => restore(b.dataset.snap));
+        });
+      }catch(e){
+        list.innerHTML = '<div style="padding:12px 8px;text-align:center;font-size:11px;color:#b42318;">불러오기 실패: ' + (e?.message || e) + '</div>';
+      }
+    }
+
+    async function restore(snapshotAt){
+      const d = new Date(snapshotAt);
+      const label = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      if(!confirm(`⚠️ ${label} 시점의 스냅샷으로 복원합니다.\n\n현재 서버의 모든 기록이 이 시점으로 되돌아갑니다.\n되돌릴 수 없습니다.\n\n계속할까요?`)) return;
+
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = '복원 중…';
+      try{
+        const { sb, user } = await getSb();
+
+        const { data: snapRows, error: readErr } = await sb.from('study_months_snapshots')
+          .select('ym, data, deleted_at, updated_at')
+          .eq('user_id', user.id)
+          .eq('snapshot_at', snapshotAt);
+        if(readErr) throw readErr;
+        if(!snapRows || !snapRows.length) throw new Error('스냅샷 데이터가 없습니다');
+
+        const { error: delErr } = await sb.from('study_months').delete().eq('user_id', user.id);
+        if(delErr) throw delErr;
+
+        const nowIso = new Date().toISOString();
+        const inserts = snapRows.map(r => ({
+          user_id: user.id,
+          ym: r.ym,
+          data: r.data,
+          deleted_at: r.deleted_at || null,
+          updated_at: r.updated_at || nowIso
+        }));
+        const { error: insErr } = await sb.from('study_months').insert(inserts);
+        if(insErr) throw insErr;
+
+        try{ await sb.from('active_timer').delete().eq('user_id', user.id); }catch(_){}
+
+        for(const item of Object.values(tabs)){
+          try{
+            item.frame.contentWindow?.postMessage({ type:'journal-force-refresh' }, location.origin);
+          }catch(_){}
+        }
+
+        alert(`✅ ${label} 시점으로 복원 완료\n\n${inserts.length}개 기록이 복원되었습니다.`);
+        panel.classList.remove('open');
+        panel.setAttribute('aria-hidden','true');
+      }catch(e){
+        console.error('[snapshot restore]', e);
+        alert('❌ 스냅샷 복원 실패: ' + (e?.message || e));
+      }finally{
+        btn.disabled = false;
+        btn.textContent = orig;
+      }
+    }
+
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const open = !panel.classList.contains('open');
+      panel.classList.toggle('open', open);
+      panel.setAttribute('aria-hidden', String(!open));
+      if(open) await loadSnapshots();
+    });
+  })();
 </script>
 
 </body>
