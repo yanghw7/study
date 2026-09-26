@@ -3770,7 +3770,7 @@ $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#setti
 async function deleteAllStudyRecords(){
   if(!cloudUser){
     alert('클라우드 로그인 상태를 확인하지 못해 삭제를 중단했어요.\n잠시 후 다시 시도해주세요.');
-    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record'}, location.origin);
+    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:true}, location.origin);
     return;
   }
   if(!window.__skipDeleteConfirm){
@@ -3782,27 +3782,27 @@ async function deleteAllStudyRecords(){
   // 다음 로그인/동기화 때 기록이 되살아나는 일을 막는다.
   if(cloudUser){
     if(!sbClient){
-      alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+      alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin);
       return;
     }
     const {data:lecRows,error:readErr} = await sbClient.from('study_months')
       .select('ym').eq('user_id', cloudUser.id).like('ym','R:%');
-    if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); return; }
+    if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
     const lecYms=(lecRows||[]).map(r=>String(r.ym||''));
     const markerIso = new Date(Math.round(serverNowMs())).toISOString();
     for(const ym of lecYms){
       const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
         .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
-      if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); return; }
+      if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
       if(existingRow){
         const {error:updErr} = await sbClient.from('study_months')
           .update({data:{}, deleted_at: markerIso, updated_at: markerIso})
           .eq('user_id', cloudUser.id).eq('ym', ym);
-        if(updErr){ alert('삭제 실패: ' + updErr.message); return; }
+        if(updErr){ alert('삭제 실패: ' + updErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
       } else {
         const {error:insErr} = await sbClient.from('study_months')
           .insert({user_id: cloudUser.id, ym, data:{}, deleted_at: markerIso, updated_at: markerIso});
-        if(insErr){ alert('삭제 실패: ' + insErr.message); return; }
+        if(insErr){ alert('삭제 실패: ' + insErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
       }
     }
     await cloudClearActiveTimerIfMine();
@@ -3820,7 +3820,7 @@ async function deleteAllStudyRecords(){
   }
   showToast('모든 강의 기록을 삭제했어요');
   if(window.parent !== window){
-    window.parent.postMessage({type:'journal-delete-done', kind:'record'}, location.origin);
+    window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:true}, location.origin);
   }
 }
 

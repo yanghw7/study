@@ -743,6 +743,50 @@ body{background:#EEF3F8!important}
 <style id="locked-card-style">
 .period-card.locked-card{opacity:.5!important;pointer-events:none!important;}
 </style>
+<style id="sleep-summary-values-black-final">
+/* 합계 5개 값은 상태색 없이 모두 검정색으로 통일 */
+.summary-grid.sleep-summary-grid .summary-item b,
+.summary-grid.sleep-summary-grid .summary-item.ok b,
+.summary-grid.sleep-summary-grid .summary-item.warn b,
+#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumWaste{
+  color:#202A35!important;
+}
+</style>
+<style id="sleep-record-values-black-final">
+/* 수면 기록/기간별 기록의 강조 숫자는 모두 기본 검정색으로 통일 */
+.period-num,
+.stat b.study-color,
+.stat b.waste-color,
+.agg-nums b.study-color,
+.agg-nums b.waste-color{
+  color:var(--ink)!important;
+}
+</style>
+<style id="sleep-summary-primary-colors-final">
+/* 합계: 총 수면은 수면장 블루, 가장 긴 수면시간은 레드 계열 */
+#sumStudy{color:#456D96!important;}
+#sumLongest{color:#B5533C!important;}
+</style>
+<style id="sleep-record-duration-blue-final">
+/* 아래 수면 기록의 수면시간: 합계의 블루 계열보다 한 단계 진하게 */
+.stat b.study-color,
+.agg-nums b.study-color{
+  color:#355F8A!important;
+}
+</style>
+<style id="sleep-longest-duration-red-final">
+/* 주별·월별·연도별 가장 긴 수면시간 값은 합계와 같은 붉은 계열 */
+.agg-nums b.waste-color{
+  color:#B5533C!important;
+}
+</style>
+<style id="sleep-summary-value-size-14-final">
+/* 오늘 수면 합계 5개 값 글자 크기 */
+.summary-grid.sleep-summary-grid .summary-item b,
+#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumWaste{
+  font-size:14px!important;
+}
+</style>
 </head>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
@@ -1146,6 +1190,27 @@ function mergePeriods(localP, remoteP){
     out._fieldUpdatedAt[k]=Math.max(Number(l._fieldUpdatedAt?.[k]||0),Number(r._fieldUpdatedAt?.[k]||0));
   });
   out._updatedAt=Math.max(Number(l._updatedAt||0),Number(r._updatedAt||0),...Object.values(out._fieldUpdatedAt).map(Number));
+
+  // [SERVER-AUTH-END] 서버에서 종료된 수면 기록은 종료 관련 필드를 서버값으로 확정한다.
+  // 다른 기기의 오래된 로컬 running 값이나 빈 종료값이 서버 종료값을 다시 덮지 못하게 한다.
+  const remoteEnded = Number(r.timerEndedAt);
+  if(Number.isFinite(remoteEnded) && remoteEnded > 0){
+    out.timerEndedAt = remoteEnded;
+    out.endDate = String(r.endDate || '');
+    out.endTime = String(r.endTime || '');
+
+    const endTs = Math.max(
+      remoteEnded,
+      Number(r._updatedAt || 0),
+      Number(r._fieldUpdatedAt?.timerEndedAt || 0),
+      Number(r._fieldUpdatedAt?.endDate || 0),
+      Number(r._fieldUpdatedAt?.endTime || 0)
+    );
+    out._fieldUpdatedAt.timerEndedAt = Math.max(Number(out._fieldUpdatedAt.timerEndedAt || 0), endTs);
+    out._fieldUpdatedAt.endDate = Math.max(Number(out._fieldUpdatedAt.endDate || 0), endTs);
+    out._fieldUpdatedAt.endTime = Math.max(Number(out._fieldUpdatedAt.endTime || 0), endTs);
+    out._updatedAt = Math.max(Number(out._updatedAt || 0), endTs);
+  }
   return out;
 }
 function mergeDays(localDay, remoteDay, ym='', dk=''){
@@ -2936,9 +3001,19 @@ $('#periodList').addEventListener('click', async (e) => {
     markChangedPeriodFields(p, beforeSync);
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
-      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), p._id); }catch(_){}
+      try{
+        const rpcRes = await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), p._id);
+        console.log('[cancel RPC 성공]', rpcRes);
+      }catch(e){
+        console.error('[cancel RPC 실패]', e);
+      }
+    } else {
+      console.log('[cancel] 비로그인 — RPC 스킵');
     }
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'sleep'},location.origin);
+    if(window.parent!==window){
+      console.log('[cancel] 부모에 exclusive-session-cancel-start 전송');
+      window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'sleep'},location.origin);
+    }
     showToast('시작 기록을 취소했어요');
   }else if(action === 'cancel-end'){
     if(!(await askConfirm(`${idx+1}회 수면 종료를 취소할까요?`, true))) return;
@@ -3646,7 +3721,7 @@ $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#setti
 async function deleteAllStudyRecords(){
   if(!cloudUser){
     alert('클라우드 로그인 상태를 확인하지 못해 삭제를 중단했어요.\n잠시 후 다시 시도해주세요.');
-    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep'}, location.origin);
+    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:true}, location.origin);
     return;
   }
   if(!window.__skipDeleteConfirm){
@@ -3658,27 +3733,27 @@ async function deleteAllStudyRecords(){
   // 다음 로그인/동기화 때 기록이 되살아나는 일을 막는다.
   if(cloudUser){
     if(!sbClient){
-      alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+      alert('클라우드 연결을 확인하지 못해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:false}, location.origin);
       return;
     }
     const {data:sleepRows,error:readErr} = await sbClient.from('study_months')
       .select('ym').eq('user_id', cloudUser.id).like('ym','S:%');
-    if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); return; }
+    if(readErr){ alert('클라우드 기록 확인에 실패해 삭제를 중단했어요: ' + readErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:false}, location.origin); return; }
     const sleepYms=(sleepRows||[]).map(r=>String(r.ym||''));
     const markerIso = new Date(Math.round(serverNowMs())).toISOString();
     for(const ym of sleepYms){
       const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
         .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
-      if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); return; }
+      if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:false}, location.origin); return; }
       if(existingRow){
         const {error:updErr} = await sbClient.from('study_months')
           .update({data:{}, deleted_at: markerIso, updated_at: markerIso})
           .eq('user_id', cloudUser.id).eq('ym', ym);
-        if(updErr){ alert('삭제 실패: ' + updErr.message); return; }
+        if(updErr){ alert('삭제 실패: ' + updErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:false}, location.origin); return; }
       } else {
         const {error:insErr} = await sbClient.from('study_months')
           .insert({user_id: cloudUser.id, ym, data:{}, deleted_at: markerIso, updated_at: markerIso});
-        if(insErr){ alert('삭제 실패: ' + insErr.message); return; }
+        if(insErr){ alert('삭제 실패: ' + insErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:false}, location.origin); return; }
       }
     }
     await cloudClearActiveTimerIfMine();
@@ -3696,7 +3771,7 @@ async function deleteAllStudyRecords(){
   }
   showToast('모든 수면 기록을 삭제했어요');
   if(window.parent !== window){
-    window.parent.postMessage({type:'journal-delete-done', kind:'sleep'}, location.origin);
+    window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:true}, location.origin);
   }
 }
 
@@ -4172,7 +4247,7 @@ async function cloudResumeActiveTimer(ym, dayKey, p, idx){
 async function cloudCancelActiveTimerStart(ym, dayKey, periodId){
   if(!sbClient || !cloudUser) return null;
   const {data,error} = await sbClient.rpc('cancel_active_timer_start',{
-    p_ym: String(ym || ''),
+    p_ym: ym ? sleepCloudYm(ym) : null,
     p_day_key: String(dayKey ?? ''),
     p_period_id: String(periodId || '')
   });
@@ -4619,50 +4694,3 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
 </body>
 </html>
-
-<style id="sleep-summary-values-black-final">
-/* 합계 5개 값은 상태색 없이 모두 검정색으로 통일 */
-.summary-grid.sleep-summary-grid .summary-item b,
-.summary-grid.sleep-summary-grid .summary-item.ok b,
-.summary-grid.sleep-summary-grid .summary-item.warn b,
-#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumWaste{
-  color:#202A35!important;
-}
-</style>
-<style id="sleep-record-values-black-final">
-/* 수면 기록/기간별 기록의 강조 숫자는 모두 기본 검정색으로 통일 */
-.period-num,
-.stat b.study-color,
-.stat b.waste-color,
-.agg-nums b.study-color,
-.agg-nums b.waste-color{
-  color:var(--ink)!important;
-}
-</style>
-<style id="sleep-summary-primary-colors-final">
-/* 합계: 총 수면은 수면장 블루, 가장 긴 수면시간은 레드 계열 */
-#sumStudy{color:#456D96!important;}
-#sumLongest{color:#B5533C!important;}
-</style>
-<style id="sleep-record-duration-blue-final">
-/* 아래 수면 기록의 수면시간: 합계의 블루 계열보다 한 단계 진하게 */
-.stat b.study-color,
-.agg-nums b.study-color{
-  color:#355F8A!important;
-}
-</style>
-
-<style id="sleep-longest-duration-red-final">
-/* 주별·월별·연도별 가장 긴 수면시간 값은 합계와 같은 붉은 계열 */
-.agg-nums b.waste-color{
-  color:#B5533C!important;
-}
-</style>
-
-<style id="sleep-summary-value-size-14-final">
-/* 오늘 수면 합계 5개 값 글자 크기 */
-.summary-grid.sleep-summary-grid .summary-item b,
-#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumWaste{
-  font-size:14px!important;
-}
-</style>

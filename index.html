@@ -361,7 +361,7 @@ function initSharedSettingsUI(){
         if(ev.data?.kind !== kind) return;
         clearTimeout(timer);
         window.removeEventListener('message', onDone);
-        resolve(true);
+        resolve(ev.data.ok !== false);
       }
       window.addEventListener('message', onDone);
     });
