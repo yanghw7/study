@@ -3988,7 +3988,10 @@ async function applyActiveTimerRow(row){
     await autoSyncFromCloud();
     found = findPeriodForActiveTimer(row);
   }
-  if(!found){ console.warn('[orphan] 공부 타이머 정리'); try{ await cloudClearActiveTimerIfMine(); }catch(_){} if(window.parent !== window){ window.parent.postMessage({type:'exclusive-session-ended', kind:'study'}, location.origin); } return false; }
+  if(!found){
+    console.warn('[pending] 공부 데이터 대기 중 (재시도 예정)');
+    return false;
+  }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
