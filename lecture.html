@@ -1913,21 +1913,21 @@ function syncAndroidTimer(){
 
     if(!info){
       if(lastAndroidTimerKey !== 'clear'){
-        window.AndroidTimer.clearTimer();
+        ;
         lastAndroidTimerKey = 'clear';
       }
       return;
     }
 
     const wasteInfo = wasteTimerForCurrentDay();
-    if(!info?.running && wasteInfo){
+    if(false){
       const localWasteStarted = Math.round(
         (Number(wasteInfo.startedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
       ) * 1000;
       const wasteLabel = `${wasteInfo.idx+1}강의 종료 · 강의 종료 후 시간`;
       const key = `waste:${localWasteStarted}:${wasteLabel}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.startTimer(localWasteStarted, wasteLabel);
+        window.AndroidTimer.startTimer('lecture', localWasteStarted, wasteLabel);
         lastAndroidTimerKey = key;
       }
       return;
@@ -1944,14 +1944,14 @@ function syncAndroidTimer(){
       ) * 1000;
       const key = `run:${localEpochStarted}:${label}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.startTimer(localEpochStarted, label);
+        window.AndroidTimer.startTimer('lecture', localEpochStarted, label);
         lastAndroidTimerKey = key;
       }
     }else if(Number(p.timerStartedAt) > 0){
       const elapsed = Math.floor(timerElapsedMs(p));
-      const key = `stop:${elapsed}:${label}`;
+      const key = `stop:${p.timerStartedAt}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.stopTimer(elapsed, label);
+        window.AndroidTimer.stopTimer('lecture', elapsed, label);
         lastAndroidTimerKey = key;
       }
     }
@@ -2376,6 +2376,10 @@ $('#periodList').addEventListener('click', async (e) => {
     }
 
     if(!confirm(`${idx+1}강의를 정말 삭제하시겠습니까?`)) return;
+    const deletedPeriod = day.periods[idx];
+    if(cloudUser && deletedPeriod && Number(deletedPeriod.timerStartedAt) > 0){
+      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), deletedPeriod._id); }catch(_){}
+    }
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
     renderPeriods();

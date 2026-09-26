@@ -1988,21 +1988,21 @@ function syncAndroidTimer(){
 
     if(!info){
       if(lastAndroidTimerKey !== 'clear'){
-        window.AndroidTimer.clearTimer();
+        window.AndroidTimer.clearTimer('sleep');
         lastAndroidTimerKey = 'clear';
       }
       return;
     }
 
     const wasteInfo = wasteTimerForCurrentDay();
-    if(!info?.running && wasteInfo){
+    if(false){
       const localWasteStarted = Math.round(
         (Number(wasteInfo.startedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
       ) * 1000;
       const wasteLabel = `${wasteInfo.idx+1}기상 · 기상 후 경과시간`;
       const key = `waste:${localWasteStarted}:${wasteLabel}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.startTimer(localWasteStarted, wasteLabel);
+        window.AndroidTimer.startTimer('sleep', localWasteStarted, wasteLabel);
         lastAndroidTimerKey = key;
       }
       return;
@@ -2019,14 +2019,14 @@ function syncAndroidTimer(){
       ) * 1000;
       const key = `run:${localEpochStarted}:${label}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.startTimer(localEpochStarted, label);
+        window.AndroidTimer.startTimer('sleep', localEpochStarted, label);
         lastAndroidTimerKey = key;
       }
     }else if(Number(p.timerStartedAt) > 0){
       const elapsed = Math.floor(timerElapsedMs(p));
-      const key = `stop:${elapsed}:${label}`;
+      const key = `stop:${p.timerStartedAt}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.stopTimer(elapsed, label);
+        window.AndroidTimer.stopTimer('sleep', elapsed, label);
         lastAndroidTimerKey = key;
       }
     }
@@ -2466,6 +2466,10 @@ $('#periodList').addEventListener('click', async (e) => {
     }
 
     if(!(await askConfirm(`${idx+1}회 수면을 정말 삭제하시겠습니까?`, true))) return;
+    const deletedPeriod = day.periods[idx];
+    if(cloudUser && deletedPeriod && Number(deletedPeriod.timerStartedAt) > 0){
+      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), deletedPeriod._id); }catch(_){}
+    }
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
     renderPeriods();
