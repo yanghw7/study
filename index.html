@@ -714,7 +714,7 @@ $('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
 
   // Android APK 브리지
   if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
-    oauthDiag('① Google 로그인 주소 생성 중');
+    
     const {data,error} = await sb.auth.signInWithOAuth({
       provider:'google',
       options:{
@@ -724,8 +724,8 @@ $('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
       }
     });
     if(error){ alert('Google 로그인 실패: '+error.message); return; }
-    if(!data?.url){ oauthDiag('❌ 로그인 URL 생성 실패'); alert('Google 로그인 주소를 만들지 못했어요.'); return; }
-    oauthDiag('② Google 계정 선택창 열기');
+    if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    
     try{ window.top.__androidOAuthSource = 'index.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
@@ -742,12 +742,12 @@ $('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
   $('sharedCloudLogout').classList.add('show');
   $('sharedCloudLogout').disabled=false;
   $('sharedCloudLogout').onclick=async()=>{
-    if(!confirm('정말 로그아웃하시겠습니까?')){ oauthDiag('L0 로그아웃 취소'); return; }
-    oauthDiag('L1 로그아웃 확인');
+    if(!confirm('정말 로그아웃하시겠습니까?')) return;
+    
     if(!init())return;
     const {error}=await sb.auth.signOut();
-    if(error){oauthDiag('L3 signOut 오류: '+error.message);return;}
-    oauthDiag('L3 signOut 반환 성공');
+    if(error){return;}
+    
     await new Promise(r=>setTimeout(r,800));
     await status();
     $('sharedCloudLogout').classList.add('show');
@@ -758,7 +758,7 @@ $('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
     sb.auth.onAuthStateChange((event, session)=>{
       window.__yangStudyLastAuthEvent = event;
       window.__yangStudyLastAuthSession = session || null;
-      oauthDiag('A1 auth event='+event+' / session='+(session?'있음':'없음')+' / user='+(session?.user?.email||'없음'));
+      
       if(event === 'TOKEN_REFRESHED') return;
       if(event === 'SIGNED_OUT') return;
       setTimeout(status, 500);

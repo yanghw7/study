@@ -3657,7 +3657,7 @@ async function deleteAllStudyRecords(){
         const {error:updErr} = await sbClient.from('study_months')
           .update({data:{}, deleted_at: markerIso, updated_at: markerIso})
           .eq('user_id', cloudUser.id).eq('ym', ym);
-        if(updErr){ alert('삭제 실패: ' + updErr.message); return; }
+        if(updErr){ alert('삭제 실패: ' + updErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'lecture', ok:false}, location.origin); return; }
       } else {
         const {error:insErr} = await sbClient.from('study_months')
           .insert({user_id: cloudUser.id, ym, data:{}, deleted_at: markerIso, updated_at: markerIso});
