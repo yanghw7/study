@@ -3778,7 +3778,13 @@ async function cloudSaveMonth(ym){
     const row = rows && rows[0];
     if(row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
-      if(!hasPeriodCreatedAfter(local, delTs)){
+      // [FIX-S1] 서버 시계 보정 오차로 _createdAt < delTs 가 될 수 있으므로,
+      //          로컬에 실제 교시가 하나라도 있으면 사용자가 되살리려는 의도로 간주하고 복원한다.
+      const localHasPeriods = Object.keys(local).some(dk => {
+        const day = local[dk];
+        return day && Array.isArray(day.periods) && day.periods.length > 0;
+      });
+      if(!localHasPeriods && !hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
         throw new Error('이 달의 기록이 다른 기기에서 삭제되었습니다.');
       }
