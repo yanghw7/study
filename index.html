@@ -58,7 +58,7 @@ html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-syst
 <link rel="manifest" href="./manifest.webmanifest?v=1.29">
 <meta name="theme-color" content="#285f50">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script></head>
+<style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body><button id="pwaInstallBtn" type="button">앱 설치</button>
 
 <div class="shell" id="shell">
@@ -192,10 +192,11 @@ function initSettingsClient(){
   if(__sbCreating) return null;
   __sbCreating = true;
   try{
+    const isAndroidApp = location.hostname === 'appassets.androidplatform.net';
     sbSettingsClient = window.supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY,
-      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } }
+      { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:!isAndroidApp } }
     );
     return sbSettingsClient;
   }catch(e){ return null; }
@@ -327,27 +328,6 @@ function initSharedSettingsUI(){
     try{ await writeSharedSettingsToCloud({weekStartDay:+week.value}); }
     catch(e){ alert('설정 저장 실패: '+(e?.message||e)); await paint(); }
   });
-
-  const sb=initSettingsClient();
-  if(sb){
-    let __authBusy=false;
-    // ★ supabase 락 안에서 getSession() 을 호출하면 재귀가 발생하므로
-    //   콜백은 즉시 반환하고 실제 작업은 다음 tick 으로 미룬다.
-    sb.auth.onAuthStateChange((event)=>{
-      if(event === 'TOKEN_REFRESHED') return;
-      setTimeout(async()=>{
-        if(__authBusy) return; __authBusy=true;
-        try{
-          sharedSettingsLoaded=false;
-          await loadSharedSettingsFromCloud();
-          paint();
-          notifySharedSettings(sharedSettingsCache);
-          const t=await restoreLastTabFromCloud();
-          if(t && tabs[t]) openTab(t, true);
-        } finally { __authBusy=false; }
-      }, 0);
-    });
-  }
 
   async function ensureDeleteFrame(kind){
     const fr=tabs[kind].frame;
@@ -548,13 +528,7 @@ let exclusiveQueue=Promise.resolve();
       }
       return;
     }
-    // stopped 이거나 null(삭제) 처리.
-    // 같은 기기에서 시작 요청으로 이미 진행 중인 탭은 RPC 처리 중 active_timer가
-    // 잠깐 null/stopped로 보이더라도 탭 표시를 지우지 않는다.
-    // 실제 종료는 자식 화면의 exclusive-session-ended 메시지로 즉시 반영된다.
-    if(exclusiveActive){
-      return;
-    }
+    // 서버 active_timer가 유일한 기준이다. stopped/null이면 즉시 표시 해제.
     exclusiveActive = null;
     setExclusiveTabStatus(null);
   }
@@ -592,17 +566,12 @@ let exclusiveQueue=Promise.resolve();
     });
   }
 
+  // index 바깥 메시지 핸들러도 서버 상태만 다시 읽을 수 있게 공개
+  window.refreshExclusiveServerState = fetchOnce;
+
   // realtime 연결 + 앱 시작할 때 딱 1회만 확인
   startRealtime();
   fetchOnce();
-
-  const sb = initSettingsClient();
-  if(sb) sb.auth.onAuthStateChange((event)=>{
-    if(event === 'TOKEN_REFRESHED') return;
-    // [FIX] removeChannel 제거 — 채널 churn 방지. startRealtime은 ch 있으면 재사용.
-    setTimeout(startRealtime, 300);
-    setTimeout(fetchOnce, 400);
-  });
 
   // 백그라운드에서 돌아올 때만 1회 (하루 몇 번 수준, 무시 가능)
   document.addEventListener('visibilitychange', ()=>{
@@ -664,87 +633,19 @@ async function stopExclusive(kind, atMs){
 }
 window.addEventListener('message',ev=>{
   if(ev.origin!==location.origin)return;
-  if(ev.data?.type==='exclusive-session-ended'){
-    if(exclusiveActive===ev.data.kind){ exclusiveActive=null; setExclusiveTabStatus(null); }
-    if(lastTransition?.startedKind===ev.data.kind) lastTransition=null;
-    if(pendingStart?.kind===ev.data.kind) pendingStart=null;
+  const type=ev.data?.type;
+  // 자식 화면의 로컬 메시지는 탭 색을 직접 바꾸지 않는다.
+  // active_timer 서버 상태를 다시 읽는 트리거로만 사용한다.
+  if(type==='exclusive-session-ended' || type==='exclusive-session-cancel-start'){
+    window.refreshExclusiveServerState?.();
     return;
   }
-  if(ev.data?.type==='exclusive-session-cancel-start'){
-    const kind=ev.data.kind;
-
-    // 아직 큐에서 처리 안 된 시작 요청이면 → 무효화만 하고 끝
-    // (2단계에서 aborted 감지해서 알아서 되돌림)
-    if(pendingStart && pendingStart.kind===kind && pendingStart.aborted===false){
-      pendingStart.aborted = true;
-      if(exclusiveActive!==kind && !lastTransition){
-        exclusiveActive=null;
-        setExclusiveTabStatus(null);
-      }
-      return;
-    }
-
-    // 이미 활성화된 상태에서 취소된 경우
-    exclusiveQueue=exclusiveQueue.then(async()=>{
-      const canUndo = lastTransition && lastTransition.startedKind===kind && lastTransition.previousKind;
-      if(canUndo){
-        const {previousKind:target, atMs}=lastTransition;
-        exclusiveFrames[target]?.contentWindow?.postMessage(
-          {type:'exclusive-session-undo-stop', atMs}, location.origin);
-        exclusiveActive=target;
-        setExclusiveTabStatus(target);
-      }else if(exclusiveActive===kind){
-        exclusiveActive=null;
-        setExclusiveTabStatus(null);
-      }
-      lastTransition=null;
-    });
-    return;
-  }
-  if(ev.data?.type!=='exclusive-session-start')return;
-  const kind=ev.data.kind, req=ev.data.req;
-  const atMs=Number.isFinite(ev.data.at)?ev.data.at:Date.now();
-  if(!exclusiveFrames[kind])return;
-
-  // 이전에 대기 중이던 시작 요청은 무효화
-  if(pendingStart) pendingStart.aborted = true;
-  pendingStart = {kind, req, atMs, aborted:false};
-
-  exclusiveQueue=exclusiveQueue.then(async()=>{
-    // 큐에 들어와서 실행할 시점에 이미 취소됐는지 확인
-    if(pendingStart?.req !== req || pendingStart.aborted){
-      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
-      return;
-    }
-
-    const previousActive = exclusiveActive!==kind ? exclusiveActive : null;
-
-    // 다른 기록장들 먼저 정지
-    await Promise.all(
-      Object.keys(exclusiveFrames)
-        .filter(other=>other!==kind)
-        .map(k=>stopExclusive(k, atMs))
-    );
-
-    // 정지시키는 동안 취소가 왔으면 → 방금 정지시킨 것을 되돌림
-    if(pendingStart?.req !== req || pendingStart.aborted){
-      if(previousActive){
-        exclusiveFrames[previousActive]?.contentWindow?.postMessage(
-          {type:'exclusive-session-undo-stop', atMs}, location.origin);
-        exclusiveActive = previousActive;
-        setExclusiveTabStatus(previousActive);
-      }
-      ev.source?.postMessage({type:'exclusive-session-result',req,ok:false},location.origin);
-      return;
-    }
-
-    // 정상 시작 확정
-    exclusiveActive=kind;
-    setExclusiveTabStatus(kind);
-    lastTransition = previousActive ? {startedKind:kind, previousKind:previousActive, atMs} : null;
-    ev.source?.postMessage({type:'exclusive-session-result',req,ok:true},location.origin);
-    if(pendingStart?.req===req) pendingStart=null;
-  });
+  if(type!=='exclusive-session-start')return;
+  const req=ev.data?.req;
+  // 시작 허용 여부도 로컬 iframe 정지 작업으로 결정하지 않는다.
+  // 실제 단일화는 start_active_timer RPC가 서버에서 원자적으로 처리한다.
+  ev.source?.postMessage({type:'exclusive-session-result',req,ok:true},location.origin);
+  window.refreshExclusiveServerState?.();
 });
 
 </script>
@@ -769,6 +670,23 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
 <script id="v128-shared-cloud">
 (()=>{
  const $=id=>document.getElementById(id); let sb=null,user=null;
+ // Android OAuth diagnostic panel (only shown inside APK)
+ function oauthDiag(msg){
+   if(!(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function')) return;
+   let box=document.getElementById('androidOAuthDiag');
+   if(!box){
+     box=document.createElement('div'); box.id='androidOAuthDiag';
+     box.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:13px/1.45 sans-serif;white-space:pre-wrap;box-shadow:0 2px 12px #0008';
+     document.body.appendChild(box);
+   }
+   const line=new Date().toLocaleTimeString()+'  '+msg;
+   const prev=(box.dataset.log||'').split('\n').filter(Boolean);
+   prev.push(line);
+   while(prev.length>10) prev.shift();
+   box.dataset.log=prev.join('\n');
+   box.textContent='OAuth 진단\n'+box.dataset.log;
+ }
+ window.yangStudyOAuthDiag=oauthDiag;
  // ★ [2단계] 부모의 싱글톤(initSettingsClient)을 재사용한다.
  //   여기서 createClient 를 새로 호출하면 같은 storage key 를 공유하는
  //   GoTrueClient 가 2개가 되어 "Multiple GoTrueClient instances" 경고가 발생한다.
@@ -777,12 +695,13 @@ window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;document.
    sb = initSettingsClient();   // ★ 새로 만들지 않고 재사용
    return !!sb;
  }
- async function status(){if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
+ let __statusBusy=false;
+ async function status(){if(__statusBusy)return user;__statusBusy=true;try{if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
 // 서버 검증 추가: 실제 요청이 통과해야만 ✅
 let verified=false;
 if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
-$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
-$('sharedCloudToggle').disabled=!!user;return user}
+$('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.add('show');$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
+$('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
  async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
  async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
  async function all(action){if(!await status()){alert('먼저 홈에서 클라우드에 로그인해 주세요.');$('sharedCloudSetup').classList.add('show');return}const map=action==='upload'?{study:['cloudUpload'],lecture:['cloudUpload'],sleep:['cloudUpload'],record:['cloudUpload']}:{study:['cloudDownload'],lecture:['cloudDownload'],sleep:['cloudDownload'],record:['cloudDownload']};for(const kind of ['study','lecture','sleep','record']){try{await clickChild(kind,map[kind]);await new Promise(r=>setTimeout(r,180))}catch(e){console.error(kind,action,e)}}}
@@ -795,6 +714,7 @@ $('sharedCloudToggle').disabled=!!user;return user}
 
   // Android APK 브리지
   if(window.AndroidAuth && typeof window.AndroidAuth.openOAuth === 'function'){
+    oauthDiag('① Google 로그인 주소 생성 중');
     const {data,error} = await sb.auth.signInWithOAuth({
       provider:'google',
       options:{
@@ -804,7 +724,8 @@ $('sharedCloudToggle').disabled=!!user;return user}
       }
     });
     if(error){ alert('Google 로그인 실패: '+error.message); return; }
-    if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    if(!data?.url){ oauthDiag('❌ 로그인 URL 생성 실패'); alert('Google 로그인 주소를 만들지 못했어요.'); return; }
+    oauthDiag('② Google 계정 선택창 열기');
     try{ window.top.__androidOAuthSource = 'index.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
@@ -818,19 +739,38 @@ $('sharedCloudToggle').disabled=!!user;return user}
   });
   if(error) alert('Google 로그인 실패: '+error.message);
 };
-  $('sharedCloudLogout').onclick=async()=>{if(init())await sb.auth.signOut();await status()};
+  $('sharedCloudLogout').classList.add('show');
+  $('sharedCloudLogout').disabled=false;
+  $('sharedCloudLogout').onclick=async()=>{
+    if(!confirm('정말 로그아웃하시겠습니까?')){ oauthDiag('L0 로그아웃 취소'); return; }
+    oauthDiag('L1 로그아웃 확인');
+    if(!init())return;
+    const {error}=await sb.auth.signOut();
+    if(error){oauthDiag('L3 signOut 오류: '+error.message);return;}
+    oauthDiag('L3 signOut 반환 성공');
+    await new Promise(r=>setTimeout(r,800));
+    await status();
+    $('sharedCloudLogout').classList.add('show');
+    $('sharedCloudLogout').disabled=false;
+  };
   $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
   if(init()){
-    sb.auth.onAuthStateChange((event)=>{
+    sb.auth.onAuthStateChange((event, session)=>{
+      window.__yangStudyLastAuthEvent = event;
+      window.__yangStudyLastAuthSession = session || null;
+      oauthDiag('A1 auth event='+event+' / session='+(session?'있음':'없음')+' / user='+(session?.user?.email||'없음'));
       if(event === 'TOKEN_REFRESHED') return;
-      setTimeout(status, 0);
+      if(event === 'SIGNED_OUT') return;
+      setTimeout(status, 500);
     });
   }
-  await status();
+  // 초기 세션 UI는 onAuthStateChange의 INITIAL_SESSION으로 복원한다.
 
-  // ★ Android 커스텀 스킴 콜백 처리
+  // ★ Android 커스텀 스킴 콜백 처리 - deadlock 진단 유지
   window.yangStudyHandleOAuthCallback = async function(callbackUrl){
+    const diag = oauthDiag;
     try{
+      diag('④-1 콜백 함수 진입');
       if(!init()) throw new Error('Supabase 연결 실패');
       const u = new URL(callbackUrl);
       const oauthError = u.searchParams.get('error_description') || u.searchParams.get('error');
@@ -838,23 +778,56 @@ $('sharedCloudToggle').disabled=!!user;return user}
 
       const code = u.searchParams.get('code');
       if(code){
-        const {data,error} = await sb.auth.exchangeCodeForSession(code);
-        if(error) throw error;
-      } else {
-        const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
-        const access_token = frag.get('access_token');
-        const refresh_token = frag.get('refresh_token');
-        if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
-        const {data,error} = await sb.auth.setSession({access_token, refresh_token});
-        if(error) throw error;
+        diag('⑤ PKCE code 방식 - exchangeCodeForSession 시작');
+        const p=sb.auth.exchangeCodeForSession(code);
+        p.then(r=>diag(r?.error?'E2 exchange 오류: '+r.error.message:'E2 exchange 반환 성공'))
+         .catch(e=>diag('E2 exchange 예외: '+(e?.message||e)));
+        return true;
       }
 
-      await status();
-      alert('Google 로그인이 완료됐어요');
+      const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
+      const access_token = frag.get('access_token');
+      const refresh_token = frag.get('refresh_token');
+      diag('⑤-1 fragment access='+(access_token?'있음':'없음')+', refresh='+(refresh_token?'있음':'없음'));
+      if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
+
+      // v28 D1: Supabase auth lock을 거치지 않고 access token 자체가 서버에서 유효한지 확인
+      diag('D1 access token 서버 검증 시작');
+      fetch(SUPABASE_URL+'/auth/v1/user',{
+        headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+access_token}
+      }).then(async r=>{
+        let body=null; try{body=await r.json()}catch(_e){}
+        diag('D2 /auth/v1/user HTTP '+r.status+' / user='+(body?.email||'없음'));
+      }).catch(e=>diag('D2 token 검증 fetch 실패: '+(e?.message||e)));
+
+      diag('⑤-2 setSession 호출');
+      const setP = sb.auth.setSession({access_token, refresh_token});
+      let setDone=false;
+      setP.then(result=>{
+        setDone=true;
+        if(result?.error){diag('⑤-3 setSession 오류: '+result.error.message);return;}
+        const sess=result?.data?.session||null;
+        user=sess?.user||null;
+        diag('⑤-3 setSession 반환 성공 / user='+(user?.email||'없음'));
+        setTimeout(()=>{ status(); },800);
+        if(user){
+          $('sharedCloudStatus').textContent='✅ '+user.email+' (setSession 확인)';
+          $('sharedCloudToggle').textContent='계정';
+          $('sharedCloudToggle').disabled=true;
+          $('sharedCloudSetup').classList.remove('show');
+        }
+        $('sharedCloudLogout').classList.add('show');
+        $('sharedCloudLogout').disabled=false;
+      }).catch(e=>{setDone=true;diag('⑤-3 setSession 예외: '+(e?.message||e));});
+
+      setTimeout(()=>diag('D3 3초 확인 / setSession 반환='+(setDone?'예':'아니오')+' / 마지막 auth event='+(window.__yangStudyLastAuthEvent||'없음')),3000);
+
       return true;
     }catch(e){
       console.error('Google OAuth callback 실패:', e);
-      alert('Google 로그인 완료 처리 실패: ' + (e?.message || e));
+      diag('❌ '+(e?.message || e));
+      $('sharedCloudLogout').classList.add('show');
+      $('sharedCloudLogout').disabled=false;
       return false;
     }
   };
