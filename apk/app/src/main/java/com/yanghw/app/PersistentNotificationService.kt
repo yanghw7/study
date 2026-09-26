@@ -1,4 +1,4 @@
-package com.min.journal
+package com.yanghw.app
 
 import android.app.*
 import android.content.*

@@ -1,4 +1,4 @@
-package com.min.journal
+package com.yanghw.app
 import android.content.*
 import androidx.core.content.ContextCompat
 class AlarmReceiver: BroadcastReceiver(){ override fun onReceive(c:Context,i:Intent){ ContextCompat.startForegroundService(c,Intent(c,AlarmService::class.java)) } }

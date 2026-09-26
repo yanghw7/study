@@ -1,4 +1,4 @@
-package com.min.journal
+package com.yanghw.app
 
 import android.Manifest
 import android.app.*
@@ -18,6 +18,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
 
 class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
@@ -31,7 +33,7 @@ class MainActivity : AppCompatActivity() {
         // system UI, but the WebView itself is physically laid out only inside Android's
         // runtime safe area. No fixed dp/px and no HTML padding are used.
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        pendingAuthUri = intent?.data?.takeIf { it.scheme == "yangstudy" && it.host == "auth" && it.path == "/callback" }
+        pendingAuthUri = intent?.data?.takeIf { isOAuthCallback(it) }
 
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.WHITE)
@@ -59,29 +61,42 @@ class MainActivity : AppCompatActivity() {
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.settings.allowFileAccess = true
-        web.settings.allowContentAccess = true
+        web.settings.allowFileAccess = false
+        web.settings.allowContentAccess = false
         web.settings.mediaPlaybackRequiresUserGesture = false
         web.webChromeClient = WebChromeClient()
-        web.webViewClient = object: WebViewClient() {
+
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        web.webViewClient = object : WebViewClientCompat() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
-                if (uri.scheme == "yangstudy" && uri.host == "auth" && uri.path == "/callback") {
+                if (isOAuthCallback(uri)) {
                     deliverAuthCallback(uri)
                     return true
                 }
                 return false
             }
+
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 injectNativeAlarmBridge()
-                pendingAuthUri?.let { deliverAuthCallback(it); pendingAuthUri = null }
+                pendingAuthUri?.let {
+                    deliverAuthCallback(it)
+                    pendingAuthUri = null
+                }
             }
         }
         web.addJavascriptInterface(NativeAlarmBridge(this), "NativeAlarm")
         web.addJavascriptInterface(AndroidAuthBridge(this) { notifyOpenUrlFailed() }, "AndroidAuth")
         web.addJavascriptInterface(NativeUiBridge(this), "NativeUi")
-        web.loadUrl("file:///android_asset/index.html")
+        web.loadUrl("https://appassets.androidplatform.net/assets/index.html")
         requestPowerfulRelevantPermissions()
         PersistentNotificationService.start(this)
     }
@@ -89,43 +104,35 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.data?.takeIf { it.scheme == "yangstudy" && it.host == "auth" && it.path == "/callback" }?.let { deliverAuthCallback(it) }
+        intent.data?.takeIf { isOAuthCallback(it) }?.let { deliverAuthCallback(it) }
+    }
+
+    private fun isOAuthCallback(uri: Uri): Boolean {
+        if (uri.scheme != "yangstudy" || uri.host != "auth" || uri.path != "/callback") return false
+        val fragment = uri.fragment ?: ""
+        return !uri.getQueryParameter("code").isNullOrBlank() ||
+            !uri.getQueryParameter("error").isNullOrBlank() ||
+            !uri.getQueryParameter("error_description").isNullOrBlank() ||
+            fragment.contains("access_token=") ||
+            fragment.contains("error=")
     }
 
     private fun deliverAuthCallback(uri: Uri) {
-        // IMPORTANT: Supabase PKCE stores the code verifier in the WebView/frame that
-        // started OAuth. Returning the code only to the top index page can therefore
-        // show a cached account label while leaving the real child-page session empty.
-        // Route the full callback URL back to the exact frame that initiated OAuth.
         val callbackUrl = org.json.JSONObject.quote(uri.toString())
         val js = """
         (function(){
           const callbackUrl=$callbackUrl;
-          const source=window.__androidOAuthSource||'index.html';
-          if(source==='index.html'){
-            if(typeof window.yangStudyHandleOAuthCallback==='function'){
-              window.yangStudyHandleOAuthCallback(callbackUrl);
-            }
+          if(typeof window.yangStudyHandleOAuthCallback==='function'){
+            window.yangStudyHandleOAuthCallback(callbackUrl);
             return;
           }
-          const frames=[...document.querySelectorAll('iframe')];
-          const target=frames.find(f=>{
-            const src=(f.getAttribute('src')||f.getAttribute('data-src')||'').split('?')[0];
-            return src.endsWith(source);
-          });
-          if(target?.contentWindow && typeof target.contentWindow.yangStudyHandleOAuthCallback==='function'){
-            target.contentWindow.yangStudyHandleOAuthCallback(callbackUrl);
-          } else {
-            // If a lazy iframe was replaced/reloaded, try every loaded child without
-            // consuming the code in the top page first.
-            for(const f of frames){
-              try{
-                if(typeof f.contentWindow?.yangStudyHandleOAuthCallback==='function'){
-                  f.contentWindow.yangStudyHandleOAuthCallback(callbackUrl);
-                  break;
-                }
-              }catch(_e){}
-            }
+          for(const f of document.querySelectorAll('iframe')){
+            try{
+              if(typeof f.contentWindow?.yangStudyHandleOAuthCallback==='function'){
+                f.contentWindow.yangStudyHandleOAuthCallback(callbackUrl);
+                return;
+              }
+            }catch(_e){}
           }
         })();
         """.trimIndent()

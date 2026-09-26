@@ -2673,38 +2673,66 @@ async function requestExclusiveSessionStart(atMs){
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
+
   let stopped=false;
   try{
-    // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
-    // 이 강의의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
     const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
     const now=new Date(atMs);
     const found=await locateRunningPeriod();
     if(found){
-      const {ym,dk,day,p}=found;
-      const before=deepClone(p);
-      p.endDate=ymd(now);p.endTime=hm(now);
-      p.timerEndedAt=Math.round(atMs);
-      lastAutoStoppedId=p._id;
-      lastAutoStoppedAt=atMs;
-      if(cloudUser){
-        const row=await cloudStopActiveTimer(ym, dk, p._id);const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-        p.timerEndedAt=Number.isFinite(ts)?ts:Math.round(atMs);
-      }else p.timerEndedAt=Math.round(atMs);
-      markChangedPeriodFields(p, before);
-      autoSortPeriodsByStart(day);
-      // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
-      await saveMonth(ym);
-      if(ym===ymKey(cur) && dk===dKey(cur)){
-        renderPeriods();updateStudyTimer();updateWasteTimer();
+      const {ym,dk,day}=found;
+      const pid=found.p._id;
+
+      // ① 로컬 확정 + 마킹 + 정렬 (await 이전)
+      {
+        const p=found.p;
+        const before=deepClone(p);
+        p.endDate=ymd(now);
+        p.endTime=hm(now);
+        p.timerEndedAt=Math.round(atMs);
+        lastAutoStoppedId=pid;
+        lastAutoStoppedAt=atMs;
+        markChangedPeriodFields(p, before);
+        autoSortPeriodsByStart(day);
       }
+
       if(ym===ymKey(cur) && dk===dKey(cur)){
-        const _sHasFocus = document.hasFocus();
-        if(!(_sHasFocus && isPeriodInputEditing()) && userActionCount===0){
+        if(isPeriodInputEditing() || userActionCount > 0){
+          periodRenderPending = true;
+        }else{
           renderPeriods();updateStudyTimer();updateWasteTimer();
         }
       }
-      try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(_){}
+
+      // ② 저장 확정
+      await saveMonth(ym);
+
+      // ③ 서버 RPC + refetch + 재마킹
+      if(cloudUser){
+        try{
+          const row=await cloudStopActiveTimer(ym, dk, pid);
+          const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
+          if(Number.isFinite(ts)){
+            const day2=monthCache[ym]?.[dk];
+            const idx2=day2?.periods?.findIndex(x=>String(x._id||'')===String(pid));
+            if(idx2>=0){
+              const p2=day2.periods[idx2];
+              const before2=deepClone(p2);
+              p2.timerEndedAt=ts;
+              markChangedPeriodFields(p2, before2);
+              await saveMonth(ym);
+              if(ym===ymKey(cur) && dk===dKey(cur)){
+                if(!(isPeriodInputEditing() || userActionCount > 0)){
+                  renderPeriods();updateStudyTimer();updateWasteTimer();
+                } else {
+                  periodRenderPending = true;
+                }
+              }
+            }
+          }
+        }catch(_){}
+      }
+
       stopped=true;
     }
   }catch(e){console.warn('자동 강의 종료 실패',e)}
@@ -2790,103 +2818,122 @@ $('#periodList').addEventListener('click', async (e) => {
   btn.disabled = true;
   btn.textContent = '⏳';
   try{
-  const idx = Number(btn.dataset.idx);
-  const day = getDayData();
-  const p = day.periods?.[idx];
-  if(!p) return;
+    let idx = Number(btn.dataset.idx);
+    let day = getDayData();
+    let p = day.periods?.[idx];
+    if(!p) return;
+    const pid = p._id;
+    // await 사이에 자동 동기화/재정렬이 일어나도 같은 강의 기록을 _id로 다시 찾는다.
+    const refetch = () => {
+      day = getDayData();
+      idx = day.periods.findIndex(x => String(x._id||'') === String(pid));
+      p = idx >= 0 ? day.periods[idx] : null;
+      return !!p;
+    };
 
-  const action = btn.dataset.lectureAction;
-  const isCancel = action === 'cancel-start' || action === 'cancel-end';
-  if(cloudUser && !serverClockCalibrated){
-    try{ await calibrateServerClock(false); }catch(_){}
-  }
-  const now = new Date(serverNowMs());
-  if(!isCancel && !isWithinSelectedStudyDay(now)){
-    showToast('오늘 강의에서만 시작/종료 버튼을 사용할 수 있어요');
-    return;
-  }
-
-  const beforeSync = deepClone(p);
-
-  if(action === 'start'){
-    if(!(await requestExclusiveSessionStart(now.getTime()))) return;
-    p.startDate = ymd(now);
-    p.startTime = hm(now);
-    p.endDate = '';
-    p.endTime = '';
-    p.timerEndedAt = null;
-    p.timerStartedAt = Math.round(now.getTime());
-    if(cloudUser){
-      void cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx).then(row=>{
-        const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
-        if(Number.isFinite(ts)){ p.timerStartedAt = ts; p._updatedAt = syncNow(); }
-        return calibrateServerClock(true);
-      }).catch(()=>{});
+    const action = btn.dataset.lectureAction;
+    const isCancel = action === 'cancel-start' || action === 'cancel-end';
+    if(cloudUser && !serverClockCalibrated){
+      try{ await calibrateServerClock(false); }catch(_){}
     }
-  }else if(action === 'end'){
-    if(!p.startDate || !p.startTime){
-      showToast('먼저 강의 시작을 눌러주세요');
+    const now = new Date(serverNowMs());
+    if(!isCancel && !isWithinSelectedStudyDay(now)){
+      showToast('오늘 강의에서만 시작/종료 버튼을 사용할 수 있어요');
       return;
     }
-    p.endDate = ymd(now);
-    p.endTime = hm(now);
-    if(cloudUser){
-      try{
-        const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
-        const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
-        p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-        void calibrateServerClock(true);
-      }catch(_){
-        p.timerEndedAt = Math.round(serverNowMs());
-      }
-    }else{
-      p.timerEndedAt = Math.round(serverNowMs());
-    }
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
-  }else if(action === 'cancel-start'){
-    const msg = (p.endDate || p.endTime)
-      ? `${idx+1}강의의 시작·종료 기록을 모두 지울까요?`
-      : `${idx+1}강의 시작을 취소할까요?`;
-    if(!(await askConfirm(msg, true))) return;
-    p.startDate = '';
-    p.startTime = '';
-    p.endDate = '';
-    p.endTime = '';
-    p.timerStartedAt = null;
-    p.timerEndedAt = null;
-    if(cloudUser){
-      try{ await cloudClearActiveTimer(); }catch(_){}
-    }
-    // 방금 시작했던 타이머를 취소하는 것이므로, 그로 인해 자동 종료됐던
-    // 다른 기록장(공부/수면)의 기록을 되돌려 달라고 알린다.
-    if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'lecture'},location.origin);
-    showToast('시작 기록을 취소했어요');
-  }else if(action === 'cancel-end'){
-    if(!(await askConfirm(`${idx+1}강의 종료를 취소할까요?`, true))) return;
-    p.endDate = '';
-    p.endTime = '';
-    p.timerEndedAt = null;
-    if(Number(p.timerStartedAt) > 0 && cloudUser){
-      try{
-        await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
-        void calibrateServerClock(true);
-      }catch(_){}
-    }
-    if(window.parent!==window){
-      try{ await requestExclusiveSessionStart(serverNowMs()); }catch(_){}
-    }
-    showToast('종료 기록을 취소했어요');
-  }else{
-    return;
-  }
 
-  markChangedPeriodFields(p, beforeSync);
-  p._updatedAt = syncNow();
-  if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
-  renderPeriods();
-  updateStudyTimer();
-  updateWasteTimer();
-  void persistToday();
+    const beforeSync = deepClone(p);
+
+    if(action === 'start'){
+      if(!refetch()) return;
+      p.startDate = ymd(now);
+      p.startTime = hm(now);
+      p.endDate = '';
+      p.endTime = '';
+      p.timerEndedAt = null;
+      p.timerStartedAt = Math.round(now.getTime());
+      markChangedPeriodFields(p, beforeSync);
+      renderPeriods(); updateStudyTimer(); updateWasteTimer();
+      if(cloudUser){
+        try{
+          const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
+          const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
+          if(Number.isFinite(ts) && ts > 0){
+            if(!refetch()) return;
+            p.timerStartedAt = ts;
+            markChangedPeriodFields(p, beforeSync);
+          }
+          void calibrateServerClock(true);
+          if(!refetch()) return;
+        }catch(_){}
+      }
+    }else if(action === 'end'){
+      if(!p.startDate || !p.startTime){
+        showToast('먼저 강의 시작을 눌러주세요');
+        return;
+      }
+      p.endDate = ymd(now);
+      p.endTime = hm(now);
+      if(Number(p.timerStartedAt) > 0) p.timerEndedAt = Math.round(serverNowMs());
+      markChangedPeriodFields(p, beforeSync);
+      renderPeriods(); updateStudyTimer(); updateWasteTimer();
+      if(Number(p.timerStartedAt) > 0 && cloudUser){
+        try{
+          const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
+          const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
+          if(Number.isFinite(ts) && ts > 0){
+            if(!refetch()) return;
+            p.timerEndedAt = ts;
+            markChangedPeriodFields(p, beforeSync);
+          }
+          void calibrateServerClock(true);
+          if(!refetch()) return;
+        }catch(_){}
+      }
+      if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+    }else if(action === 'cancel-start'){
+      const msg = (p.endDate || p.endTime)
+        ? `${idx+1}강의의 시작·종료 기록을 모두 지울까요?`
+        : `${idx+1}강의 시작을 취소할까요?`;
+      if(!(await askConfirm(msg, true))) return;
+      p.startDate = '';
+      p.startTime = '';
+      p.endDate = '';
+      p.endTime = '';
+      p.timerStartedAt = null;
+      p.timerEndedAt = null;
+      markChangedPeriodFields(p, beforeSync);
+      renderPeriods(); updateStudyTimer(); updateWasteTimer();
+      if(cloudUser){
+        try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), p._id); }catch(_){}
+      }
+      if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'lecture'},location.origin);
+      showToast('시작 기록을 취소했어요');
+    }else if(action === 'cancel-end'){
+      if(!(await askConfirm(`${idx+1}강의 종료를 취소할까요?`, true))) return;
+      p.endDate = '';
+      p.endTime = '';
+      p.timerEndedAt = null;
+      markChangedPeriodFields(p, beforeSync);
+      renderPeriods(); updateStudyTimer(); updateWasteTimer();
+      if(Number(p.timerStartedAt) > 0 && cloudUser){
+        try{
+          await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
+          void calibrateServerClock(true);
+          if(!refetch()) return;
+        }catch(_){}
+      }
+      showToast('종료 기록을 취소했어요');
+    }else{
+      return;
+    }
+
+    p._updatedAt = syncNow();
+    if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
+    await persistToday();
+    renderPeriods();
+    updateStudyTimer();
+    updateWasteTimer();
   } finally {
     userActionCount--;
     if(btn.isConnected){
@@ -3852,12 +3899,12 @@ $('#cloudGoogle').onclick = async () => {
       provider:'google',
       options:{
         redirectTo:'yangstudy://auth/callback',
-        skipBrowserRedirect:true
+        skipBrowserRedirect:true,
+        queryParams:{ prompt:'select_account' }
       }
     });
     if(error){ alert('Google 로그인 실패: ' + error.message); return; }
     if(!data?.url){ alert('Google 로그인 주소를 만들지 못했어요.'); return; }
-    try{ window.top.__androidOAuthSource = 'lecture.html'; }catch(_e){}
     window.AndroidAuth.openOAuth(data.url);
     return;
   }
@@ -3866,7 +3913,7 @@ $('#cloudGoogle').onclick = async () => {
   const redirectTo = window.location.origin + window.location.pathname;
   const {error} = await sbClient.auth.signInWithOAuth({
     provider:'google',
-    options:{redirectTo}
+    options:{redirectTo, queryParams:{ prompt:'select_account' }}
   });
   if(error) alert('Google 로그인 실패: ' + error.message);
 };
@@ -3879,12 +3926,24 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     if(oauthError) throw new Error(oauthError);
 
     const code = u.searchParams.get('code');
-    if(!code) throw new Error('Google 로그인 인증 코드가 없습니다.');
+    let authData = null;
+    if(code){
+      const {data,error} = await sbClient.auth.exchangeCodeForSession(code);
+      if(error) throw error;
+      authData = data;
+    } else {
+      const frag = new URLSearchParams(u.hash.replace(/^#/, ''));
+      const fragError = frag.get('error_description') || frag.get('error');
+      if(fragError) throw new Error(fragError);
+      const access_token = frag.get('access_token');
+      const refresh_token = frag.get('refresh_token');
+      if(!access_token || !refresh_token) throw new Error('Google 로그인 토큰이 없습니다.');
+      const {data,error} = await sbClient.auth.setSession({access_token, refresh_token});
+      if(error) throw error;
+      authData = data;
+    }
 
-    const {data,error} = await sbClient.auth.exchangeCodeForSession(code);
-    if(error) throw error;
-
-    cloudUser = data?.session?.user || data?.user || null;
+    cloudUser = authData?.session?.user || authData?.user || null;
     await refreshCloudStatus();
 
     if(cloudUser){
@@ -4077,6 +4136,22 @@ async function cloudResumeActiveTimer(ym, dayKey, p, idx){
   return data || null;
 }
 
+async function cloudCancelActiveTimerStart(ym, dayKey, periodId){
+  if(!sbClient || !cloudUser) return null;
+  const {data,error} = await sbClient.rpc('cancel_active_timer_start',{
+    p_ym: String(ym || ''),
+    p_day_key: String(dayKey ?? ''),
+    p_period_id: String(periodId || '')
+  });
+  if(error){
+    console.error('서버 타이머 시작 취소 실패:', error);
+    showToast('서버 타이머 시작 취소 실패');
+    throw error;
+  }
+  activeTimerLastFingerprint = '';
+  return data || null;
+}
+
 async function cloudClearActiveTimer(){
   if(!sbClient || !cloudUser) return;
   const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
@@ -4116,9 +4191,62 @@ function findPeriodForActiveTimer(row){
   return {ym, dk, day, p:day.periods[idx], idx};
 }
 
+// [CROSS-DEVICE-END] 다른 종류의 타이머가 서버에서 시작되면
+// 이 페이지에 남아 있는 실행 중 기록을 그 시작 시각으로 종료해 클라우드에 저장한다.
+async function closeLocalRunningPeriodsForForeignTimer(row){
+  if(!row || row.status !== 'running') return false;
+
+  // 서버 start_active_timer()가 이전 강의의 종료값을 study_months에 기록한다.
+  // 클라이언트에서는 종료값을 새로 만들거나 저장하지 않고 서버값이 보일 때까지 재동기화한다.
+  const runningIds = new Set();
+  for(const month of Object.values(monthCache || {})){
+    if(!month || typeof month !== 'object') continue;
+    for(const day of Object.values(month)){
+      if(!day || !Array.isArray(day.periods)) continue;
+      for(const p of day.periods){
+        const st = Number(p?.timerStartedAt);
+        const en = Number(p?.timerEndedAt);
+        if(Number.isFinite(st) && st > 0 && !(Number.isFinite(en) && en >= st) && p?._id){
+          runningIds.add(String(p._id));
+        }
+      }
+    }
+  }
+  if(!runningIds.size) return false;
+
+  for(let attempt=0; attempt<6; attempt++){
+    await autoSyncFromCloud();
+    let ended = false;
+    for(const month of Object.values(monthCache || {})){
+      if(!month || typeof month !== 'object') continue;
+      for(const day of Object.values(month)){
+        if(!day || !Array.isArray(day.periods)) continue;
+        if(day.periods.some(p => runningIds.has(String(p?._id || '')) && Number(p?.timerEndedAt) > 0)){
+          ended = true;
+          break;
+        }
+      }
+      if(ended) break;
+    }
+    if(ended){
+      if(isPeriodInputEditing() || userActionCount > 0) periodRenderPending = true;
+      else await renderCurrentView();
+      syncAndroidTimer();
+      if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+      return true;
+    }
+    if(attempt < 5) await new Promise(r=>setTimeout(r,200 * (attempt + 1)));
+  }
+
+  console.warn('[pending] 강의 종료 데이터 대기 중 (재시도 예정)');
+  return false;
+}
+
 async function applyActiveTimerRow(row){
   if(!row) return false;
-  if(!String(row.ym||'').startsWith('L:')) return false;
+  if(!(String(row.ym||'').startsWith('L:'))){
+    return await closeLocalRunningPeriodsForForeignTimer(row);
+  }
 
   let found = findPeriodForActiveTimer(row);
 
@@ -4128,12 +4256,16 @@ async function applyActiveTimerRow(row){
     await autoSyncFromCloud();
     found = findPeriodForActiveTimer(row);
   }
-  if(!found) return false;
+  if(!found){
+    console.warn('[pending] 강의 데이터 대기 중 (재시도 예정)');
+    return false;
+  }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
   if(!Number.isFinite(started)) return false;
 
+  const beforeApply = deepClone(found.p);
   // [FIX1] 서버 타이머 값을 시작/종료 일시에 함께 반영
   const startDT = new Date(started);
   found.p.startDate = ymd(startDT);
@@ -4153,6 +4285,7 @@ async function applyActiveTimerRow(row){
     }
   }
 
+  markChangedPeriodFields(found.p, beforeApply);
   // v2: 로컬 저장 없음. (메모리 캐시만 사용)
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
