@@ -2403,31 +2403,34 @@ async function requestExclusiveSessionStart(atMs){
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='study') return;
-
+  
+  console.log('★★★ STUDY STOP 신호 받음 ★★★');
   let stopped=false;
   try{
+    // 다른 기록장(강의/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
+    // 이 공부 세션의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
     const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
     const now=new Date(atMs);
     const found=await locateRunningPeriod();
+    console.log('★STOP found=', JSON.stringify(found ? {ym:found.ym, dk:found.dk, endPage:found.p?.endPage, endDate:found.p?.endDate} : null));
     if(found){
-      const {ym,dk,day}=found;
-      const pid=found.p._id;
-
-      // ① 로컬 확정 + 마킹 + 정렬 (await 이전에 확정해야 stale 참조 회피)
-      {
-        const p=found.p;
-        const before=deepClone(p);
-        p.endDate=ymd(now);
-        p.endTime=hm(now);
-        p.timerEndedAt=Math.round(atMs);
-        // 자동 전환 시 페이지 진도는 시작페이지 그대로 저장
-        if(String(p.startPage||'').trim()) p.endPage=String(p.startPage).trim();
-        lastAutoStoppedId=pid;
-        lastAutoStoppedAt=atMs;
-        markChangedPeriodFields(p, before);
-        autoSortPeriodsByStart(day);
+      const {ym,dk,day,p}=found;
+      const before=deepClone(p);
+      p.endDate=ymd(now);p.endTime=hm(now);
+      p.timerEndedAt=Math.round(atMs);
+      lastAutoStoppedId = p._id;
+      lastAutoStoppedAt = atMs;
+      // 자동 전환 시 페이지 진도는 시작페이지 그대로 저장
+      if(String(p.startPage||'').trim()) p.endPage=String(p.startPage).trim();
+      p.timerEndedAt=Math.round(atMs);
+      if(cloudUser){
+        const row = await cloudStopActiveTimer(ym, dk, p._id);
+          const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
+          if(Number.isFinite(ts)){ p.timerEndedAt = ts; p._updatedAt = syncNow(); }
       }
-
+      markChangedPeriodFields(p, before);
+      autoSortPeriodsByStart(day);
+      // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
       if(ym===ymKey(cur) && dk===dKey(cur)){
         if(isPeriodInputEditing() || userActionCount > 0){
           periodRenderPending = true;
@@ -2435,36 +2438,8 @@ window.addEventListener('message',async ev=>{
           renderPeriods();updateStudyTimer();updateWasteTimer();
         }
       }
-
-      // ② 저장을 확정 (await!) — 부모 응답 전에 서버 반영 보장
-      await saveMonth(ym);
-
-      // ③ 서버 RPC 후 refetch + 재마킹 (서버 timestamp 반영)
-      if(cloudUser){
-        try{
-          const row=await cloudStopActiveTimer(ym, dk, pid);
-          const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-          if(Number.isFinite(ts)){
-            const day2=monthCache[ym]?.[dk];
-            const idx2=day2?.periods?.findIndex(x=>String(x._id||'')===String(pid));
-            if(idx2>=0){
-              const p2=day2.periods[idx2];
-              const before2=deepClone(p2);
-              p2.timerEndedAt=ts;
-              markChangedPeriodFields(p2, before2);
-              await saveMonth(ym);
-              if(ym===ymKey(cur) && dk===dKey(cur)){
-                if(!(isPeriodInputEditing() || userActionCount > 0)){
-                  renderPeriods();updateStudyTimer();updateWasteTimer();
-                } else {
-                  periodRenderPending = true;
-                }
-              }
-            }
-          }
-        }catch(_){}
-      }
-
+      void saveMonth(ym);
+      try{ renderPeriods();updateStudyTimer();updateWasteTimer(); }catch(e){console.log('렌더에러:',e);}
       stopped=true;
     }
   }catch(e){console.warn('자동 공부 종료 실패',e)}
