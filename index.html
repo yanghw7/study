@@ -644,7 +644,7 @@
       setExclusiveTabStatus(null);
     }
 
-    async function fetchOnce(){
+    async function fetchOnce(autoSwitch){
       const sb = initSettingsClient();
       if(!sb) return;
       try{
@@ -653,16 +653,21 @@
         if(!user) return;
         const {data:row} = await sb.from('active_timer')
           .select('*').eq('user_id', user.id).maybeSingle();
-        applyFromRow(row);
+        applyFromRow(row, {autoSwitch: autoSwitch === true});
       }catch(e){}
     }
 
-    function startRealtime(){
+    function startRealtime(retry){
       const sb = initSettingsClient();
       if(!sb || ch) return;
       sb.auth.getSession().then(({data:{session}})=>{
         const user = session?.user;
-        if(!user || ch) return;
+        if(!user){
+          // 세션 복원 전이면 재시도 (최대 20회)
+          if((retry||0) < 20) setTimeout(()=>startRealtime((retry||0)+1), 500 + (retry||0)*200);
+          return;
+        }
+        if(ch) return;
         ch = sb.channel(`gongbujang-tab-${user.id}`)
           .on('postgres_changes',
               {event:'*', schema:'public', table:'active_timer', filter:`user_id=eq.${user.id}`},
@@ -690,10 +695,10 @@
     });
     window.addEventListener('pageshow', ()=>{ fetchOnce(); });
 
-    // [RT-FALLBACK] 10초 폴링 안전망 — Realtime 이벤트를 놓쳐도 최대 10초 안에 반영
+    // [RT-FALLBACK] 10초 폴링 안전망 — Realtime 이벤트를 놓쳐도 최대 10초 안에 반영 + 자동 탭 전환
     setInterval(()=>{
       if(document.visibilityState !== 'visible') return;
-      fetchOnce();
+      fetchOnce(true);
     }, 10000);
   })();
 
