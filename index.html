@@ -447,7 +447,7 @@
       del.textContent = '삭제 중…';
       del.disabled = true;
 
-      Promise.allSettled(['study','lecture','sleep','record'].map(k => deleteOneJournal(k)))
+      (async () => { const kinds = ['study','lecture','sleep','record']; const results = []; for (const k of kinds) { try { const v = await deleteOneJournal(k); results.push({status:'fulfilled', value:v}); } catch(e) { results.push({status:'rejected', reason:e}); } await new Promise(r=>setTimeout(r,800)); } return results; })()
         .then((results) => {
           const failed = results
             .map((r, i) => (r.status === 'fulfilled' && r.value === true) ? null : ['study','lecture','sleep','record'][i])

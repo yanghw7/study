@@ -2320,7 +2320,10 @@ function createRecordCard(p, idx){
     if(slotData?.lastTime){
       const text = String(slotData.lastTime);
       const m = text.match(/(\d{2}):(\d{2})$/);
-      if(m) value.value = `${m[1]}:${m[2]}`;
+      if(m){
+        value.dataset.time = `${m[1]}:${m[2]}`;
+        value.value = formatTime12(`${m[1]}:${m[2]}`);
+      }
     }
     if(slot > 1) subject.value = slotData?.subject || '';
 
@@ -4469,6 +4472,14 @@ document.addEventListener('DOMContentLoaded',()=>{
 const recordTimerStarts = [null,null,null];
 let recordTimerTick = null;
 
+function formatTime12(hhmm){
+  const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return hhmm || '';
+  const h = Number(m[1]);
+  const ap = h < 12 ? '오전' : '오후';
+  const h12 = h % 12 || 12;
+  return `${ap} ${String(h12).padStart(2,'0')}시 ${m[2]}분`;
+}
 function recordHMS(ms){
   const sec = Math.max(0, Math.floor(ms/1000));
   const h = String(Math.floor(sec/3600)).padStart(2,'0');
@@ -4578,7 +4589,7 @@ document.addEventListener('input',(e)=>{
       if(!tP.recordSlots[tSlot]) tP.recordSlots[tSlot]={count:0,subject:'',lastTime:'',timerStartedAt:null,numberInput:0};
       const tBefore=JSON.parse(JSON.stringify(tP));
       if(timeInput.value){
-        tP.recordSlots[tSlot].lastTime = timeInput.value;
+        tP.recordSlots[tSlot].lastTime = timeInput.dataset.time || timeInput.value;
       }
       markChangedPeriodFields(tP,tBefore);
       void persistToday();
@@ -4795,7 +4806,7 @@ document.documentElement.setAttribute('lang', 'en-GB');
     if(!input||input.disabled) return;
     e.preventDefault();
     target=input;
-    const m=String(input.value||'').match(/^(\d{2}):(\d{2})$/);
+    const m=String(input.dataset.time||input.value||'').match(/^(\d{2}):(\d{2})$/);
     const now=new Date();
     hour.value=m?m[1]:String(now.getHours()).padStart(2,'0');
     minute.value=m?m[2]:String(now.getMinutes()).padStart(2,'0');
@@ -4805,7 +4816,9 @@ document.documentElement.setAttribute('lang', 'en-GB');
   back.addEventListener('click',(e)=>{if(e.target===back) close()});
   set.addEventListener('click',()=>{
     if(!target) return close();
-    target.value=`${hour.value}:${minute.value}`;
+    const hhmm = `${hour.value}:${minute.value}`;
+    target.dataset.time = hhmm;
+    target.value = formatTime12(hhmm);
     target.dispatchEvent(new Event('input',{bubbles:true}));
     close();
   });
