@@ -1537,7 +1537,7 @@ async function getRunningPeriodForBoundary(){
         .maybeSingle();
 
       if(!error && data?.status === 'running' && String(data.ym || '').startsWith('L:')){
-        const ym = String(data.ym || '');
+        const ym = String(data.ym || '').slice(2);
         const dk = String(data.day_key || '');
 
         await loadMonth(ym);
@@ -2603,7 +2603,7 @@ async function locateRunningPeriod(){
     try{
       const {data,error} = await sbClient.from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
       if(!error && data?.status==='running' && String(data.ym||'').startsWith('L:')){
-        const ym=String(data.ym||''), dk=String(data.day_key||'');
+        const ym=String(data.ym||'').slice(2), dk=String(data.day_key||'');
         await loadMonth(ym);
         const day=monthCache[ym]?.[dk];
         if(day?.periods){

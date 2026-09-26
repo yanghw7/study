@@ -1598,9 +1598,14 @@ window.addEventListener('message', (ev)=>{
     const wasPaused = __journalPaused;
     __journalPaused = false;
     if(wasPaused && cloudUser){
-      // 탭 전환 순간 즉시 최신화
-      void syncActiveTimerFromCloud(true);
-      void autoSyncFromCloud();
+      // [FIX-RESUME] 순서 보장 + 명시적 렌더
+      (async ()=>{
+        try{
+          await autoSyncFromCloud(true);      // lockOwned=true 로 guard 우회
+          await syncActiveTimerFromCloud(true);
+          await renderCurrentView();
+        }catch(e){ console.warn('resume 동기화 실패:', e); }
+      })();
     }
   }
 });
