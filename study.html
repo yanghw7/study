@@ -2399,7 +2399,7 @@ async function requestExclusiveSessionStart(atMs){
       window.addEventListener('message',onMsg);
       window.parent.postMessage({type:'exclusive-session-start',kind:'study',req,at:atMs},location.origin);
     });
-  }catch(e){return true}
+  }catch(e){return false}
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='study') return;
@@ -2439,14 +2439,14 @@ window.addEventListener('message',async ev=>{
       // ② 저장을 확정 (await!) — 부모 응답 전에 서버 반영 보장
       await saveMonth(ym);
 
-      // ③ 서버 RPC
+      // 서버 RPC
       if(cloudUser){
         try{
           await cloudStopActiveTimer(ym, dk, pid);
         }catch(_){}
       }
 
-      // ④ 서버 데이터 재조회 후 화면 반영
+      // 서버 데이터 재조회 후 화면 반영
       await autoSyncFromCloud();
       if(!(isPeriodInputEditing() || userActionCount > 0)){
         renderPeriods();updateStudyTimer();updateWasteTimer();
