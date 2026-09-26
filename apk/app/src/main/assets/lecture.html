@@ -4164,43 +4164,57 @@ function findPeriodForActiveTimer(row){
 // 이 페이지에 남아 있는 실행 중 기록을 그 시작 시각으로 종료해 클라우드에 저장한다.
 async function closeLocalRunningPeriodsForForeignTimer(row){
   if(!row || row.status !== 'running') return false;
-  const boundaryMs = Date.parse(row.started_at);
-  if(!Number.isFinite(boundaryMs)) return false;
-  const endDT = new Date(boundaryMs);
-  const touched = new Set();
-  let changed = false;
-  for(const [ym, month] of Object.entries(monthCache || {})){
+
+  // 서버 start_active_timer()가 이전 강의의 종료값을 study_months에 기록한다.
+  // 클라이언트에서는 종료값을 새로 만들거나 저장하지 않고 서버값이 보일 때까지 재동기화한다.
+  const runningIds = new Set();
+  for(const month of Object.values(monthCache || {})){
     if(!month || typeof month !== 'object') continue;
     for(const day of Object.values(month)){
       if(!day || !Array.isArray(day.periods)) continue;
       for(const p of day.periods){
         const st = Number(p?.timerStartedAt);
         const en = Number(p?.timerEndedAt);
-        if(!(Number.isFinite(st) && st > 0) || (Number.isFinite(en) && en >= st)) continue;
-        if(boundaryMs < st) continue;
-        const before = deepClone(p);
-        p.endDate = ymd(endDT);
-        p.endTime = hm(endDT);
-        p.timerEndedAt = Math.round(boundaryMs);
-        markChangedPeriodFields(p, before);
-        touched.add(ym);
-        changed = true;
+        if(Number.isFinite(st) && st > 0 && !(Number.isFinite(en) && en >= st) && p?._id){
+          runningIds.add(String(p._id));
+        }
       }
     }
   }
-  if(!changed) return false;
-  for(const ym of touched) await saveMonth(ym);
-  try{ await renderCurrentView(); }catch(_){ updateStudyTimer(); }
-  syncAndroidTimer();
-  if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
-  return true;
+  if(!runningIds.size) return false;
+
+  for(let attempt=0; attempt<6; attempt++){
+    await autoSyncFromCloud();
+    let ended = false;
+    for(const month of Object.values(monthCache || {})){
+      if(!month || typeof month !== 'object') continue;
+      for(const day of Object.values(month)){
+        if(!day || !Array.isArray(day.periods)) continue;
+        if(day.periods.some(p => runningIds.has(String(p?._id || '')) && Number(p?.timerEndedAt) > 0)){
+          ended = true;
+          break;
+        }
+      }
+      if(ended) break;
+    }
+    if(ended){
+      if(isPeriodInputEditing() || userActionCount > 0) periodRenderPending = true;
+      else await renderCurrentView();
+      syncAndroidTimer();
+      if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'lecture'},location.origin);
+      return true;
+    }
+    if(attempt < 5) await new Promise(r=>setTimeout(r,200 * (attempt + 1)));
+  }
+
+  console.warn('[pending] 강의 종료 데이터 대기 중 (재시도 예정)');
+  return false;
 }
 
 async function applyActiveTimerRow(row){
   if(!row) return false;
   if(!(String(row.ym||'').startsWith('L:'))){
-    await closeLocalRunningPeriodsForForeignTimer(row);
-    return true;
+    return await closeLocalRunningPeriodsForForeignTimer(row);
   }
 
   let found = findPeriodForActiveTimer(row);
@@ -4212,9 +4226,9 @@ async function applyActiveTimerRow(row){
     found = findPeriodForActiveTimer(row);
   }
   if(!found){
-  console.warn('[pending] 강의 데이터 대기 중 (재시도 예정)');
-  return false;
-}
+    console.warn('[pending] 강의 데이터 대기 중 (재시도 예정)');
+    return false;
+  }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
