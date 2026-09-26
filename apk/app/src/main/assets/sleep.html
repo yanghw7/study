@@ -4200,43 +4200,49 @@ function findPeriodForActiveTimer(row){
 // 이 페이지에 남아 있는 실행 중 기록을 그 시작 시각으로 종료해 클라우드에 저장한다.
 async function closeLocalRunningPeriodsForForeignTimer(row){
   if(!row || row.status !== 'running') return false;
-  const boundaryMs = Date.parse(row.started_at);
-  if(!Number.isFinite(boundaryMs)) return false;
-  const endDT = new Date(boundaryMs);
-  const touched = new Set();
-  let changed = false;
-  for(const [ym, month] of Object.entries(monthCache || {})){
-    if(!month || typeof month !== 'object') continue;
-    for(const day of Object.values(month)){
-      if(!day || !Array.isArray(day.periods)) continue;
-      for(const p of day.periods){
-        const st = Number(p?.timerStartedAt);
-        const en = Number(p?.timerEndedAt);
-        if(!(Number.isFinite(st) && st > 0) || (Number.isFinite(en) && en >= st)) continue;
-        if(boundaryMs < st) continue;
-        const before = deepClone(p);
-        p.endDate = ymd(endDT);
-        p.endTime = hm(endDT);
-        p.timerEndedAt = Math.round(boundaryMs);
-        markChangedPeriodFields(p, before);
-        touched.add(ym);
-        changed = true;
+
+  // 다른 종류의 타이머가 시작되면 서버 start_active_timer()가
+  // 기존 Sleep 기록의 종료값을 study_months에 먼저 기록한다.
+  // 로컬에서 종료값을 임의 생성/저장하지 않고 서버값이 보일 때까지 재동기화한다.
+  for(let attempt=0; attempt<4; attempt++){
+    await autoSyncFromCloud();
+
+    let ended = false;
+    for(const month of Object.values(monthCache || {})){
+      if(!month || typeof month !== 'object') continue;
+      for(const day of Object.values(month)){
+        if(!day || !Array.isArray(day.periods)) continue;
+        for(const p of day.periods){
+          const st = Number(p?.timerStartedAt);
+          const en = Number(p?.timerEndedAt);
+          if(Number.isFinite(st) && st > 0 && Number.isFinite(en) && en >= st){
+            ended = true;
+            break;
+          }
+        }
+        if(ended) break;
       }
+      if(ended) break;
     }
+
+    if(ended){
+      periodRenderPending = false;
+      await renderCurrentView();
+      syncAndroidTimer();
+      if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
+      return true;
+    }
+    if(attempt < 3) await new Promise(r=>setTimeout(r,120 * (attempt + 1)));
   }
-  if(!changed) return false;
-  for(const ym of touched) await saveMonth(ym);
-  try{ await renderCurrentView(); }catch(_){ updateStudyTimer(); }
-  syncAndroidTimer();
-  if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
-  return true;
+
+  console.warn('[pending] 수면 종료 데이터 대기 중 (재시도 예정)');
+  return false;
 }
 
 async function applyActiveTimerRow(row){
   if(!row) return false;
   if(!(String(row.ym||'').startsWith('S:'))){
-    await closeLocalRunningPeriodsForForeignTimer(row);
-    return true;
+    return await closeLocalRunningPeriodsForForeignTimer(row);
   }
 
   let found = findPeriodForActiveTimer(row);
@@ -4248,9 +4254,9 @@ async function applyActiveTimerRow(row){
     found = findPeriodForActiveTimer(row);
   }
   if(!found){
-  console.warn('[pending] 수면 데이터 대기 중 (재시도 예정)');
-  return false;
-}
+    console.warn('[pending] 수면 데이터 대기 중 (재시도 예정)');
+    return false;
+  }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
