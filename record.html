@@ -4528,7 +4528,7 @@ function updateRecordSummary(){
     const ne=document.getElementById(`recordNumber${i+1}`);
     if(ne) ne.textContent=String(numbers[i]);
     const te=document.getElementById(`recordTimer${i+1}`);
-    if(te) te.textContent=recordTimerStarts[i] ? recordHMS(Date.now()-recordTimerStarts[i]) : '00:00:00';
+    if(te) te.textContent=recordTimerStarts[i] ? recordHMS(serverNowMs()-recordTimerStarts[i]) : '00:00:00';
   }
 }
 function ensureRecordTimerTick(){
@@ -4555,12 +4555,12 @@ document.addEventListener('click', async (e)=>{
     const input=document.querySelector(`.record-subject[data-idx="${idx}"][data-slot="${slot}"]`);
     if(input && slot > 1) r.subject=input.value||'';
 
-    const now=new Date();
+    const now=new Date(serverNowMs());
     const hh=String(now.getHours()).padStart(2,'0');
     const mm=String(now.getMinutes()).padStart(2,'0');
     r.count=(r.count||0)+1;
     r.lastTime=`${hh}:${mm}`;
-    r.timerStartedAt=Date.now();
+    r.timerStartedAt=Math.round(serverNowMs());
     // 과거 날짜에 입력한 기록은 상단의 현재 경과 타이머와 완전히 분리한다.
     if(ymd(cur) === ymd(logicalToday())) recordTimerStarts[slot]=r.timerStartedAt;
     markChangedPeriodFields(p, before);
