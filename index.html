@@ -760,8 +760,13 @@
     const type=ev.data?.type;
     // 자식 화면의 로컬 메시지는 탭 색을 직접 바꾸지 않는다.
     // active_timer 서버 상태를 다시 읽는 트리거로만 사용한다.
-    if(type==='exclusive-session-ended' || type==='exclusive-session-cancel-start'){
+    if(type==='exclusive-session-ended'){
       window.refreshExclusiveServerState?.();
+      return;
+    }
+    if(type==='exclusive-session-cancel-start'){
+      // 강의/수면 취소 시 이전에 자동종료된 기록장이 복원되므로 autoSwitch:true 로 자동 전환
+      window.refreshExclusiveServerState?.(true);
       return;
     }
     if(type!=='exclusive-session-start')return;
