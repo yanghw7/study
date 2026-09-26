@@ -76,6 +76,7 @@
   .date-big{font-family:'Source Serif 4',serif;font-size:26px;font-weight:600;letter-spacing:-.01em;}
   .date-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
   .day-rule{font-size:10px;color:var(--ink-soft);opacity:.7;margin-top:3px;}
+  .day-rule-pending{color:#b42318!important;font-weight:900!important;opacity:1!important;margin-left:4px!important;font-size:10px!important;white-space:nowrap!important;}
 
   .wake-row{
     display:flex;align-items:center;justify-content:space-between;
@@ -1086,7 +1087,7 @@ body{background:#FCF6F7!important}
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // BUILD: v9.9-waste-live-timer-red
 // BUILD: v9.3-cross-device-period-lock
@@ -1467,7 +1468,19 @@ function renderDateHeader(){
   $('#dateBig').textContent = `${cur.getMonth()+1}월 ${cur.getDate()}일`;
   $('#dateSub').textContent = `${cur.getFullYear()}년 · ${dayKeys[cur.getDay()]}요일`;
   const cutoff = cutoffForDate(cur);
-  $('#dayRule').textContent = `하루 집계 기준 ${pad(cutoff)}:00`;
+  let ruleHtml = `하루 집계 기준 ${pad(cutoff)}:00`;
+  const pd = appSettings.pendingDayStart;
+  if(pd && Number.isInteger(Number(pd.hour)) && pd.effectiveAt){
+    const d = new Date(pd.effectiveAt);
+    if(!isNaN(d.getTime())){
+      const mo = String(d.getMonth()+1).padStart(2,'0');
+      const da = String(d.getDate()).padStart(2,'0');
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mi = String(d.getMinutes()).padStart(2,'0');
+      ruleHtml += ` <span class="day-rule-pending">(다음 적용시점 ${mo}/${da} ${hh}:${mi})</span>`;
+    }
+  }
+  $('#dayRule').innerHTML = ruleHtml;
 }
 
 // 날짜(YYYY-MM-DD)와 시간(HH:MM)을 합쳐 실제 Date 객체로 변환.
@@ -4307,10 +4320,7 @@ async function applyActiveTimerRow(row){
     }else{
       await renderCurrentView();
     }
-  }else{
-    updateStudyTimer();
   }
-  syncAndroidTimer();
   return true;
 }
 

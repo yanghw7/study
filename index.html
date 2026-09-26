@@ -46,7 +46,8 @@
     .shared-settings-panel{display:none;position:fixed;top:50px;right:8px;z-index:10050;width:min(290px,calc(100vw - 16px));padding:12px;border:1px solid #dbe4e0;border-radius:12px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.16);color:#34423d}
     .shared-settings-panel.show{display:block}
     .shared-settings-title{font-size:14px;font-weight:900;margin-bottom:10px}
-    .shared-settings-row{display:grid;grid-template-columns:1fr 116px;align-items:center;gap:10px;margin:8px 0;font-size:12px;font-weight:800}
+    .shared-settings-row{display:grid;grid-template-columns:1fr 116px auto;align-items:center;gap:10px;margin:8px 0;font-size:12px;font-weight:800}
+    .shared-pending-note{display:block!important;width:100%!important;box-sizing:border-box!important;color:#b42318!important;font-size:11px!important;font-weight:900!important;line-height:1.35!important;white-space:nowrap!important;text-align:right!important;padding-right:2px!important;margin-top:2px!important;}
     .shared-settings-row select{height:34px;border:1px solid #dbe4e0;border-radius:8px;background:#fff;padding:0 7px;font-weight:800;color:#34423d}
     .shared-settings-note{margin-top:8px;font-size:10px;line-height:1.45;color:#6b7773}
     .shared-danger-zone{margin-top:12px;padding-top:10px;border-top:1px solid #ead9d9}.shared-delete-all{width:100%;height:36px;margin-top:14px;border:1px solid #c9362b;border-radius:8px;background:#fff;color:#b42318;font-size:11px;font-weight:900}.shared-delete-all:active{background:#fff1f0}.shared-delete-grid{display:grid;gap:6px;margin-top:8px}.shared-delete-one{width:100%;height:34px;border:1px solid #e2c7c4;border-radius:8px;background:#fff;color:#8f3028;font-size:10.5px;font-weight:850}.shared-delete-one:active{background:#fff5f4}
@@ -72,6 +73,7 @@
   <div id="sharedSettingsPanel" class="shared-settings-panel" aria-hidden="true">
     <div class="shared-settings-title">⚙ 공통 설정</div>
     <label class="shared-settings-row"><span>하루 집계 기준시점</span><select id="sharedDayStartHour"></select></label>
+    <div id="sharedDayStartPending" class="shared-pending-note" style="display:none;"></div>
     <div class="shared-settings-note">자정(00:00)부터 오전 11:00까지 선택할 수 있습니다. 선택한 시간 전의 기록은 전날 기록으로 집계됩니다.</div>
     <label class="shared-settings-row"><span>1주 시작 요일</span><select id="sharedWeekStart">
       <option value="0">일요일</option><option value="1">월요일</option><option value="2">화요일</option>
@@ -180,7 +182,48 @@
   Object.entries(tabs).forEach(([key,item])=>item.button.onclick=()=>openTab(key));
   let first='study';
   openTab(first, true);
-  restoreLastTabFromCloud().then(tab=>{ if(tab && tab!==first && tabs[tab]) openTab(tab, true); });
+  // [6단계] 진행 중인 타이머 탭 → 없으면 마지막 탭 → 없으면 공부 탭
+  (async function restoreBootTab(){
+    // 1) 진행 중인 타이머 확인 (세션 복원 대기 위해 재시도)
+    let hasSession = false;
+    for(let attempt=0; attempt<6; attempt++){
+      try{
+        const sb = initSettingsClient();
+        if(!sb) break;
+        const {data:{session}} = await sb.auth.getSession();
+        const user = session?.user;
+        if(!user){
+          await new Promise(r=>setTimeout(r, 400*(attempt+1)));
+          continue;
+        }
+        hasSession = true;
+        const {data:row} = await sb.from('active_timer')
+          .select('ym').eq('user_id', user.id).maybeSingle();
+        if(row?.ym){
+          const ym = String(row.ym);
+          let kind = null;
+          if(ym.startsWith('L:')) kind = 'lecture';
+          else if(ym.startsWith('S:')) kind = 'sleep';
+          else if(/^\d{4}-\d{2}$/.test(ym)) kind = 'study';
+          if(kind && tabs[kind]){
+            if(kind !== first) openTab(kind, true);
+            return;   // 진행 중 타이머 탭 열고 종료
+          }
+        }
+        break;   // 세션 있고 active_timer 없음 → fallback
+      }catch(e){ break; }
+    }
+    if(!hasSession) return;   // 비로그인 → 공부 탭 유지
+    // 2) 진행 중 타이머 없음 → 마지막 탭 복원 (재시도)
+    for(let attempt=0; attempt<3; attempt++){
+      const tab = await restoreLastTabFromCloud();
+      if(tab){
+        if(tab!==first && tabs[tab]) openTab(tab, true);
+        return;
+      }
+      await new Promise(r=>setTimeout(r, 400*(attempt+1)));
+    }
+  })();
 
 
   const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
@@ -300,15 +343,39 @@
     const panel=document.getElementById('sharedSettingsPanel');
     const hour=document.getElementById('sharedDayStartHour');
     const week=document.getElementById('sharedWeekStart');
+    const pendingEl=document.getElementById('sharedDayStartPending');
     for(let h=0;h<12;h++){
       const o=document.createElement('option');
       o.value=String(h); o.textContent=String(h).padStart(2,'0')+':00';
       hour.appendChild(o);
     }
+    function nextBoundaryOfHour(h){
+      const now=new Date();
+      const d=new Date(now.getFullYear(),now.getMonth(),now.getDate(),h,0,0,0);
+      if(d.getTime()<=now.getTime()) d.setDate(d.getDate()+1);
+      return d;
+    }
+    function paintPendingInfo(){
+      if(!pendingEl) return;
+      const p=sharedSettingsCache.pendingDayStart;
+      if(!p){
+        pendingEl.style.display='none';
+        pendingEl.textContent='';
+        return;
+      }
+      const d=new Date(p.effectiveAt);
+      const mo=String(d.getMonth()+1).padStart(2,'0');
+      const da=String(d.getDate()).padStart(2,'0');
+      const hh=String(d.getHours()).padStart(2,'0');
+      const mi=String(d.getMinutes()).padStart(2,'0');
+      pendingEl.textContent=`(다음 적용시점 ${mo}/${da} ${hh}:${mi})`;
+      pendingEl.style.display='block';
+    }
     async function paint(){
       const v=await readSharedSettings();
-      hour.value=String(v.dayStartHour);
+      hour.value=String(v.pendingDayStart?v.pendingDayStart.hour:v.dayStartHour);
       week.value=String(v.weekStartDay);
+      paintPendingInfo();
     }
     paint();
     btn.addEventListener('click',e=>{
@@ -321,12 +388,56 @@
     panel.addEventListener('click',e=>e.stopPropagation());
     document.addEventListener('click',()=>{panel.classList.remove('show');panel.setAttribute('aria-hidden','true')});
     hour.addEventListener('change',async()=>{
-      try{ await writeSharedSettingsToCloud({dayStartHour:+hour.value}); }
-      catch(e){ alert('설정 저장 실패: '+(e?.message||e)); await paint(); }
+      const newHour=+hour.value;
+      const current=await readSharedSettings();
+      const applied=current.dayStartHour;
+      const existing=current.pendingDayStart;
+      // 사용자가 현재 적용값으로 되돌림 → 예약 취소
+      if(newHour===applied){
+        if(existing){
+          try{ await writeSharedSettingsToCloud({pendingDayStart:null}); paintPendingInfo(); }
+          catch(e){ alert('예약 취소 실패: '+(e?.message||e)); await paint(); }
+        }
+        return;
+      }
+      // 그 외 → 예약 생성/교체
+      try{
+        const effectiveAt=nextBoundaryOfHour(applied).toISOString();
+        await writeSharedSettingsToCloud({pendingDayStart:{hour:newHour,effectiveAt}});
+        paintPendingInfo();
+      }catch(e){
+        alert('예약 저장 실패: '+(e?.message||e));
+        await paint();
+      }
     });
     week.addEventListener('change',async()=>{
       try{ await writeSharedSettingsToCloud({weekStartDay:+week.value}); }
       catch(e){ alert('설정 저장 실패: '+(e?.message||e)); await paint(); }
+    });
+    // 자식이 pending 활성화 시점을 감지하면 부모에게 알림 → 캐시/클라우드 반영
+    window.addEventListener('message',async(ev)=>{
+      if(ev.origin!==location.origin) return;
+      if(ev.data?.type!=='journal-activate-pending-day-start') return;
+      try{
+        const h=Number(ev.data.hour);
+        if(!Number.isInteger(h)||h<0||h>11) return;
+        sharedSettingsCache.dayStartHour=h;
+        sharedSettingsCache.pendingDayStart=null;
+        const sb=initSettingsClient();
+        if(sb){
+          const {data:{session}}=await sb.auth.getSession();
+          if(session?.user){
+            await sb.from('journal_settings').upsert({
+              user_id:session.user.id,
+              day_start_hour:h,
+              pending_day_start:null,
+              updated_at:new Date().toISOString()
+            },{onConflict:'user_id'});
+          }
+        }
+        await paint();
+        notifySharedSettings(sharedSettingsCache);
+      }catch(e){ console.warn('[pending-activate] 반영 실패', e); }
     });
 
     async function ensureDeleteFrame(kind){
@@ -683,7 +794,7 @@
   // 서버 검증 추가: 실제 요청이 통과해야만 ✅
   let verified=false;
   if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
-  $('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.add('show');$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
+  $('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
   $('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
    async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}
    async function clickChild(kind,ids){const fr=await ensureFrame(kind);for(const id of ids){const el=fr.contentDocument?.getElementById(id);if(el){el.click();return true}}return false}
@@ -720,8 +831,6 @@
     });
     if(error) alert('Google 로그인 실패: '+error.message);
   };
-    $('sharedCloudLogout').classList.add('show');
-    $('sharedCloudLogout').disabled=false;
     $('sharedCloudLogout').onclick=async()=>{
       if(!confirm('정말 로그아웃하시겠습니까?')) return;
       if(!init())return;
@@ -729,8 +838,6 @@
       if(error){return;}
       await new Promise(r=>setTimeout(r,800));
       await status();
-      $('sharedCloudLogout').classList.add('show');
-      $('sharedCloudLogout').disabled=false;
     };
     $('sharedCloudUpload').onclick=()=>all('upload'); $('sharedCloudDownload').onclick=()=>all('download');
     if(init()){
@@ -781,15 +888,12 @@
             $('sharedCloudToggle').disabled=true;
             $('sharedCloudSetup').classList.remove('show');
           }
-          $('sharedCloudLogout').classList.add('show');
-          $('sharedCloudLogout').disabled=false;
         }).catch(()=>{});
 
         return true;
       }catch(e){
         console.error('Google OAuth callback 실패:', e);
-        $('sharedCloudLogout').classList.add('show');
-        $('sharedCloudLogout').disabled=false;
+        setTimeout(()=>{ status(); }, 500);
         return false;
       }
     };
