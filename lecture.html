@@ -2661,7 +2661,7 @@ async function requestExclusiveSessionStart(atMs){
   try{
     const req='lecture-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     return await new Promise(resolve=>{
-      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(true)},650);
+      const timer=setTimeout(()=>{window.removeEventListener('message',onMsg);resolve(false)},3500);
       function onMsg(ev){
         if(ev.source!==window.parent || ev.data?.type!=='exclusive-session-result' || ev.data?.req!==req)return;
         clearTimeout(timer);window.removeEventListener('message',onMsg);resolve(ev.data.ok!==false);
@@ -2673,66 +2673,43 @@ async function requestExclusiveSessionStart(atMs){
 }
 window.addEventListener('message',async ev=>{
   if(ev.origin!==location.origin || ev.data?.type!=='exclusive-session-stop' || ev.data?.kind!=='lecture')return;
-
   let stopped=false;
   try{
+    // 다른 기록장(공부/수면)이 새로 시작하며 보낸 시각을 그대로 종료 시각으로 써서
+    // 이 강의의 종료 시각과 새 세션의 시작 시각이 정확히 일치하도록 한다.
     const atMs=Number.isFinite(ev.data.at)?ev.data.at:serverNowMs();
     const now=new Date(atMs);
     const found=await locateRunningPeriod();
     if(found){
-      const {ym,dk,day}=found;
-      const pid=found.p._id;
+      const {ym,dk,day,p}=found;
+      const pid=p._id;
+      const before=deepClone(p);
 
-      // ① 로컬 확정 + 마킹 + 정렬 (await 이전)
-      {
-        const p=found.p;
-        const before=deepClone(p);
-        p.endDate=ymd(now);
-        p.endTime=hm(now);
-        p.timerEndedAt=Math.round(atMs);
-        lastAutoStoppedId=pid;
-        lastAutoStoppedAt=atMs;
-        markChangedPeriodFields(p, before);
-        autoSortPeriodsByStart(day);
-      }
+      // 로컬 확정 + 마킹 + 정렬은 await 이전에 완료
+      p.endDate=ymd(now);p.endTime=hm(now);
+      p.timerEndedAt=Math.round(atMs);
+      lastAutoStoppedId=pid;
+      lastAutoStoppedAt=atMs;
+      markChangedPeriodFields(p, before);
+      autoSortPeriodsByStart(day);
 
-      if(ym===ymKey(cur) && dk===dKey(cur)){
-        if(isPeriodInputEditing() || userActionCount > 0){
-          periodRenderPending = true;
-        }else{
-          renderPeriods();updateStudyTimer();updateWasteTimer();
-        }
-      }
-
-      // ② 저장 확정
+      // 화면에 보이는 날짜가 아니라, 실제로 타이머가 있던 날짜(ym)에 정확히 저장한다.
       await saveMonth(ym);
 
-      // ③ 서버 RPC + refetch + 재마킹
+      // 서버 RPC
       if(cloudUser){
         try{
-          const row=await cloudStopActiveTimer(ym, dk, pid);
-          const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
-          if(Number.isFinite(ts)){
-            const day2=monthCache[ym]?.[dk];
-            const idx2=day2?.periods?.findIndex(x=>String(x._id||'')===String(pid));
-            if(idx2>=0){
-              const p2=day2.periods[idx2];
-              const before2=deepClone(p2);
-              p2.timerEndedAt=ts;
-              markChangedPeriodFields(p2, before2);
-              await saveMonth(ym);
-              if(ym===ymKey(cur) && dk===dKey(cur)){
-                if(!(isPeriodInputEditing() || userActionCount > 0)){
-                  renderPeriods();updateStudyTimer();updateWasteTimer();
-                } else {
-                  periodRenderPending = true;
-                }
-              }
-            }
-          }
+          await cloudStopActiveTimer(ym, dk, pid);
         }catch(_){}
       }
 
+      // 서버 데이터 재조회 후 화면 반영
+      await autoSyncFromCloud();
+      if(!(isPeriodInputEditing() || userActionCount > 0)){
+        renderPeriods();updateStudyTimer();updateWasteTimer();
+      }else{
+        periodRenderPending = true;
+      }
       stopped=true;
     }
   }catch(e){console.warn('자동 강의 종료 실패',e)}
