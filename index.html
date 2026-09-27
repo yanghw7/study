@@ -36,9 +36,9 @@
     .alarmline button.primary{background:#285f50;border-color:#285f50;color:#fff}
     .alarmline button.danger{display:none!important;background:#b42318;border-color:#b42318;color:#fff}
     .alarmline button.danger.show{display:inline-block!important}
-    #alarmFileName{min-width:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#77827e}
+    
     .alarmstatusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;min-height:30px}.alarmstatusline:has(#alarmStatus:empty){display:none}#alarmStatus{display:block;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}.alarmstatusline #alarmStop{display:none;height:27px;padding:0 8px;border:1px solid #b42318;border-radius:8px;background:#b42318;color:#fff;font-size:10.5px;font-weight:800;white-space:nowrap}.alarmstatusline #alarmStop.show{display:inline-block}
-    @media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{font-size:13px}}
+    @media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmStatus{font-size:13px}}
 
     .cloudbar{flex:0 0 auto;margin:4px 8px 0;padding:4px 6px;border:1px solid #dbe4e0;border-radius:10px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font:700 10px Inter,system-ui,sans-serif;color:#34423d}.cloudline{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:nowrap}.cloudline strong{font-size:11px;white-space:nowrap}.cloudline button{height:27px;border:1px solid #dbe4e0;border-radius:7px;background:#fff;padding:0 6px;font:800 9px Inter,system-ui,sans-serif;white-space:nowrap;color:#34423d}.cloudline button.primary{background:#285f50;border-color:#285f50;color:#fff}.cloudline input{height:27px;min-width:90px;flex:1;border:1px solid #dbe4e0;border-radius:7px;padding:0 6px;font:700 10px Inter,system-ui,sans-serif}.cloudstatus{margin-left:0;font-size:9px;color:#60706a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.cloudsetup{display:none;margin-top:4px;gap:4px;align-items:center}.cloudsetup.show{display:flex}.cloudlogout{display:none!important}.cloudlogout.show{display:inline-block!important}@media(max-width:560px){.cloudbar{padding:4px 5px}.cloudline{gap:3px}.cloudline strong{font-size:10px}.cloudline button{padding:0 5px;font-size:8.5px}.cloudsetup{flex-wrap:wrap}.cloudsetup input{min-width:0;width:calc(50% - 2px);flex:auto}.cloudstatus{font-size:8.5px}}
 
@@ -155,7 +155,7 @@
       <input id="alarmMinutes" type="number" min="0" max="59" value="" placeholder="" aria-label="분"><span class="unit">분</span>
       <span class="unit afterAlarm">후</span>
       <select id="alarmSoundSelect" aria-label="알람음"><option value="">불러오는 중...</option></select>
-      <span id="alarmFileName" hidden></span>
+
       <button id="alarmPreview" type="button">▶ 미리듣기</button>
       <button id="alarmStart" class="primary" type="button">시작</button>
       <button id="alarmCancel" type="button">해제</button>
@@ -554,15 +554,12 @@
 
       try{
         win.__skipDeleteConfirm = true;
-        if(!win.__nativeConfirm) win.__nativeConfirm = win.confirm;
-        win.confirm = () => true;
       }catch(e){}
 
       const wait = waitDeleteDone(kind);
       win.postMessage({type:'journal-delete-request', kind}, location.origin);
       return wait.finally(() => {
         try{
-          win.confirm = win.__nativeConfirm || win.confirm;
           win.__skipDeleteConfirm = false;
         }catch(e){}
       });
@@ -1083,7 +1080,7 @@
         const counts = sections.map(k => `${labels[k]} ${Object.keys(backup[k]?.months||{}).length}개월`).join('\n');
         const totalMonths = sections.reduce((s,k)=>s+Object.keys(backup[k]?.months||{}).length, 0);
         if(!totalMonths){ alert('백업 파일에 기록이 없습니다.'); return; }
-        if(!confirm(`⚠️ 이 백업 파일로 현재 기록을 교체합니다.\n\n파일 내용:\n${counts}\n\n계속할까요?`)) return;
+        if(!confirm(`⚠️ 이 백업 파일로 기록을 복원합니다.\n\n백업에 담긴 달만 덮어씁니다.\n백업 이후에 추가된 달과 다른 기록장은 그대로 유지됩니다.\n\n파일 내용:\n${counts}\n\n계속할까요?`)) return;
 
         const results = {};
         for(const kind of sections){
@@ -1180,7 +1177,7 @@
     async function restore(snapshotAt){
       const d = new Date(snapshotAt);
       const label = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-      if(!confirm(`⚠️ ${label} 시점의 스냅샷으로 복원합니다.\n\n현재 서버의 모든 기록이 이 시점으로 되돌아갑니다.\n되돌릴 수 없습니다.\n\n계속할까요?`)) return;
+      if(!confirm(`⚠️ ${label} 시점의 스냅샷으로 복원합니다.\n\n이 스냅샷에 담긴 달만 덮어씁니다.\n스냅샷 이후 추가된 기록과 다른 기록장은 그대로 유지됩니다.\n\n계속할까요?`)) return;
 
       btn.disabled = true;
       const orig = btn.textContent;
@@ -1218,16 +1215,27 @@
         alert('⚠️ 이 스냅샷은 데이터가 비어 있습니다.\n\n스냅샷 생성이 실패한 것으로 보입니다.\n복원을 중단합니다.');
         btn.disabled = false; btn.textContent = orig; return;
       }
-      const _willLose = [..._curPrefixes].filter(p => !_snapPrefixes.has(p));
-      if(_willLose.length){
-        const _names = _willLose.map(p => _labels[p] || p).join(', ');
-        if(!confirm(`⚠️ 이 스냅샷은 다음 기록장 데이터를 포함하지 않습니다:\n\n${_names}\n\n계속하면 이 기록장들의 데이터가 영구 삭제됩니다.\n정말 진행할까요?`)){
+      // 스냅샷에 담기지 않은 기록장 = 이번 복원에서 건드리지 않고 그대로 유지됨
+      const _willKeep = [..._curPrefixes].filter(p => !_snapPrefixes.has(p));
+      const _willRestore = [..._snapPrefixes];
+      if(_willKeep.length){
+        const _keepNames = _willKeep.map(p => _labels[p] || p).join(', ');
+        const _restoreNames = _willRestore.length
+          ? _willRestore.map(p => _labels[p] || p).join(', ')
+          : '없음';
+        if(!confirm(
+          `ℹ️ 이 스냅샷에 포함되지 않은 기록장이 있습니다.\n\n` +
+          `복원될 기록장: ${_restoreNames}\n` +
+          `그대로 유지될 기록장: ${_keepNames}\n\n` +
+          `이 스냅샷에 담긴 기록장만 덮어씁니다.\n` +
+          `나머지 기록장 데이터는 삭제되지 않고 그대로 유지됩니다.\n\n` +
+          `계속할까요?`
+        )){
           btn.disabled = false; btn.textContent = orig; return;
         }
       }
 
-      const { error: delErr } = await sb.from('study_months').delete().eq('user_id', user.id);
-        if(delErr) throw delErr;
+      // 삭제 없이 upsert만 수행
 
         const nowIso = new Date().toISOString();
         const inserts = snapRows.map(r => ({
@@ -1237,7 +1245,7 @@
           deleted_at: r.deleted_at || null,
           updated_at: r.updated_at || nowIso
         }));
-        const { error: insErr } = await sb.from('study_months').insert(inserts);
+        const { error: insErr } = await sb.from('study_months').upsert(inserts, { onConflict: 'user_id,ym' });
         if(insErr) throw insErr;
 
         try{ await sb.from('active_timer').delete().eq('user_id', user.id); }catch(_){}
@@ -1248,7 +1256,7 @@
           }catch(_){}
         }
 
-        alert(`✅ ${label} 시점으로 복원 완료\n\n${inserts.length}개 기록이 복원되었습니다.`);
+        alert(`✅ ${label} 시점으로 복원 완료\n\n${inserts.length}개 기록을 덮어썼습니다.\n(스냅샷에 없던 기록은 그대로 유지됨)`);
         panel.classList.remove('open');
         panel.setAttribute('aria-hidden','true');
       }catch(e){

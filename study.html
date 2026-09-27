@@ -3709,6 +3709,9 @@ let sbClient = null;
 let cloudUser = null;
 
 // 부팅 타이밍 문제로 sbClient를 못 받았으면 부모가 준비될 때까지 재시도
+// 무한 재귀 방지: 최대 30회 (약 10초) 시도 후 포기
+let __supabaseRetryCount = 0;
+const __SUPABASE_RETRY_MAX = 30;
 setTimeout(function retryInitSupabase(){
   if(sbClient) return;
   if(initSupabase()){
@@ -3724,6 +3727,11 @@ setTimeout(function retryInitSupabase(){
       }
     }).catch(()=>{});
     return;
+  }
+  __supabaseRetryCount++;
+  if(__supabaseRetryCount >= __SUPABASE_RETRY_MAX){
+    console.warn('[study] Supabase 클라이언트를 ' + __SUPABASE_RETRY_MAX + '회 시도 후에도 받지 못했습니다. 로그인/동기화가 비활성 상태로 실행됩니다.');
+    return;   // ★ 재귀 종료
   }
   setTimeout(retryInitSupabase, 300);
 }, 100);
@@ -4463,6 +4471,20 @@ async function applyBackupRestore(backup){
   if(!sbClient || !cloudUser) throw new Error('클라우드 로그인이 필요합니다');
   const months = backup?.months || {};
   const yms = Object.keys(months).filter(ym => /^\d{4}-\d{2}$/.test(ym));
+  if(!yms.length) return 0;
+  const _uNow = new Date((typeof serverNowMs==='function'?serverNowMs():Date.now())).toISOString();
+  const _uRows = yms.map(ym => ({
+    user_id: cloudUser.id, ym,
+    data: ensureMonthSync(deepClone(months[ym]), ym),
+    deleted_at: null, updated_at: _uNow
+  }));
+  const { error: _uErr } = await sbClient
+    .from('study_months')
+    .upsert(_uRows, { onConflict: 'user_id,ym' });
+  if(_uErr) throw _uErr;
+  yms.forEach(ym => { monthCache[ym] = ensureMonthSync(deepClone(months[ym]), ym); });
+  return yms.length;
+  // ⬇ 이 아래는 실행되지 않는 옛 코드 (그냥 둠)
   let applied = 0;
   for(const ym of yms){
     const normalized = ensureMonthSync(deepClone(months[ym]), ym);

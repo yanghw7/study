@@ -4736,6 +4736,20 @@ async function applyBackupRestore(backup){
   if(!sbClient || !cloudUser) throw new Error('클라우드 로그인이 필요합니다');
   const months = backup?.months || {};
   const yms = Object.keys(months).filter(ym => /^\d{4}-\d{2}$/.test(ym));
+    if(!yms.length) return 0;
+  const _uNow = new Date((typeof serverNowMs==='function'?serverNowMs():Date.now())).toISOString();
+  const _uRows = yms.map(ym => ({
+    user_id: cloudUser.id, ym: lectureCloudYm(ym),
+    data: ensureMonthSync(deepClone(months[ym]), ym),
+    deleted_at: null, updated_at: _uNow
+  }));
+  const { error: _uErr } = await sbClient
+    .from('study_months')
+    .upsert(_uRows, { onConflict: 'user_id,ym' });
+  if(_uErr) throw _uErr;
+  yms.forEach(ym => { monthCache[ym] = ensureMonthSync(deepClone(months[ym]), ym); });
+  return yms.length;
+  // ⬇ 이 아래는 실행되지 않는 옛 코드 (그냥 둠)
   let applied = 0;
   for(const ym of yms){
     const normalized = ensureMonthSync(deepClone(months[ym]), ym);
