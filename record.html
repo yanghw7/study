@@ -2015,9 +2015,11 @@ window.addEventListener('message', (ev)=>{
   if(ev.origin!==location.origin) return;
   if(ev.data?.type === 'journal-pause'){
     __journalPaused = true;
+    stopBackgroundSensitiveLoops();
   } else if(ev.data?.type === 'journal-resume'){
     const wasPaused = __journalPaused;
     __journalPaused = false;
+    startBackgroundSensitiveLoops();
     if(wasPaused && cloudUser){
       // 탭 전환 순간 즉시 최신화
       void syncActiveTimerFromCloud(true);
@@ -2039,15 +2041,15 @@ function startBackgroundSensitiveLoops(){
     }, 300000);   // [RT] 폴백. realtime이 기본 (개발 중 5분)
   }
 
-  if(!clockCalibrateId){
-    clockCalibrateId = setInterval(()=>{
-      if(cloudUser) calibrateServerClock(false);
-    }, 60000);
-  }
-
+  // [LOG-FIX v2] 시계 보정 인터벌 제거
   if(!rolloverCheckId){
     rolloverCheckId = setInterval(()=>{
-      checkStudyDayBoundaryRollover();
+      // [LOG-FIX v3] 실행 중인 타이머가 있을 때만 서버 확인
+      const _d = monthCache[ymKey(cur)]?.[dKey(cur)];
+      const _hasRunning = (_d?.periods || []).some(p =>
+        Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
+      );
+      if(_hasRunning) checkStudyDayBoundaryRollover();
     }, 60000);
   }
 }
