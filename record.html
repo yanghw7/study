@@ -1192,7 +1192,8 @@ function formatEffectiveAt(iso){
 }
 
 let cur = logicalToday();
-let monthCache = {}; // "YYYY-MM" -> data object
+let monthCache = {};
+let lastMonthSyncAt = null; // "YYYY-MM" -> data object
 let currentView = 'day';
 
 function ymKey(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}`; }
@@ -1407,7 +1408,7 @@ async function saveMonth(ym){
     return false;
   }
   try{
-    await cloudSaveMonth(ym);
+    await cloudSaveMonth(ym); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
     return true;
   }catch(e){
     console.error('클라우드 저장 실패:', e);
@@ -3983,7 +3984,7 @@ async function uploadAllToCloud(){
   if(months.length===0){ showToast('저장할 기록이 없어요'); return; }
   for(const [ym,data] of months){
     monthCache[ym]=ensureMonthSync(deepClone(data),ym);
-    await cloudSaveMonth(ym);
+    await cloudSaveMonth(ym); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
   }
   showToast('전체 기록을 병합해서 클라우드에 저장했어요');
 }
@@ -3995,12 +3996,12 @@ async function autoSyncFromCloud(lockOwned=false){
     fullCloudSyncRunning = true;
   }
   try{
-const {data,error} = await sbClient.from('study_months').select('ym,data,deleted_at').eq('user_id',cloudUser.id).like('ym','R:%').order('ym');
+const {data,error} = await sbClient.from('study_months').select('ym,data,updated_at,deleted_at').eq('user_id',cloudUser.id).like('ym','R:%').gt('updated_at', lastMonthSyncAt || '1970-01-01T00:00:00Z').order('ym');
   if(error){
     console.error('자동 동기화 불러오기 실패:', error);
     throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
   }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:')); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
 
   for(const row of lectureRows){
     const ym=recordLocalYm(row.ym);
@@ -4031,7 +4032,7 @@ async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
   const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
   if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:'));
+  const lectureRows=(data||[]).filter(row=>String(row.ym||'').startsWith('R:')); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
   if(lectureRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
   if(!(await askConfirm('클라우드 기록으로 이 브라우저의 기록을 교체할까요?', true))) return;
   monthCache={};
