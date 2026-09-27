@@ -575,7 +575,7 @@
     <div class="cloud-setup" id="cloudSetup">
       <div class="cloud-grid">
         <input id="cloudEmail" type="email" placeholder="이메일">
-        <input id="cloudPassword" type="password" placeholder="비밀번호 (6자 이상)">
+        <input id="cloudPassword" type="text" placeholder="비밀번호 (6자 이상)">
       </div>
       <div class="cloud-actions">
         <button class="data-btn" id="cloudSignUp">회원가입</button>
@@ -2166,6 +2166,7 @@ function refreshTimeFieldDisabled(idx){
 }
 
 async function renderDay(){
+  await loadMonth(ymKey(cur));
   renderDateHeader();
   await loadMonth(ymKey(cur));
   renderPeriods();
@@ -3670,6 +3671,20 @@ window.addEventListener('message', async (ev)=>{
   await deleteAllStudyRecords();
 });
 
+// 스냅샷 복원 후 부모가 보내는 새로고침 신호
+window.addEventListener('message', async (ev)=>{
+  if(ev.origin !== location.origin) return;
+  if(ev.data?.type !== 'journal-force-refresh') return;
+  try{
+    monthCache = {};
+    if(typeof cloudUser !== 'undefined' && cloudUser){
+      await autoSyncFromCloud(true);
+    }
+    enforceStudyDayLimit();
+    await renderCurrentView();
+  }catch(e){ console.warn('[force-refresh] 실패:', e); }
+});
+
 $('#settingsSave').onclick = async () => {
   // v2: 설정 UI 는 index(부모)의 공통 설정 패널로 일원화.
   alert('설정은 상단 ⚙ 공통 설정에서 변경해주세요.');
@@ -3691,6 +3706,26 @@ const SUPABASE_URL = 'https://nvpvxtwebzefhgulswsv.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
 let sbClient = null;
 let cloudUser = null;
+
+// 부팅 타이밍 문제로 sbClient를 못 받았으면 부모가 준비될 때까지 재시도
+setTimeout(function retryInitSupabase(){
+  if(sbClient) return;
+  if(initSupabase()){
+    refreshCloudStatus().then(()=>{
+      if(cloudUser){
+        void calibrateServerClock(true);
+        autoSyncFromCloud(true).then(()=>renderCurrentView()).catch(()=>{});
+        startActiveTimerRealtime();
+        syncActiveTimerFromCloud(true).catch(()=>{});
+      }else{
+        enforceStudyDayLimit();
+        renderCurrentView();
+      }
+    }).catch(()=>{});
+    return;
+  }
+  setTimeout(retryInitSupabase, 300);
+}, 100);
 
 function initSupabase(){
   if(sbClient) return true;
@@ -4001,9 +4036,9 @@ $('#cloudSync').onclick = runManualCloudSync;
 initSupabase();
 
 // [FIX] 자식 iframe은 부모의 journal-auth-changed 알림만 받는다 (재귀 방지)
-if(false && sbClient){
+if(sbClient){
   let __authBusy=false;
-  false && sbClient.auth.onAuthStateChange((event, session) => { setTimeout(async () => {
+  sbClient.auth.onAuthStateChange((event, session) => { setTimeout(async () => {
     if(__authBusy) return; __authBusy=true; try{
     if(event === 'TOKEN_REFRESHED') return;
     cloudUser = session?.user || null;
