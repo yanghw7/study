@@ -1897,6 +1897,34 @@ window.addEventListener('pageshow', ()=>{
 let activeTimerPollId = null;
 let clockCalibrateId = null;
 let rolloverCheckId = null;
+let boundaryPlus3TimerId = null;
+
+// 기준시점 +3초에 한 번만 정확히 검사한다.
+// 60초 fallback은 그대로 유지하고, 이 타이머는 화면이 보일 때만 동작한다.
+function scheduleBoundaryPlus3Check(){
+  if(boundaryPlus3TimerId){
+    clearTimeout(boundaryPlus3TimerId);
+    boundaryPlus3TimerId = null;
+  }
+  if(document.visibilityState === 'hidden') return;
+
+  maybeActivatePending();
+  const nowMs = serverNowMs();
+  const now = new Date(nowMs);
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Number(appSettings.dayStartHour || 0), 0, 3, 0);
+  if(target.getTime() <= nowMs) target.setDate(target.getDate() + 1);
+
+  boundaryPlus3TimerId = setTimeout(async ()=>{
+    boundaryPlus3TimerId = null;
+    try{
+      await checkStudyDayBoundaryRollover();
+    }catch(e){
+      console.warn('기준시점 +3초 검사 실패:', e);
+    }finally{
+      scheduleBoundaryPlus3Check();
+    }
+  }, Math.max(0, target.getTime() - nowMs));
+}
 
 // [PAUSE] 부모(공부장 홈)가 안 보이는 iframe의 폴링을 멈춘다.
 // Realtime 구독과 메시지 핸들러(exclusive-session, journal-delete)는 그대로 유지된다.
@@ -1940,6 +1968,10 @@ function startBackgroundSensitiveLoops(){
       checkStudyDayBoundaryRollover();
     }, 60000);
   }
+
+  if(!boundaryPlus3TimerId){
+    scheduleBoundaryPlus3Check();
+  }
 }
 
 function stopBackgroundSensitiveLoops(){
@@ -1956,6 +1988,11 @@ function stopBackgroundSensitiveLoops(){
   if(rolloverCheckId){
     clearInterval(rolloverCheckId);
     rolloverCheckId = null;
+  }
+
+  if(boundaryPlus3TimerId){
+    clearTimeout(boundaryPlus3TimerId);
+    boundaryPlus3TimerId = null;
   }
 }
 
