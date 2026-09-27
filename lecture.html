@@ -1436,7 +1436,7 @@ function serverNowMs(){
 
 async function calibrateServerClock(force=false){
   if(serverClockCalibrationBusy || !sbClient || !cloudUser) return serverClockOffsetMs;
-  if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 60000){
+  if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 300000){
     return serverClockOffsetMs;
   }
 
@@ -1955,7 +1955,7 @@ function startBackgroundSensitiveLoops(){
         syncActiveTimerFromCloud(false);
         autoSyncFromCloud();   // [DEL-SYNC] 삭제 반영 폴링
       }
-    }, 60000);   // [RT] 폴백. realtime이 기본
+    }, 300000);   // [RT] 폴백. realtime이 기본 (개발 중 5분)
   }
 
   if(!clockCalibrateId){

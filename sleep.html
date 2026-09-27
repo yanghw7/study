@@ -1503,7 +1503,7 @@ function serverNowMs(){
 
 async function calibrateServerClock(force=false){
   if(serverClockCalibrationBusy || !sbClient || !cloudUser) return serverClockOffsetMs;
-  if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 60000){
+  if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 300000){
     return serverClockOffsetMs;
   }
 
@@ -2022,7 +2022,7 @@ function startBackgroundSensitiveLoops(){
         syncActiveTimerFromCloud(false);
         autoSyncFromCloud();   // [DEL-SYNC] 삭제 반영 폴링
       }
-    }, 60000);   // [RT] 폴백. realtime이 기본
+    }, 300000);   // [RT] 폴백. realtime이 기본 (개발 중 5분)
   }
 
   if(!clockCalibrateId){
@@ -2721,11 +2721,6 @@ $('#periodList').addEventListener('input', async (e) => {
 
       p[dateKey] = d || '';
       p[timeKey] = tm || '';
-      console.log('[sleep input 저장]', {
-        k, idx, dateKey, d, timeKey, tm,
-        p_endDate: p.endDate, p_endTime: p.endTime,
-        raw_input_value: t.value
-      });
 
       // 직접 입력은 기록/합계 계산용이며 실시간 타이머를 시작하지 않는다.
       // 과거 일시를 입력해도 '진행 중'이나 수백 시간 타이머가 생기지 않는다.
@@ -3235,16 +3230,16 @@ $('#periodList').addEventListener('click', async (e) => {
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(cloudUser){
       try{
-        const rpcRes = await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), p._id);
-        console.log('[cancel RPC 성공]', rpcRes);
+        await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), p._id);
+        // (성공 로그 제거)
       }catch(e){
-        console.error('[cancel RPC 실패]', e);
+        console.warn('[cancel RPC 실패]', e);
       }
     } else {
-      console.log('[cancel] 비로그인 — RPC 스킵');
+      // (비로그인 스킵)
     }
     if(window.parent!==window){
-      console.log('[cancel] 부모에 exclusive-session-cancel-start 전송');
+      // (부모 통지)
       window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'sleep'},location.origin);
     }
     showToast('시작 기록을 취소했어요');
@@ -4845,7 +4840,7 @@ async function collectBackupData(){
         if(row.deleted_at) return;
         months[ym] = ensureMonthSync(deepClone(row.data||{}), ym);
       });
-      console.log('[sleep backup] 클라우드에서', Object.keys(months).length, '개월 읽음');
+      console.warn('[sleep backup]', Object.keys(months).length, '개월');
     }catch(e){
       console.warn('[sleep backup] 클라우드 읽기 실패, 캐시로 폴백:', e);
       Object.keys(monthCache).forEach(ym=>{
