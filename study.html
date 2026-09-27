@@ -1894,7 +1894,7 @@ function syncAndroidTimer(){
     console.warn('Android 타이머 브리지 실패:', e);
   }
 }
-setInterval(syncAndroidTimer, 1000);
+// [v-B] 이벤트 기반으로 전환: setInterval 제거. 상태 변경 시 syncAndroidTimer() 직접 호출.
 
 
 // 각 공부일은 생성 당시의 집계 기준시간을 보존한다. 설정을 바꿔도 과거 기록 범위는 변하지 않는다.
@@ -2404,6 +2404,7 @@ $('#periodList').addEventListener('click', async (e) => {
     if(action !== 'start') autoSortPeriodsByStart(day);
     await persistToday();
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
+    if(typeof syncAndroidTimer === 'function') syncAndroidTimer();   // [v-B]
   } finally {
     userActionCount--;
     if(btn.isConnected){
@@ -2642,6 +2643,7 @@ window.addEventListener('message',async ev=>{
           renderPeriods();updateStudyTimer();updateWasteTimer();
         }
       }
+      if(typeof syncAndroidTimer === 'function') syncAndroidTimer();   // [v-B]
 
       // ② 저장을 확정 (await!) — 부모 응답 전에 서버 반영 보장
       await saveMonth(ym);
