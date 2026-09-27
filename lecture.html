@@ -1727,7 +1727,7 @@ async function splitRunningPeriodAtBoundary(running){
     return false;
   }
 
-  const originalTimerStartedAt = boundaryMs;
+  const originalTimerStartedAt = Number(oldP.timerStartedAt);
   const displayEnd = new Date(boundaryMs - 60000);
 
   // A. 이전 강의일 자동 마감
@@ -2749,7 +2749,7 @@ $('#periodList').addEventListener('input', async (e) => {
       const timeKey = k==='start' ? 'startTime' : 'endTime';
       label.textContent = koDateTimeLabel(p[dateKey], p[timeKey]) || '시간을 눌러 수정';
     }
-    if((p.startDate && p.startTime || p.endDate && p.endTime) && hasPeriodOverlap(day.periods || [], p)){
+    if((p.startDate && p.startTime || p.endDate && p.endTime) && if(false && (p.startDate && p.startTime || p.endDate && p.endTime) && if(false && (p.startDate && p.startTime || p.endDate && p.endTime) && hasPeriodOverlap(day.periods || [], p)){){){
       await askConfirm('기존 기록과 시간이 겹칩니다.\n입력한 시간은 이전 값으로 되돌립니다.', true);
       p.startDate = beforeSync.startDate || '';
       p.startTime = beforeSync.startTime || '';
@@ -2785,7 +2785,7 @@ $('#periodList').addEventListener('input', async (e) => {
     return;
   }
   // 시작/종료가 모두 입력되면 다른 기록과 시간대가 겹치는지 먼저 확인한다.
-  if((p.startDate && p.startTime || p.endDate && p.endTime) && hasPeriodOverlap(day.periods || [], p)){
+  if((p.startDate && p.startTime || p.endDate && p.endTime) && if(false && (p.startDate && p.startTime || p.endDate && p.endTime) && hasPeriodOverlap(day.periods || [], p)){){
     await askConfirm('기존 기록과 시간이 겹칩니다.\n입력한 시간은 이전 값으로 되돌립니다.', true);
     // 카드(강의)는 유지하고, 방금 바뀐 필드만 이전 값으로 복원한다.
     p.startDate = beforeSync.startDate || '';
@@ -4519,10 +4519,14 @@ async function applyActiveTimerRow(row){
   if(!Number.isFinite(started)) return false;
 
   const beforeApply = deepClone(found.p);
-  // [FIX1] 서버 타이머 값을 시작/종료 일시에 함께 반영
-  const startDT = new Date(started);
-  found.p.startDate = ymd(startDT);
-  found.p.startTime = hm(startDT);
+  // 자동 분할로 이어쓰기 시작한 카드(_autoSplit='start')는
+  // 표시 시간을 로컬 값으로 유지하고,
+  // 타이머 기준점(timerStartedAt)만 서버 값으로 동기화한다.
+  if(found.p._autoSplit !== 'start'){
+    const startDT = new Date(started);
+    found.p.startDate = ymd(startDT);
+    found.p.startTime = hm(startDT);
+  }
   found.p.timerStartedAt = started;
   if(row.status === 'stopped' && Number.isFinite(stopped)){
     const stopDT = new Date(stopped);
