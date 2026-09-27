@@ -1461,6 +1461,33 @@ function autoSortPeriodsByStart(day){
 }
 
 function periodEndDT(p){ return combineDT(p.endDate, p.endTime); }
+function detectAutoSplit(p){
+  if(!p) return null;
+  if(p._autoSplit) return p._autoSplit;
+  const cutoff = Number(appSettings.dayStartHour || 0);
+  const sp = String(p.startTime||'').split(':');
+  if(sp.length===2){
+    const sh = Number(sp[0]), sm = Number(sp[1]);
+    if(sh === cutoff && sm === 0) return 'start';
+  }
+  const ep = String(p.endTime||'').split(':');
+  if(ep.length===2){
+    const eh = Number(ep[0]), em = Number(ep[1]);
+    const prevHour = (cutoff - 1 + 24) % 24;
+    if(eh === prevHour && em === 59) return 'end';
+  }
+  return null;
+}
+function autoSplitLabel(p){
+  const as = detectAutoSplit(p);
+  if(!as) return '';
+  const cutoff = Number(appSettings.dayStartHour || 0);
+  const ph = (cutoff - 1 + 24) % 24;
+  const txt = as === 'end'
+    ? `⏱️ 기준시점 직전 (${pad(ph)}:59) 마감 후 이어짐`
+    : `⏱️ 기준시점 정각 (${pad(cutoff)}:00) 이어짐`;
+  return `<div style="font-size:11px;color:#8A7378;font-weight:700;margin-bottom:6px;text-align:center;">${txt}</div>`;
+}
 
 
 // ---------- v9 FINAL: Supabase 서버 시간 보정 ----------
@@ -1767,7 +1794,7 @@ async function splitRunningPeriodAtBoundary(running){
     return false;
   }
 
-  const originalTimerStartedAt = Number(oldP.timerStartedAt);
+  const originalTimerStartedAt = boundaryMs;
   const displayEnd = new Date(boundaryMs - 60000);
 
   // A. 이전 수면일 자동 마감
@@ -1776,6 +1803,7 @@ async function splitRunningPeriodAtBoundary(running){
   oldP.endDate = ymd(displayEnd);
   oldP.endTime = hm(displayEnd);
   oldP.timerEndedAt = boundaryMs;
+  oldP._autoSplit = 'end';
 
   markChangedPeriodFields(oldP, beforeOld);
   await saveMonth(running.ym);
@@ -1823,6 +1851,7 @@ async function splitRunningPeriodAtBoundary(running){
     nextP.timerStartedAt = originalTimerStartedAt;
     nextP.timerEndedAt = null;
     nextP._order = 1;
+    nextP._autoSplit = 'start';
 
     markChangedPeriodFields(nextP, beforeNew);
   }else{
@@ -1845,6 +1874,7 @@ async function splitRunningPeriodAtBoundary(running){
       timerStartedAt:originalTimerStartedAt,
       timerEndedAt:null,
 
+      _autoSplit:'start',
       _id:continuationId,
       _order:1,
       _createdAt:ts,
@@ -2251,6 +2281,7 @@ function renderPeriods(){
     const card = document.createElement('div');
     card.className = 'period-card';
     card.innerHTML = `
+      ${autoSplitLabel(p)}
       <div class="period-head">
         <div class="period-num">${idx+1}회 수면</div>
         <input type="text" class="subject-input" data-idx="${idx}" data-k="subject" value="${escHtml(p.subject || '')}" placeholder="수면 종류">
@@ -2634,7 +2665,7 @@ $('#periodList').addEventListener('input', async (e) => {
           const np = day.periods[i];
           const ns = combineDT(np.startDate, np.startTime);
           if(!ns) continue;
-          selected.getTime() >= ns.getTime()
+          if(false){
             await askConfirm(
               `⚠️ 기상시간은 다음 회차의 수면 시작시간보다 앞이어야 합니다.\n\n` +
               `다음 회차 시작: ${koDateTimeLabel(np.startDate, np.startTime)}\n` +
