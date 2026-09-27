@@ -1030,7 +1030,7 @@ body{background:#FCF6F7!important}
     <div class="cloud-setup" id="cloudSetup">
       <div class="cloud-grid">
         <input id="cloudEmail" type="email" placeholder="이메일">
-        <input id="cloudPassword" type="password" placeholder="비밀번호 (6자 이상)">
+        <input id="cloudPassword" type="text" placeholder="비밀번호 (6자 이상)">
       </div>
       <div class="cloud-actions">
         <button class="data-btn" id="cloudSignUp">회원가입</button>
@@ -2526,6 +2526,7 @@ function refreshLectureTimeFieldDisabled(idx){
 }
 
 async function renderDay(){
+  await loadMonth(ymKey(cur));
   renderDateHeader();
   await loadMonth(ymKey(cur));
   renderPeriods();
@@ -3847,6 +3848,20 @@ window.addEventListener('message', async (ev)=>{
   if(ev.data?.type !== 'journal-delete-request') return;
   if(ev.data?.kind !== 'record') return;
   await deleteAllStudyRecords();
+});
+
+// 스냅샷 복원 후 부모가 보내는 새로고침 신호
+window.addEventListener('message', async (ev)=>{
+  if(ev.origin !== location.origin) return;
+  if(ev.data?.type !== 'journal-force-refresh') return;
+  try{
+    monthCache = {};
+    if(typeof cloudUser !== 'undefined' && cloudUser){
+      await autoSyncFromCloud(true);
+    }
+    enforceStudyDayLimit();
+    await renderCurrentView();
+  }catch(e){ console.warn('[force-refresh] 실패:', e); }
 });
 
 $('#settingsSave').onclick = async () => {

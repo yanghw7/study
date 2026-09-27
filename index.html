@@ -45,6 +45,8 @@
     .shared-settings-btn{font-size:17px!important;padding:0!important;background:#e8eeeb!important;color:#53615c!important}
     .shared-settings-panel{display:none;position:fixed;top:50px;right:8px;z-index:10050;width:min(290px,calc(100vw - 16px));padding:12px;border:1px solid #dbe4e0;border-radius:12px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.16);color:#34423d;max-height:calc(100dvh - 60px);overflow-y:auto;-webkit-overflow-scrolling:touch}
     .shared-settings-panel.show{display:block}
+.shared-settings-panel button{-webkit-appearance:none!important;appearance:none!important;box-shadow:none!important;}
+.shared-settings-panel input{-webkit-appearance:none!important;appearance:none!important;}
     .shared-settings-title{font-size:14px;font-weight:900;margin-bottom:10px}
     .shared-settings-row{display:grid;grid-template-columns:1fr 116px auto;align-items:center;gap:10px;margin:8px 0;font-size:12px;font-weight:800}
     .shared-pending-note{display:block!important;width:100%!important;box-sizing:border-box!important;color:#b42318!important;font-size:11px!important;font-weight:900!important;line-height:1.35!important;white-space:nowrap!important;text-align:right!important;padding-right:2px!important;margin-top:2px!important;}
@@ -53,7 +55,39 @@
     .shared-danger-zone{margin-top:12px;padding-top:10px;border-top:1px solid #ead9d9}.shared-delete-all{width:100%;height:36px;margin-top:14px;border:1px solid #c9362b;border-radius:8px;background:#fff;color:#b42318;font-size:11px;font-weight:900}.shared-delete-all:active{background:#fff1f0}.shared-delete-grid{display:grid;gap:6px;margin-top:8px}.shared-delete-one{width:100%;height:34px;border:1px solid #e2c7c4;border-radius:8px;background:#fff;color:#8f3028;font-size:10.5px;font-weight:850}.shared-delete-one:active{background:#fff5f4}
 
 
-    .shared-data-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.shared-backup-location{width:100%;height:40px;margin-top:8px;border:1px solid #d9dfdc;border-radius:10px;background:#fff;color:#1f2926;font-size:11.5px;font-weight:900}.shared-backup-location:active{background:#f4f7f5}.shared-backup-location-status{margin-top:5px;font-size:10px;color:#6b7773}.shared-data-btn{height:44px;border:1px solid #d9dfdc;border-radius:12px;background:#fff;color:#1f2926;font-size:13px;font-weight:900}.shared-data-btn:active{background:#f4f7f5}.backup-choice{display:none;margin-top:8px;padding:10px;border:1px solid #dfe4e1;border-radius:12px;background:#f8faf9}.backup-choice.open{display:block}.backup-choice-title{font-size:11px;font-weight:900;margin-bottom:8px;color:#46534f}.backup-choice-grid{display:grid;gap:6px}.backup-choice-btn{width:100%;height:36px;border:1px solid #d9dfdc;border-radius:9px;background:#fff;color:#26312e;font-size:11px;font-weight:850}.backup-choice-btn:active{background:#eef3f0}#sharedRestoreFile{display:none}
+    #sharedSnapshotPanel.open{display:flex!important;position:fixed!important;inset:0!important;z-index:20000!important;background:rgba(0,0,0,.55)!important;align-items:center!important;justify-content:center!important;padding:20px!important;box-sizing:border-box!important;overflow:visible!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important;}
+#sharedSnapshotPickBtn{display:none!important;}
+#sharedSnapshotList[hidden]{display:block!important;}
+#sharedSnapshotList{position:static!important;transform:none!important;display:block!important;width:min(420px,100%)!important;max-height:70vh!important;overflow-y:auto!important;padding:18px!important;background:#fff!important;border-radius:16px!important;box-shadow:0 20px 60px rgba(0,0,0,.3)!important;box-sizing:border-box!important;margin:0!important;}
+#sharedSnapshotPanel>.backup-choice-title{display:none;}
+#sharedSnapshotList{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 40px));max-height:70vh;overflow-y:auto;padding:18px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);box-sizing:border-box;}
+#sharedSnapshotList::before{content:'스냅샷에서 복원 — 복원할 시점을 선택하세요';display:block;font-size:13px;font-weight:900;color:#1f2926;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #e5eae7;}
+#sharedSnapshotList .backup-choice-btn{width:100%;height:40px;border:1px solid #d9dfdc;border-radius:10px;background:#fff;color:#26312e;font:800 12px Inter,system-ui,sans-serif;cursor:pointer;-webkit-appearance:none;appearance:none;margin-bottom:6px;}
+#sharedSnapshotList .backup-choice-btn:active{background:#eef3f0;}
+#sharedSnapshotList[hidden]{display:none!important;}
+#sharedSnapshotList::-webkit-scrollbar{width:6px;}
+#sharedSnapshotList::-webkit-scrollbar-thumb{background:#c9d3ce;border-radius:3px;}
+#sharedSnapshotList::-webkit-scrollbar-thumb:hover{background:#a9b3ae;}
+.shared-data-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.shared-backup-location{-webkit-appearance:none!important;appearance:none!important;-webkit-appearance:none!important;appearance:none!important;box-sizing:border-box!important;display:block!important;width:100%!important;height:40px!important;margin:8px 0 0!important;padding:0 12px!important;border:1px solid #d9dfdc!important;border-radius:10px!important;background:#fff!important;color:#1f2926!important;font-size:11.5px!important;font-weight:900!important;line-height:38px!important;text-align:center!important;cursor:pointer!important;box-shadow:none!important;outline:none!important}.shared-backup-location:active{background:#f4f7f5}.shared-backup-location-status{margin-top:5px;font-size:10px;color:#6b7773}.shared-data-btn{height:44px;border:1px solid #d9dfdc;border-radius:12px;background:#fff;color:#1f2926;font-size:13px;font-weight:900}.shared-data-btn:active{background:#f4f7f5}.backup-choice{display:none;margin-top:8px;padding:10px;border:1px solid #dfe4e1;border-radius:12px;background:#f8faf9}
+#sharedSnapshotPickBtn{display:none!important;}
+#sharedSnapshotPanel.open{display:flex!important;position:fixed!important;inset:0!important;z-index:20000!important;background:rgba(0,0,0,.55)!important;align-items:center!important;justify-content:center!important;padding:20px!important;margin:0!important;border:0!important;border-radius:0!important;box-sizing:border-box!important;overflow:visible!important;max-height:none!important;}
+#sharedSnapshotPanel.open>.backup-choice-title{display:none!important;}
+#sharedSnapshotList{width:min(420px,100%)!important;max-height:70vh!important;overflow-y:auto!important;padding:18px!important;background:#fff!important;border-radius:16px!important;box-shadow:0 20px 60px rgba(0,0,0,.3)!important;display:block!important;box-sizing:border-box!important;margin:0!important;-webkit-overflow-scrolling:touch!important;}
+#sharedSnapshotList::before{content:'스냅샷에서 복원 — 복원할 시점을 선택하세요';display:block;font-size:13px;font-weight:900;color:#1f2926;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #e5eae7;}
+#sharedSnapshotList .backup-choice-btn{width:100%!important;height:42px!important;border:1px solid #d9dfdc!important;border-radius:10px!important;background:#fff!important;color:#26312e!important;font:800 12px Inter,system-ui,sans-serif!important;cursor:pointer!important;-webkit-appearance:none!important;appearance:none!important;margin:0 0 6px!important;display:block!important;box-sizing:border-box!important;}
+#sharedSnapshotList .backup-choice-btn:active{background:#eef3f0!important;}
+#sharedSnapshotList::-webkit-scrollbar{width:6px;}
+#sharedSnapshotList::-webkit-scrollbar-thumb{background:#c9d3ce;border-radius:3px;}
+#sharedSnapshotPanel.open{display:flex!important;position:fixed!important;inset:0!important;z-index:20000!important;background:rgba(0,0,0,.55)!important;align-items:center!important;justify-content:center!important;padding:20px!important;margin:0!important;border:0!important;border-radius:0!important;max-height:none!important;box-sizing:border-box!important;overflow:visible!important;}
+#sharedSnapshotPanel.open>.backup-choice-title{display:none!important;}
+#sharedSnapshotList{width:min(420px,100%)!important;max-height:70vh!important;overflow-y:auto!important;padding:18px!important;background:#fff!important;border-radius:16px!important;box-shadow:0 20px 60px rgba(0,0,0,.3)!important;display:block!important;box-sizing:border-box!important;margin:0!important;-webkit-overflow-scrolling:touch!important;}
+#sharedSnapshotList::before{content:'스냅샷에서 복원 — 복원할 시점을 선택하세요';display:block;font-size:13px;font-weight:900;color:#1f2926;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #e5eae7;}
+#sharedSnapshotList .backup-choice-btn{width:100%!important;height:40px!important;border:1px solid #d9dfdc!important;border-radius:10px!important;background:#fff!important;color:#26312e!important;font:800 12px Inter,system-ui,sans-serif!important;cursor:pointer!important;-webkit-appearance:none!important;appearance:none!important;margin-bottom:6px!important;display:block!important;box-sizing:border-box!important;}
+#sharedSnapshotList .backup-choice-btn:active{background:#eef3f0!important;}
+#sharedSnapshotList::-webkit-scrollbar{width:6px;}
+#sharedSnapshotList::-webkit-scrollbar-thumb{background:#c9d3ce;border-radius:3px;}.backup-choice.open{display:block}.backup-choice-title{font-size:11px;font-weight:900;margin-bottom:8px;color:#46534f}.backup-choice-grid{display:grid;gap:6px}.backup-choice-btn{width:100%;height:36px;border:1px solid #d9dfdc;border-radius:9px;background:#fff;color:#26312e;font-size:11px;font-weight:850}.backup-choice-btn:active{background:#eef3f0}#sharedRestoreFile{display:none}
+#sharedSnapshotList{max-height:216px!important;}
   </style>
 
   <link rel="manifest" href="./manifest.webmanifest?v=1.29">
@@ -97,10 +131,11 @@
       </div>
     </div>
     <input id="sharedRestoreFile" type="file" accept="application/json,.json">
-    <button id="sharedSnapshotBtn" class="shared-backup-location" type="button">🔄 스냅샷에서 복원</button>
-    <div id="sharedSnapshotPanel" class="backup-choice" aria-hidden="true">
-      <div class="backup-choice-title">복원할 시점을 선택하세요</div>
-      <div id="sharedSnapshotList" class="backup-choice-grid"></div>
+    <button id="sharedSnapshotBtn" type="button" style="-webkit-appearance:none;appearance:none;box-sizing:border-box;display:block;width:100%;height:44px;margin:10px 0 0;padding:0 12px;border:1px solid #d9dfdc;border-radius:12px;background:#fff;color:#1f2926;font:900 13px/1 Inter,system-ui,sans-serif;text-align:center;cursor:pointer;box-shadow:none;outline:none;">스냅샷에서 복원</button>
+    
+<div id="sharedSnapshotPanel" class="backup-choice" aria-hidden="true" onclick="if(event.target===this){this.classList.remove('open');this.setAttribute('aria-hidden','true');}">
+      <button id="sharedSnapshotPickBtn" type="button" style="-webkit-appearance:none;appearance:none;box-sizing:border-box;display:block;width:100%;height:40px;padding:0 12px;border:1px solid #d9dfdc;border-radius:10px;background:#fff;color:#1f2926;font:900 12.5px/1 Inter,system-ui,sans-serif;text-align:center;cursor:pointer;box-shadow:none;outline:none;">복원 시점 선택 ▼</button>
+      <div id="sharedSnapshotList" class="backup-choice-grid" hidden style="margin-top:8px;"></div>
     </div>
     <div class="shared-danger-zone">
       <div class="shared-delete-grid">
@@ -137,8 +172,10 @@
 
     </div>
     <div class="cloudsetup" id="sharedCloudSetup">
-      <input id="sharedCloudEmail" type="email" placeholder="이메일">
-      <input id="sharedCloudPassword" type="password" placeholder="비밀번호 (6자 이상)">
+      <form onsubmit="event.preventDefault();return false;" style="display:contents;">
+        <input id="sharedCloudEmail" type="email" placeholder="이메일" autocomplete="username">
+        <input id="sharedCloudPassword" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password">
+      </form>
       <button id="sharedCloudSignup" type="button">회원가입</button>
       <button id="sharedCloudLogin" class="primary" type="button">로그인</button>
       <button id="sharedCloudGoogle" type="button">Google 로그인</button>
@@ -1158,7 +1195,38 @@
         if(readErr) throw readErr;
         if(!snapRows || !snapRows.length) throw new Error('스냅샷 데이터가 없습니다');
 
-        const { error: delErr } = await sb.from('study_months').delete().eq('user_id', user.id);
+        // [데이터 유실 방지] 스냅샷이 담고 있는 기록장 종류 확인
+      const _prefixOf = ym => {
+        const s = String(ym||'');
+        if(/^\d{4}-\d{2}$/.test(s)) return 'study';
+        if(s.startsWith('L:')) return 'lecture';
+        if(s.startsWith('S:')) return 'sleep';
+        if(s.startsWith('R:')) return 'record';
+        return null;
+      };
+      const _snapPrefixes = new Set(snapRows.map(r => _prefixOf(r.ym)).filter(Boolean));
+      const { data: _curRows } = await sb.from('study_months')
+        .select('ym').eq('user_id', user.id);
+      const _curPrefixes = new Set((_curRows||[]).map(r => _prefixOf(r.ym)).filter(Boolean));
+      const _labels = { study:'공부 기록장', lecture:'강의 기록장', sleep:'수면 기록장', record:'기타 기록장' };
+      // 스냅샷에 실제 데이터가 있는지 확인 (빈 스냅샷 거부)
+      const _snapHasRealData = snapRows.some(r => {
+        const d = r.data || {};
+        return Object.values(d).some(day => day && Array.isArray(day.periods) && day.periods.length > 0);
+      });
+      if(!_snapHasRealData){
+        alert('⚠️ 이 스냅샷은 데이터가 비어 있습니다.\n\n스냅샷 생성이 실패한 것으로 보입니다.\n복원을 중단합니다.');
+        btn.disabled = false; btn.textContent = orig; return;
+      }
+      const _willLose = [..._curPrefixes].filter(p => !_snapPrefixes.has(p));
+      if(_willLose.length){
+        const _names = _willLose.map(p => _labels[p] || p).join(', ');
+        if(!confirm(`⚠️ 이 스냅샷은 다음 기록장 데이터를 포함하지 않습니다:\n\n${_names}\n\n계속하면 이 기록장들의 데이터가 영구 삭제됩니다.\n정말 진행할까요?`)){
+          btn.disabled = false; btn.textContent = orig; return;
+        }
+      }
+
+      const { error: delErr } = await sb.from('study_months').delete().eq('user_id', user.id);
         if(delErr) throw delErr;
 
         const nowIso = new Date().toISOString();
@@ -1192,12 +1260,20 @@
       }
     }
 
+    const pickBtn = document.getElementById('sharedSnapshotPickBtn');
+    let _snapLoaded = false;
+
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const open = !panel.classList.contains('open');
       panel.classList.toggle('open', open);
       panel.setAttribute('aria-hidden', String(!open));
-      if(open) await loadSnapshots();
+      if(open){
+        list.hidden = false;
+        _snapLoaded = false;
+        await loadSnapshots();
+        _snapLoaded = true;
+      }
     });
   })();
 </script>
