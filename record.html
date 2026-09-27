@@ -960,7 +960,7 @@ body{background:#FCF6F7!important}
       <div class="summary-title today-summary-title">합계</div>
       <div class="record-top-timers">
         <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
-          <span class="study-timer-label">카페인 경과시간</span>
+          <span class="study-timer-label">과라나 카페인 경과시간</span>
           <span class="study-timer-time" id="recordTimer1">00:00:00</span>
         </div>
         <div class="study-timer" style="min-width:0;width:100%;box-sizing:border-box;">
@@ -2285,12 +2285,12 @@ function createRecordCard(p, idx){
     subject.className = 'subject-input record-subject';
     subject.dataset.idx = idx;
     subject.dataset.slot = slot;
-    subject.placeholder = slot === 0 ? '카페인' : (slot === 1 ? 'Vita C' : `기록 ${slot + 1}`);
+    subject.placeholder = slot === 0 ? '과라나 카페인' : (slot === 1 ? 'Vita C' : `기록 ${slot + 1}`);
 
     const slotData = (p.recordSlots && p.recordSlots[slot]) || null;
-    // 카페인/Vita C는 고정 항목: 가운데 정렬 + 사용자 수정 불가
+    // 과라나 카페인/Vita C는 고정 항목: 가운데 정렬 + 사용자 수정 불가
     if(slot === 0 || slot === 1){
-      subject.value = slot === 0 ? '카페인' : 'Vita C';
+      subject.value = slot === 0 ? '과라나 카페인' : 'Vita C';
       subject.readOnly = true;
       subject.tabIndex = -1;
       subject.classList.add('record-subject-fixed');
@@ -2314,7 +2314,7 @@ function createRecordCard(p, idx){
     lectureAdd.dataset.slot = slot;
     const hasRecordStart = Number(slotData?.timerStartedAt) > 0;
     lectureAdd.dataset.recordAction = hasRecordStart ? 'cancel-start' : 'start';
-    lectureAdd.textContent = hasRecordStart ? (slot === 0 ? '카페인 취소' : (slot === 1 ? 'Vita C 취소' : `기록 ${slot + 1} 취소`)) : (slot === 0 ? '카페인 입력' : (slot === 1 ? 'Vita C 입력' : `기록 ${slot + 1} 입력`));
+    lectureAdd.textContent = hasRecordStart ? (slot === 0 ? '과라나 카페인 취소' : (slot === 1 ? 'Vita C 취소' : `기록 ${slot + 1} 취소`)) : (slot === 0 ? '과라나 카페인 입력' : (slot === 1 ? 'Vita C 입력' : `기록 ${slot + 1} 입력`));
     if(hasRecordStart) lectureAdd.classList.add('cancel-start');
 
     const startBox = document.createElement('div');
@@ -3262,7 +3262,7 @@ async function renderDayCharts(){
     d.setHours(0,0,0,0);
     return d <= currentStudyDay;
   });
-  const names = ['카페인','Vita C','기록 3'];
+  const names = ['과라나 카페인','Vita C','기록 3'];
   const sections = names.map((name,slot)=>{
     const slotPoints = points.map(p=>({label:p.label,date:p.date,count:p.slots[slot].count,number:p.slots[slot].number}));
     const slotAveragePoints = averagePoints.map(p=>({label:p.label,date:p.date,count:p.slots[slot].count,number:p.slots[slot].number}));
@@ -3350,7 +3350,7 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          카페인 <b>${weeks[w].counts[0]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[0]}</b><br>
+          과라나 카페인 <b>${weeks[w].counts[0]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[0]}</b><br>
           Vita C <b>${weeks[w].counts[1]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[1]}</b><br>
           기록3 <b>${weeks[w].counts[2]}회</b> · <b style="color:#B86F7D;">${weeks[w].numbers[2]}</b>
         </div>
@@ -3373,7 +3373,7 @@ async function renderMonthView(){
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          카페인 <b>${monthCounts[0]}회</b> · <b style="color:#B86F7D;">${monthNumbers[0]}</b><br>
+          과라나 카페인 <b>${monthCounts[0]}회</b> · <b style="color:#B86F7D;">${monthNumbers[0]}</b><br>
           Vita C <b>${monthCounts[1]}회</b> · <b style="color:#B86F7D;">${monthNumbers[1]}</b><br>
           기록3 <b>${monthCounts[2]}회</b> · <b style="color:#B86F7D;">${monthNumbers[2]}</b>
         </div>
@@ -3399,7 +3399,7 @@ async function renderYearView(){
     }
     if(counts.every(v=>v===0) && numbers.every(v=>v===0)) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">카페인 <b>${counts[0]}회</b> · <b style="color:#B86F7D;">${numbers[0]}</b><br>Vita C <b>${counts[1]}회</b> · <b style="color:#B86F7D;">${numbers[1]}</b><br>기록3 <b>${counts[2]}회</b> · <b style="color:#B86F7D;">${numbers[2]}</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">과라나 카페인 <b>${counts[0]}회</b> · <b style="color:#B86F7D;">${numbers[0]}</b><br>Vita C <b>${counts[1]}회</b> · <b style="color:#B86F7D;">${numbers[1]}</b><br>기록3 <b>${counts[2]}회</b> · <b style="color:#B86F7D;">${numbers[2]}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
@@ -3836,6 +3836,13 @@ async function deleteAllStudyRecords(){
   if(!window.__skipPostDeleteRender){
     await renderCurrentView();
   }
+    // [A-4] 안드로이드 알림바 즉시 초기화
+  try{
+    if(window.AndroidTimer && typeof window.AndroidTimer.clearTimer === 'function'){
+      window.AndroidTimer.clearTimer('record');
+    }
+  }catch(_){}
+
   showToast('모든 강의 기록을 삭제했어요');
   if(window.parent !== window){
     window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:true}, location.origin);
@@ -4224,6 +4231,9 @@ if(sbClient){
   }
   enforceStudyDayLimit();
   await renderCurrentView();
+
+  // [D] 부팅(콜드 스타트) 시 1회: 서버 반영 완료 후 Android 알림바 상태를 즉시 갱신
+  if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
 
   // 비로그인 로컬 사용에서도 최초 로드 후 한 번 검사.
   if(!cloudUser){

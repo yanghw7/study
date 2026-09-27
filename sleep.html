@@ -4002,6 +4002,13 @@ async function deleteAllStudyRecords(){
   if(!window.__skipPostDeleteRender){
     await renderCurrentView();
   }
+  // [A-2] 안드로이드 알림바 즉시 초기화
+  try{
+    if(window.AndroidTimer && typeof window.AndroidTimer.clearTimer === 'function'){
+      window.AndroidTimer.clearTimer('sleep');
+    }
+  }catch(_){}
+
   showToast('모든 수면 기록을 삭제했어요');
   if(window.parent !== window){
     window.parent.postMessage({type:'journal-delete-done', kind:'sleep', ok:true}, location.origin);
@@ -4412,6 +4419,9 @@ if(sbClient){
   }
   enforceStudyDayLimit();
   await renderCurrentView();
+
+    // [D] 부팅(콜드 스타트) 시 1회: 서버 반영 완료 후 Android 알림바 상태를 즉시 갱신
+  if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
 
   // 비로그인 로컬 사용에서도 최초 로드 후 한 번 검사.
   if(!cloudUser){
