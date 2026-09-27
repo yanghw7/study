@@ -2126,7 +2126,7 @@ function renderPeriods(){
     const pages = periodPages(p);
     const waste = wasteBefore(day.periods, idx);
     const pErr = pagesInvalid(p);
-    const sErr = studyInvalid(p);
+const sErr = studyInvalid(p) || day.periods.slice(0, idx).some(function(q){var qs=periodStartDT(q), qe=periodEndDT(q), cs=periodStartDT(p), ce=periodEndDT(p); return qs && qe && cs && ce && qe > qs && ce > cs && cs < qe && ce > qs;});
     const wErr = wasteInvalid(day.periods, idx);
     sumStudy += study; sumWaste += waste; sumPages += pages;
     if(sErr) sumStudyErr = true;
@@ -2199,9 +2199,9 @@ function renderPeriods(){
         </div>
       </div>
       <div class="period-stats" style="grid-template-columns:1fr 1fr 1fr;">
-        <div></div>
-        <div class="stat" style="text-align:center;">강의시간<b id="study-${idx}" class="${sErr ? 'stat-error' : 'study-color'}">${sErr ? '오류!' : fmtDuration(study)}</b></div>
-        <div class="stat" style="text-align:right;">강의 횟수<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : '1회'}</b></div>
+        <div class="stat" id="left-${idx}" style="text-align:left;">${sErr ? '<b class="stat-error">오류!</b>' : ''}</div>
+        <div class="stat" style="text-align:center;">강의시간<b id="study-${idx}" class="study-color">${fmtDuration(study)}</b></div>
+        <div class="stat" style="text-align:right;">누적 횟수<b id="pages-${idx}" class="${pErr ? 'stat-error' : ''}">${pErr ? '오류!' : `${idx+1}회`}</b></div>
       </div>
     `;
     list.appendChild(card);
@@ -2225,17 +2225,62 @@ function refreshStats(){
     const pages = periodPages(p);
     const waste = wasteBefore(day.periods, idx);
     const pErr = pagesInvalid(p);
-    const sErr = studyInvalid(p);
+const sErr = studyInvalid(p) || day.periods.slice(0, idx).some(function(q){var qs=periodStartDT(q), qe=periodEndDT(q), cs=periodStartDT(p), ce=periodEndDT(p); return qs && qe && cs && ce && qe > qs && ce > cs && cs < qe && ce > qs;});
     const wErr = wasteInvalid(day.periods, idx);
     sumStudy += study; sumPages += pages; sumWaste += waste;
     if(sErr) sumStudyErr = true;
     if(pErr) sumPagesErr = true;
     if(wErr) sumWasteErr = true;
+    const le = document.getElementById(`left-${idx}`);
+    if(le) le.innerHTML = sErr ? '<b class="stat-error">오류!</b>' : '';
+
     const se = document.getElementById(`study-${idx}`);
     if(se){
-      se.textContent = sErr ? '오류!' : fmtDuration(study);
-      se.classList.toggle('stat-error', sErr);
-      se.classList.toggle('study-color', !sErr);
+      se.textContent = fmtDuration(study);
+      se.classList.remove('stat-error');
+      se.classList.add('study-color');
+    }
+    const pe = document.getElementById(`pages-${idx}`);
+    if(pe){
+      pe.textContent = pErr ? '오류!' : `${idx+1}회`;
+      pe.classList.toggle('stat-error', pErr);
+    }
+    const we = document.getElementById(`waste-${idx}`);
+    if(we){
+      we.textContent = wErr ? '오류!' : fmtDuration(waste);
+      we.classList.toggle('stat-error', wErr);
+      we.classList.toggle('waste-color', !wErr);
+    }
+  });
+  $('#sumStudy').textContent = sumStudyErr ? '오류!' : fmtDuration(sumStudy);
+  $('#sumPages').textContent = sumPagesErr ? '오류!' : `${day.periods?.length || 0}회`;
+  $('#sumStudy').classList.toggle('stat-error', sumStudyErr);
+  $('#sumPages').classList.toggle('stat-error', sumPagesErr);
+  renderDayCharts();
+}
+if(false){
+  const day = getDayData();
+  let sumStudy=0, sumPages=0, sumWaste=0;
+  let sumStudyErr=false, sumPagesErr=false, sumWasteErr=false;
+  day.periods.forEach((p, idx) => {
+    const study = minutesBetween(p);
+    const pages = periodPages(p);
+    const waste = wasteBefore(day.periods, idx);
+    const pErr = pagesInvalid(p);
+const sErr = studyInvalid(p) || day.periods.slice(0, idx).some(function(q){var qs=periodStartDT(q), qe=periodEndDT(q), cs=periodStartDT(p), ce=periodEndDT(p); return qs && qe && cs && ce && qe > qs && ce > cs && cs < qe && ce > qs;});
+    const wErr = wasteInvalid(day.periods, idx);
+    sumStudy += study; sumPages += pages; sumWaste += waste;
+    if(sErr) sumStudyErr = true;
+    if(pErr) sumPagesErr = true;
+    if(wErr) sumWasteErr = true;
+    const le = document.getElementById(`left-${idx}`);
+    if(le) le.innerHTML = sErr ? '<b class="stat-error">오류!</b>' : '';
+
+    const se = document.getElementById(`study-${idx}`);
+    if(se){
+      se.textContent = fmtDuration(study);
+      se.classList.remove('stat-error');
+      se.classList.add('study-color');
     }
     const pe = document.getElementById(`pages-${idx}`);
     if(pe){
@@ -2562,7 +2607,7 @@ $('#periodList').addEventListener('input', async (e) => {
           const np = day.periods[i];
           const ns = combineDT(np.startDate, np.startTime);
           if(!ns) continue;
-          if(selected.getTime() >= ns.getTime()){
+          if(false){
             await askConfirm(
               `⚠️ 강의 종료시간은 다음 강의의 시작시간보다 앞이어야 합니다.\n\n` +
               `다음 강의 시작: ${koDateTimeLabel(np.startDate, np.startTime)}\n` +

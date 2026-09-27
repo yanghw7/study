@@ -2735,7 +2735,7 @@ $('#periodList').addEventListener('input', async (e) => {
           const np = day.periods[i];
           const ns = combineDT(np.startDate, np.startTime);
           if(!ns) continue;
-          if(selected.getTime() >= ns.getTime()){
+          selected.getTime() >= ns.getTime()
             await askConfirm(
               `⚠️ 종료시간은 다음 교시의 시작시간보다 앞이어야 합니다.\n\n` +
               `다음 교시 시작: ${koDateTimeLabel(np.startDate, np.startTime)}\n` +
