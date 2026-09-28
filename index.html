@@ -718,7 +718,6 @@
               (payload)=>applyFromRow(payload.new, {autoSwitch:true}))
           .subscribe((status)=>{
             if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
-              try{ sb.removeChannel(ch); }catch(_){}
               ch = null;
               setTimeout(startRealtime, 5000);
             }
