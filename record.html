@@ -739,6 +739,29 @@ body{background:#FCF6F7!important}
   }
 }
 </style>
+<<<<<<< HEAD
+=======
+
+
+<!-- DEV ONLY: Eruda mobile developer console -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>
+eruda.init();
+(function paintErudaLauncherBlue(){
+  const paint = () => {
+    const el = document.querySelector('.eruda-entry-btn');
+    if(el){
+      el.style.setProperty('background', '#1976d2', 'important');
+      el.style.setProperty('bottom', '90px', 'important');
+      return true;
+    }
+    return false;
+  };
+  if(!paint()) setTimeout(paint, 300);
+  setTimeout(paint, 1000);
+})();
+</script>
+>>>>>>> 43cc3ee6c53621830cd6680c491fc1cb0fd9a99d
 </head>
 
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
@@ -3581,6 +3604,12 @@ let fullCloudSyncRunning = false;
 $('#cloudUpload').onclick = uploadAllToCloud;
 $('#cloudDownload').onclick = downloadAllFromCloud;
 $('#cloudSync').onclick = () => location.reload();
+<<<<<<< HEAD
+=======
+
+
+// PWA Service Worker는 강의 횟수 하단에서 등록합니다.
+>>>>>>> 43cc3ee6c53621830cd6680c491fc1cb0fd9a99d
 
 initSupabase();
 
