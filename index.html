@@ -92,6 +92,7 @@
   <link rel="manifest" href="./manifest.webmanifest?v=1.29">
   <meta name="theme-color" content="#285f50">
   <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="icon" href="./icon-192.png">
   <style>#pwaInstallBtn{display:none;position:fixed;right:14px;bottom:76px;z-index:9999;border:0;border-radius:12px;padding:11px 14px;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 3px 14px rgba(0,0,0,.16);background:#285f50;color:#fff}#pwaInstallBtn.show{display:block}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body><button id="pwaInstallBtn" type="button">앱 설치</button>
@@ -198,6 +199,8 @@
    record:{button:document.getElementById('recordTab'),frame:document.getElementById('recordFrame')}
   };
 
+  const LAST_TAB_LOCAL_KEY='journal:last-tab';
+
   function openTab(which, skipSave){
     Object.entries(tabs).forEach(([key,item])=>{
       const active=key===which;
@@ -212,51 +215,16 @@
         }, location.origin);
       }catch(e){}
     });
-    if(!skipSave) saveLastTabToCloud(which);
+    try{ localStorage.setItem(LAST_TAB_LOCAL_KEY, which); }catch(_){}
+    if(!skipSave) scheduleLastTabCloudSave(which);
   }
   Object.entries(tabs).forEach(([key,item])=>item.button.onclick=()=>openTab(key));
   let first='study';
+  try{
+    const localTab=localStorage.getItem(LAST_TAB_LOCAL_KEY);
+    if(localTab && tabs[localTab]) first=localTab;
+  }catch(_){}
   openTab(first, true);
-  (async function restoreBootTab(){
-    let hasSession = false;
-    for(let attempt=0; attempt<6; attempt++){
-      try{
-        const sb = initSettingsClient();
-        if(!sb) break;
-        const {data:{session}} = await sb.auth.getSession();
-        const user = session?.user;
-        if(!user){
-          await new Promise(r=>setTimeout(r, 400*(attempt+1)));
-          continue;
-        }
-        hasSession = true;
-        const {data:row} = await sb.from('active_timer')
-          .select('ym').eq('user_id', user.id).maybeSingle();
-        if(row?.ym){
-          const ym = String(row.ym);
-          let kind = null;
-          if(ym.startsWith('L:')) kind = 'lecture';
-          else if(ym.startsWith('S:')) kind = 'sleep';
-          else if(ym.startsWith('R:')) kind = 'record';
-          else if(/^\d{4}-\d{2}$/.test(ym)) kind = 'study';
-          if(kind && tabs[kind]){
-            if(kind !== first) openTab(kind, true);
-            return;
-          }
-        }
-        break;
-      }catch(e){ break; }
-    }
-    if(!hasSession) return;
-    for(let attempt=0; attempt<3; attempt++){
-      const tab = await restoreLastTabFromCloud();
-      if(tab){
-        if(tab!==first && tabs[tab]) openTab(tab, true);
-        return;
-      }
-      await new Promise(r=>setTimeout(r, 400*(attempt+1)));
-    }
-  })();
 
   const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
   let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
@@ -346,16 +314,31 @@
     notifySharedSettings(next);
     return next;
   }
+  let lastTabCloudSaveTimer=null;
+  let pendingLastTabCloud=null;
+  let lastTabCloudSavedValue=null;
+  function scheduleLastTabCloudSave(tab){
+    pendingLastTabCloud=tab;
+    if(lastTabCloudSaveTimer) clearTimeout(lastTabCloudSaveTimer);
+    lastTabCloudSaveTimer=setTimeout(()=>{
+      lastTabCloudSaveTimer=null;
+      const next=pendingLastTabCloud;
+      pendingLastTabCloud=null;
+      if(!next || next===lastTabCloudSavedValue) return;
+      void saveLastTabToCloud(next);
+    },3000);
+  }
   async function saveLastTabToCloud(tab){
     const sb=initSettingsClient();
     if(!sb) return;
     const {data:{session}}=await sb.auth.getSession();
     if(!session?.user) return;
-    await sb.from('journal_settings').upsert({
+    const {error}=await sb.from('journal_settings').upsert({
       user_id:session.user.id,
       last_tab:tab,
       updated_at:new Date().toISOString()
     },{onConflict:'user_id'});
+    if(!error) lastTabCloudSavedValue=tab;
   }
   async function restoreLastTabFromCloud(){
     const sb=initSettingsClient();
@@ -634,9 +617,157 @@
       return null;
     }
 
+    function kindFromMonthYm(ym){
+      const s = String(ym||'');
+      if(s.startsWith('L:')) return 'lecture';
+      if(s.startsWith('S:')) return 'sleep';
+      if(s.startsWith('R:')) return 'record';
+      if(/^\d{4}-\d{2}$/.test(s)) return 'study';
+      return null;
+    }
+
     let ch = null;
     let chGeneration = 0;
     let realtimeRetryTimer = null;
+
+    let centralPollTimer = null;
+    let centralPollBusy = false;
+    let centralLastMonthSyncAt = null;
+    let centralUserId = null;
+    let centralActiveTimerRow = null;
+    let centralLastPollAt = 0;
+    let centralLastActiveFetchAt = 0;
+    let centralActiveFetchBusy = false;
+    let centralActiveFetchPendingAutoSwitch = false;
+    const centralMonthBroadcastSig = new Map();
+
+    let centralServerClockOffsetMs = 0;
+    let centralServerClockCalibrated = false;
+    let centralServerClockLastCalibratedAt = 0;
+    let centralServerClockPromise = null;
+
+    const CENTRAL_POLL_MS = 15 * 60 * 1000;
+    const CENTRAL_CLOCK_MAX_AGE_MS = 5 * 60 * 1000;
+
+    function postToFrame(target, msg){
+      if(!target) return;
+
+      try{
+        // iframe element
+        if(target.contentWindow){
+          if(!target.getAttribute?.('src')) return;
+          target.contentWindow.postMessage(msg, location.origin);
+          return;
+        }
+
+        // WindowProxy (e.g. event.source)
+        if(typeof target.postMessage === 'function'){
+          target.postMessage(msg, location.origin);
+        }
+      }catch(_){}
+    }
+
+    function sendCentralServerClock(target=null){
+      if(!centralServerClockCalibrated) return;
+      const msg={
+        type:'journal-server-clock',
+        offset:centralServerClockOffsetMs,
+        calibratedAt:centralServerClockLastCalibratedAt
+      };
+      if(target){
+        postToFrame(target, msg);
+        return;
+      }
+      for(const item of Object.values(tabs)) postToFrame(item.frame, msg);
+    }
+
+    async function calibrateCentralServerClock(force=false){
+      if(!force && centralServerClockCalibrated && Date.now()-centralServerClockLastCalibratedAt < CENTRAL_CLOCK_MAX_AGE_MS){
+        return centralServerClockOffsetMs;
+      }
+      if(centralServerClockPromise) return centralServerClockPromise;
+
+      const sb=initSettingsClient();
+      if(!sb) return centralServerClockOffsetMs;
+
+      centralServerClockPromise=(async()=>{
+        try{
+          const {data:{session}}=await sb.auth.getSession();
+          if(!session?.user) return centralServerClockOffsetMs;
+          const t0=Date.now();
+          const {data,error}=await sb.rpc('server_now');
+          const t1=Date.now();
+          if(error) throw error;
+          const serverMs=Date.parse(data);
+          if(!Number.isFinite(serverMs)) throw new Error('서버 시간을 읽지 못했습니다.');
+          centralServerClockOffsetMs=Math.round(serverMs-((t0+t1)/2));
+          centralServerClockCalibrated=true;
+          centralServerClockLastCalibratedAt=Date.now();
+          sendCentralServerClock();
+        }catch(e){
+          console.warn('[central] 서버 시계 보정 실패:', e);
+        }finally{
+          centralServerClockPromise=null;
+        }
+        return centralServerClockOffsetMs;
+      })();
+
+      return centralServerClockPromise;
+    }
+
+    function broadcastActiveTimer(row, source='realtime'){
+      centralActiveTimerRow = row || null;
+      for(const item of Object.values(tabs)){
+        postToFrame(item.frame, {
+          type:'journal-central-active-timer',
+          row: centralActiveTimerRow,
+          source
+        });
+      }
+    }
+
+    function broadcastMonthRow(row, source='realtime'){
+      if(!row || !row.ym) return;
+      const kind = kindFromMonthYm(row.ym);
+      const item = kind ? tabs[kind] : null;
+      if(!item) return;
+
+      const sig=`${row.updated_at||''}|${row.deleted_at||''}`;
+      if(centralMonthBroadcastSig.get(String(row.ym)) === sig) return;
+      centralMonthBroadcastSig.set(String(row.ym), sig);
+
+      postToFrame(item.frame, {
+        type:'journal-central-month-row',
+        row,
+        source
+      });
+    }
+
+    function broadcastMonthDeleted(ym){
+      const kind=kindFromMonthYm(ym);
+      const item=kind ? tabs[kind] : null;
+      if(!item) return;
+      centralMonthBroadcastSig.delete(String(ym||''));
+      postToFrame(item.frame, {
+        type:'journal-central-month-deleted',
+        ym:String(ym||'')
+      });
+    }
+
+    function pushCentralStateToFrame(frame){
+      postToFrame(frame, {
+        type:'journal-central-active-timer',
+        row: centralActiveTimerRow,
+        source:'snapshot'
+      });
+      sendCentralServerClock(frame);
+    }
+
+    Object.values(tabs).forEach(item=>{
+      item.frame.addEventListener('load', ()=>{
+        setTimeout(()=>pushCentralStateToFrame(item.frame), 0);
+      });
+    });
 
     function clearRealtimeRetry(){
       if(realtimeRetryTimer){
@@ -653,25 +784,47 @@
       }, delay);
     }
 
-    async function stopRealtime(){
-      clearRealtimeRetry();
-      chGeneration++;
+    function stopCentralPollTimer(){
+      if(centralPollTimer){
+        clearInterval(centralPollTimer);
+        centralPollTimer = null;
+      }
+    }
 
-      const old = ch;
-      ch = null;
+    function startCentralPollTimer(){
+      if(centralPollTimer) return;
+      centralPollTimer = setInterval(()=>{
+        if(document.visibilityState === 'hidden') return;
+        // active_timer is polled only when Realtime is unavailable.
+        if(!ch) void fetchOnce(false, false);
+        void centralPoll(false);
+      }, CENTRAL_POLL_MS);
+    }
 
-      if(old){
-        const sb = initSettingsClient();
-        try{
-          if(sb) await sb.removeChannel(old);
-          else await old.unsubscribe();
-        }catch(_){
-          try{ await old.unsubscribe(); }catch(__){}
-        }
+    function resetCentralUser(userId){
+      const id = userId || null;
+      if(centralUserId === id) return;
+      centralUserId = id;
+      centralLastMonthSyncAt = null;
+      centralActiveTimerRow = null;
+      centralLastPollAt = 0;
+      centralLastActiveFetchAt = 0;
+      centralMonthBroadcastSig.clear();
+    }
+
+    function advanceCentralMonthCursor(rows){
+      let maxMs = Number.isFinite(Date.parse(centralLastMonthSyncAt || ''))
+        ? Date.parse(centralLastMonthSyncAt)
+        : -Infinity;
+
+      for(const row of (rows || [])){
+        const ms = Date.parse(row?.updated_at || '');
+        if(Number.isFinite(ms) && ms > maxMs) maxMs = ms;
       }
 
-      exclusiveActive = null;
-      setExclusiveTabStatus(null);
+      if(Number.isFinite(maxMs)){
+        centralLastMonthSyncAt = new Date(maxMs).toISOString();
+      }
     }
 
     function applyFromRow(row, opts){
@@ -691,24 +844,137 @@
               try{ openTab(kind, true); }catch(_){}
             }
           }
+          return;
         }
-        return;
       }
+
       exclusiveActive = null;
       setExclusiveTabStatus(null);
     }
 
-    async function fetchOnce(autoSwitch){
+    function handleActiveRow(row, opts={}){
+      const normalized = row && Object.keys(row).length ? row : null;
+      centralActiveTimerRow = normalized;
+      applyFromRow(normalized, opts);
+      broadcastActiveTimer(normalized, opts.source || 'realtime');
+    }
+
+    async function fetchOnce(autoSwitch, force=false){
       const sb = initSettingsClient();
       if(!sb) return;
+      if(centralActiveFetchBusy){
+        if(autoSwitch === true) centralActiveFetchPendingAutoSwitch = true;
+        return;
+      }
+      if(!force && Date.now()-centralLastActiveFetchAt < 30000){
+        if(autoSwitch === true){
+          applyFromRow(centralActiveTimerRow, {autoSwitch:true});
+        }
+        return;
+      }
+
+      centralActiveFetchBusy=true;
+      let fetchedOk=false;
       try{
         const {data:{session}} = await sb.auth.getSession();
         const user = session?.user;
         if(!user) return;
-        const {data:row} = await sb.from('active_timer')
-          .select('*').eq('user_id', user.id).maybeSingle();
-        applyFromRow(row, {autoSwitch: autoSwitch === true});
-      }catch(e){}
+
+        resetCentralUser(user.id);
+
+        const {data:row,error} = await sb.from('active_timer')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if(error) throw error;
+
+        handleActiveRow(row, {
+          autoSwitch: autoSwitch === true,
+          source:'fetch'
+        });
+        fetchedOk=true;
+        centralLastActiveFetchAt=Date.now();
+      }catch(e){
+        console.warn('[central] active_timer 조회 실패:', e);
+      }finally{
+        centralActiveFetchBusy=false;
+        const needSwitch=centralActiveFetchPendingAutoSwitch;
+        centralActiveFetchPendingAutoSwitch=false;
+        if(needSwitch){
+          if(fetchedOk) applyFromRow(centralActiveTimerRow, {autoSwitch:true});
+          else void fetchOnce(true, true);
+        }
+      }
+    }
+
+    async function centralPoll(force=false){
+      const sb = initSettingsClient();
+      if(!sb || centralPollBusy) return;
+
+      const now = Date.now();
+      if(!force && now - centralLastPollAt < 30000) return;
+
+      centralPollBusy = true;
+      try{
+        const {data:{session}} = await sb.auth.getSession();
+        const user = session?.user;
+        if(!user) return;
+
+        resetCentralUser(user.id);
+
+        let monthQuery = sb.from('study_months')
+          .select('ym,data,updated_at,deleted_at,user_id')
+          .eq('user_id', user.id)
+          .order('updated_at', {ascending:true});
+
+        // Cursor is advanced only from rows actually received.
+        // gte intentionally re-reads the latest timestamp as a tiny overlap,
+        // avoiding a same-timestamp edge case without using "now - N seconds".
+        if(centralLastMonthSyncAt){
+          monthQuery = monthQuery.gte('updated_at', centralLastMonthSyncAt);
+        }
+
+        const monthRes = await monthQuery;
+
+        if(monthRes.error){
+          console.warn('[central] study_months 폴링 실패:', monthRes.error);
+        }else{
+          const rows = monthRes.data || [];
+          for(const row of rows) broadcastMonthRow(row, 'poll');
+          advanceCentralMonthCursor(rows);
+        }
+
+        centralLastPollAt = Date.now();
+      }catch(e){
+        console.warn('[central] 폴링 실패:', e);
+      }finally{
+        centralPollBusy = false;
+      }
+    }
+
+    async function stopRealtime(){
+      clearRealtimeRetry();
+      stopCentralPollTimer();
+      chGeneration++;
+
+      const old = ch;
+      ch = null;
+
+      if(old){
+        const sb = initSettingsClient();
+        try{
+          if(sb) await sb.removeChannel(old);
+          else await old.unsubscribe();
+        }catch(_){
+          try{ await old.unsubscribe(); }catch(__){}
+        }
+      }
+
+      resetCentralUser(null);
+      exclusiveActive = null;
+      setExclusiveTabStatus(null);
+      broadcastActiveTimer(null, 'signed-out');
     }
 
     function startRealtime(retry=0){
@@ -732,19 +998,64 @@
           return;
         }
 
+        resetCentralUser(user.id);
+
         if(generation !== chGeneration || ch) return;
 
-        const next = sb.channel(`gongbujang-tab-${user.id}-${generation}`)
+        // Parent owns the only journal Realtime channel.
+        // It carries both active_timer and study_months changes.
+        const next = sb.channel(`journal-central-${user.id}-${generation}`)
           .on(
             'postgres_changes',
-            {event:'*', schema:'public', table:'active_timer', filter:`user_id=eq.${user.id}`},
-            (payload)=>applyFromRow(payload.new, {autoSwitch:true})
+            {event:'*',schema:'public',table:'active_timer',filter:`user_id=eq.${user.id}`},
+            (payload)=>{
+              const row = payload?.new && Object.keys(payload.new).length
+                ? payload.new
+                : null;
+              handleActiveRow(row, {
+                autoSwitch:true,
+                source:'realtime'
+              });
+            }
+          )
+          .on(
+            'postgres_changes',
+            {event:'*',schema:'public',table:'study_months',filter:`user_id=eq.${user.id}`},
+            (payload)=>{
+              const row = payload?.new && Object.keys(payload.new).length
+                ? payload.new
+                : null;
+
+              if(row){
+                broadcastMonthRow(row, 'realtime');
+                return;
+              }
+
+              // Hard DELETE is rare; soft deletes arrive as UPDATE with deleted_at.
+              // Parent already knows exactly which ym disappeared, so no child re-query is needed.
+              const oldYm = payload?.old?.ym;
+              if(oldYm){
+                broadcastMonthDeleted(oldYm);
+              }else{
+                for(const item of Object.values(tabs)){
+                  postToFrame(item.frame, {type:'journal-central-force-sync'});
+                }
+              }
+            }
           );
 
         ch = next;
+        startCentralPollTimer();
 
         next.subscribe((status)=>{
           if(ch !== next) return;
+
+          if(status === 'SUBSCRIBED'){
+            void fetchOnce(true, true);
+            void calibrateCentralServerClock(false);
+            void centralPoll(true);
+            return;
+          }
 
           if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
             ch = null;
@@ -772,14 +1083,51 @@
     window.restartExclusiveTabRealtime = ()=>{
       void stopRealtime().finally(()=>startRealtime(0));
     };
+    window.runCentralJournalSync = ()=>centralPoll(true);
+    window.getCentralActiveTimerSnapshot = ()=>{
+      return centralActiveTimerRow ? {...centralActiveTimerRow} : null;
+    };
+
+    window.addEventListener('message', (ev)=>{
+      if(ev.origin !== location.origin) return;
+
+      if(ev.data?.type === 'journal-request-server-clock'){
+        const forceClock=ev.data?.force === true;
+        if(!forceClock && centralServerClockCalibrated && Date.now()-centralServerClockLastCalibratedAt < CENTRAL_CLOCK_MAX_AGE_MS){
+          sendCentralServerClock(ev.source);
+        }else{
+          void calibrateCentralServerClock(forceClock).finally(()=>sendCentralServerClock(ev.source));
+        }
+        return;
+      }
+
+      if(ev.data?.type !== 'journal-central-sync-request') return;
+
+      pushCentralStateToFrame(ev.source);
+
+      // "full" is reserved for foreground/app-resume recovery.
+      // Normal tab changes use the in-memory parent snapshot and do not hit Supabase.
+      if(ev.data?.full === true){
+        void fetchOnce(false, false);
+        void centralPoll(false);
+      }
+    });
 
     startRealtime();
-    fetchOnce();
 
     document.addEventListener('visibilitychange', ()=>{
-      if(document.visibilityState === 'visible') fetchOnce();
+      if(document.visibilityState === 'visible'){
+        void fetchOnce(false, false);
+        void calibrateCentralServerClock(false);
+        void centralPoll(false);
+      }
     });
-    window.addEventListener('pageshow', ()=>{ fetchOnce(); });
+
+    window.addEventListener('pageshow', ()=>{
+      void fetchOnce(false, false);
+      void calibrateCentralServerClock(false);
+      void centralPoll(false);
+    });
 
   })();
 
@@ -839,7 +1187,7 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=11.02', { scope: './' })
+      navigator.serviceWorker.register('./sw.js?v=11.05', { scope: './' })
         .then(reg => reg.update())
         .catch(err => console.error('Service worker registration failed:', err));
     });
@@ -861,9 +1209,18 @@
      return !!sb;
    }
    let __statusBusy=false;
+   let __statusVerifiedAt=0,__statusVerifiedUserId=null,__statusVerifiedOk=false;
    async function status(){if(__statusBusy)return user;__statusBusy=true;try{if(!init()){ $('sharedCloudStatus').textContent='연결 실패';return null }const {data:{session}}=await sb.auth.getSession();user=session?.user||null;
   let verified=false;
-  if(user){try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}}
+  if(user){
+    const uid=String(user.id||'');
+    if(__statusVerifiedUserId===uid && Date.now()-__statusVerifiedAt<300000){
+      verified=__statusVerifiedOk;
+    }else{
+      try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}
+      __statusVerifiedUserId=uid;__statusVerifiedAt=Date.now();__statusVerifiedOk=verified;
+    }
+  }else{__statusVerifiedUserId=null;__statusVerifiedAt=0;__statusVerifiedOk=false}
   $('sharedCloudStatus').textContent=user?(verified?'✅ '+user.email:'⚠️ '+user.email+' (세션 만료 의심)'):'❌ 로그인 필요';$('sharedCloudLogout').classList.toggle('show',!!user);$('sharedCloudLogout').disabled=false;$('sharedCloudToggle').textContent=user?'계정':'로그인';$('sharedCloudToggle').disabled=!!user;$('sharedCloudSetup').classList.toggle('show',!user);
   $('sharedCloudToggle').disabled=!!user;return user}finally{__statusBusy=false}}
    async function ensureFrame(kind){const fr=tabs[kind].frame;if(!fr.getAttribute('src')){fr.src=fr.dataset.src;await new Promise(r=>fr.addEventListener('load',r,{once:true}))}else if(!fr.contentDocument?.readyState || fr.contentDocument.readyState!=='complete'){await new Promise(r=>fr.addEventListener('load',r,{once:true}))}return fr}

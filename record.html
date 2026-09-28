@@ -1264,6 +1264,28 @@ function cancelPendingSaves(){
   }
 }
 
+async function flushPendingSavesNow(){
+  const keys = [...new Set([...Object.keys(saveTimers), ...Object.keys(saveWaiters)])];
+  for(const ym of keys){
+    if(saveTimers[ym]){
+      clearTimeout(saveTimers[ym]);
+      delete saveTimers[ym];
+      try{
+        const result = await saveMonth(ym);
+        settleSaveWaiters(ym, null, result);
+      }catch(e){
+        settleSaveWaiters(ym, e, false);
+        throw e;
+      }
+    }else if(saveWaiters[ym]?.length){
+      await new Promise((resolve,reject)=>{
+        saveWaiters[ym].push({resolve,reject});
+      });
+    }
+  }
+  return true;
+}
+
 let periodRenderPending = false;
 let userActionCount = 0;
 async function flushPendingRender(){
@@ -1388,15 +1410,58 @@ let serverClockOffsetMs = 0;
 let serverClockCalibrated = false;
 let serverClockLastCalibratedAt = 0;
 let serverClockCalibrationBusy = false;
+let parentServerClockWaiters = [];
 
 function serverNowMs(){
   return Date.now() + (serverClockCalibrated ? serverClockOffsetMs : 0);
+}
+
+function applyParentServerClock(offset){
+  const n=Number(offset);
+  if(!Number.isFinite(n)) return false;
+  serverClockOffsetMs=Math.round(n);
+  serverClockCalibrated=true;
+  serverClockLastCalibratedAt=Date.now();
+  const waiters=parentServerClockWaiters.splice(0);
+  for(const done of waiters){ try{ done(true); }catch(_){} }
+  return true;
+}
+
+function requestParentServerClock(timeoutMs=1000, force=false){
+  if(window.parent === window) return Promise.resolve(false);
+  return new Promise(resolve=>{
+    let settled=false;
+    const finish=(ok)=>{
+      if(settled) return;
+      settled=true;
+      resolve(ok===true);
+    };
+    parentServerClockWaiters.push(finish);
+    try{
+      window.parent.postMessage({type:'journal-request-server-clock',force:force===true}, location.origin);
+    }catch(_){
+      const i=parentServerClockWaiters.indexOf(finish);
+      if(i>=0) parentServerClockWaiters.splice(i,1);
+      finish(false);
+      return;
+    }
+    setTimeout(()=>{
+      const i=parentServerClockWaiters.indexOf(finish);
+      if(i>=0) parentServerClockWaiters.splice(i,1);
+      finish(false);
+    }, timeoutMs);
+  });
 }
 
 async function calibrateServerClock(force=false){
   if(serverClockCalibrationBusy || !sbClient || !cloudUser) return serverClockOffsetMs;
   if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 300000){
     return serverClockOffsetMs;
+  }
+
+  if(window.parent !== window){
+    const gotParentClock = await requestParentServerClock(force ? 1200 : 800, force);
+    if(gotParentClock) return serverClockOffsetMs;
   }
 
   serverClockCalibrationBusy = true;
@@ -1780,38 +1845,86 @@ window.addEventListener('pageshow', ()=>{
   setTimeout(()=>checkStudyDayBoundaryRollover(), 0);
 });
 
-let activeTimerPollId = null;
 let clockCalibrateId = null;
 let rolloverCheckId = null;
 
 let __journalPaused = false;
+
+function requestCentralSync(full=false){
+  if(window.parent === window) return;
+  try{
+    window.parent.postMessage({
+      type:'journal-central-sync-request',
+      kind:'record',
+      full: full === true
+    }, location.origin);
+  }catch(_){}
+}
+
 window.addEventListener('message', (ev)=>{
   if(ev.origin!==location.origin) return;
+
   if(ev.data?.type === 'journal-pause'){
     __journalPaused = true;
     stopBackgroundSensitiveLoops();
-  } else if(ev.data?.type === 'journal-resume'){
+    return;
+  }
+
+  if(ev.data?.type === 'journal-resume'){
     const wasPaused = __journalPaused;
     __journalPaused = false;
     startBackgroundSensitiveLoops();
-    if(wasPaused && cloudUser){
-      void syncActiveTimerFromCloud(true);
-      void autoSyncFromCloud();
+
+    if(wasPaused){
+      // No child polling/read here. Parent sends its current central snapshot.
+      requestCentralSync(false);
+      if(!(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing())
+         && !(typeof userActionCount === 'number' && userActionCount > 0)){
+        Promise.resolve(renderCurrentView()).catch(()=>{});
+      }
     }
+    return;
+  }
+
+  if(ev.data?.type === 'journal-central-month-row'){
+    const row = ev.data?.row;
+    if(row) void applyRealtimeMonthRow({new:row});
+    return;
+  }
+
+  if(ev.data?.type === 'journal-server-clock'){
+    applyParentServerClock(ev.data?.offset);
+    return;
+  }
+
+  if(ev.data?.type === 'journal-central-month-deleted'){
+    const raw=String(ev.data?.ym||'');
+    if(!raw.startsWith('R:')) return;
+    const ym=raw.slice(2);
+    delete monthCache[ym];
+    if(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing()){
+      periodRenderPending=true;
+    }else if(typeof userActionCount === 'number' && userActionCount > 0){
+      periodRenderPending=true;
+    }else{
+      Promise.resolve(renderCurrentView()).catch(()=>{});
+    }
+    return;
+  }
+
+  if(ev.data?.type === 'journal-central-active-timer'){
+    void applyCentralActiveTimerRow(ev.data?.row || null);
+    return;
+  }
+
+  if(ev.data?.type === 'journal-central-force-sync'){
+    if(cloudUser) void autoSyncFromCloud();
   }
 });
 
 function startBackgroundSensitiveLoops(){
   if(document.visibilityState === 'hidden') return;
 
-  if(!activeTimerPollId){
-    activeTimerPollId = setInterval(()=>{
-      if(cloudUser){
-        syncActiveTimerFromCloud(false);
-        autoSyncFromCloud();
-      }
-    }, 300000);
-  }
 
   if(!rolloverCheckId){
     rolloverCheckId = setInterval(()=>{
@@ -1825,10 +1938,6 @@ function startBackgroundSensitiveLoops(){
 }
 
 function stopBackgroundSensitiveLoops(){
-  if(activeTimerPollId){
-    clearInterval(activeTimerPollId);
-    activeTimerPollId = null;
-  }
 
   if(clockCalibrateId){
     clearInterval(clockCalibrateId);
@@ -1844,9 +1953,14 @@ function stopBackgroundSensitiveLoops(){
 async function recoverFromBackground(){
   try{
     if(cloudUser){
-      void calibrateServerClock(true);
-      await autoSyncFromCloud();
-      await syncActiveTimerFromCloud(true);
+      if(window.parent !== window){
+        requestCentralSync(true);
+        await calibrateServerClock(false);
+      }else{
+        await calibrateServerClock(false);
+        await autoSyncFromCloud();
+        await syncActiveTimerFromCloud(true);
+      }
     }
 
     await checkStudyDayBoundaryRollover();
@@ -1867,11 +1981,13 @@ document.addEventListener('visibilitychange', async ()=>{
     return;
   }
 
+  if(__journalPaused) return;
   startBackgroundSensitiveLoops();
   await recoverFromBackground();
 });
 
 window.addEventListener('pageshow', async ()=>{
+  if(__journalPaused) return;
   startBackgroundSensitiveLoops();
   await recoverFromBackground();
 });
@@ -3316,13 +3432,22 @@ $('#settingsOverlay').addEventListener('click', (e)=>{ if(e.target === $('#setti
 async function deleteAllStudyRecords(){
   if(!cloudUser){
     alert('클라우드 로그인 상태를 확인하지 못해 삭제를 중단했어요.\n잠시 후 다시 시도해주세요.');
-    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:true}, location.origin);
+    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin);
     return;
   }
   if(!window.__skipDeleteConfirm){
     if(!(await askConfirm('정말 모든 기록을 삭제하시겠어요? 삭제한 기록은 되돌릴 수 없습니다.', true))) return;
   }
   window.__skipDeleteConfirm = false;
+
+  try{
+    await flushPendingSavesNow();
+  }catch(e){
+    console.error('삭제 전 저장 실패:', e);
+    alert('삭제 전 저장에 실패해 삭제를 중단했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+    if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin);
+    return;
+  }
 
   if(cloudUser){
     if(!sbClient){
@@ -3335,15 +3460,12 @@ async function deleteAllStudyRecords(){
     const lecYms=(lecRows||[]).map(r=>String(r.ym||''));
     const markerIso = new Date(Math.round(serverNowMs())).toISOString();
     for(const ym of lecYms){
-      const {data:existingRow,error:readOneErr} = await sbClient.from('study_months')
-        .select('updated_at').eq('user_id', cloudUser.id).eq('ym', ym).maybeSingle();
-      if(readOneErr){ alert('삭제 확인 실패: ' + readOneErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
-      if(existingRow){
-        const {error:updErr} = await sbClient.from('study_months')
-          .update({data:{}, deleted_at: markerIso, updated_at: markerIso})
-          .eq('user_id', cloudUser.id).eq('ym', ym);
-        if(updErr){ alert('삭제 실패: ' + updErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
-      } else {
+      const {data:updatedRows,error:updErr} = await sbClient.from('study_months')
+        .update({data:{}, deleted_at: markerIso, updated_at: markerIso})
+        .eq('user_id', cloudUser.id).eq('ym', ym)
+        .select('ym');
+      if(updErr){ alert('삭제 실패: ' + updErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
+      if(!(updatedRows||[]).length){
         const {error:insErr} = await sbClient.from('study_months')
           .insert({user_id: cloudUser.id, ym, data:{}, deleted_at: markerIso, updated_at: markerIso});
         if(insErr){ alert('삭제 실패: ' + insErr.message); if(window.parent!==window) window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:false}, location.origin); return; }
@@ -3534,7 +3656,8 @@ async function cloudSaveMonth(ym){
     }
     if(writeOk){
       if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
-      monthCache[ym]=merged;
+      const current = ensureMonthSync(monthCache[ym] || {}, ym);
+      monthCache[ym] = mergeMonths(merged, current, ym);
       return;
     }
     await new Promise(r=>setTimeout(r,120*(attempt+1)));
@@ -3783,7 +3906,14 @@ let fullCloudSyncRunning = false;
 
 $('#cloudUpload').onclick = uploadAllToCloud;
 $('#cloudDownload').onclick = downloadAllFromCloud;
-$('#cloudSync').onclick = () => {
+$('#cloudSync').onclick = async () => {
+  try{
+    await flushPendingSavesNow();
+  }catch(e){
+    console.error('동기화 전 저장 실패:', e);
+    showToast('저장에 실패해 동기화를 중단했어요');
+    return;
+  }
   if(window.top && window.top !== window) window.top.location.reload();
   else location.reload();
 };
@@ -3797,6 +3927,10 @@ if(sbClient){
     __authBusy = true;
     setTimeout(async () => {
       try {
+    if(event === 'TOKEN_REFRESHED'){
+      setCloudUser(session?.user || null);
+      return;
+    }
     setCloudUser(session?.user || null);
     const status = $('#cloudStatus');
     if(status){
@@ -3805,7 +3939,7 @@ if(sbClient){
     const logoutBtn = $('#cloudLogout');
     if(logoutBtn) logoutBtn.style.display = cloudUser ? '' : 'none';
 
-    if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')){
+    if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')){
       try{
         void calibrateServerClock(true);
         await autoSyncFromCloud();
@@ -3854,7 +3988,6 @@ if(sbClient){
   startBackgroundSensitiveLoops();
 })().finally(()=>{ try{ window.__journalReady = true; }catch(e){} });
 
-let activeTimerRealtimeChannel = null;
 
 async function cloudStartActiveTimer(ym, dayKey, p, idx){
   return null;
@@ -3877,6 +4010,11 @@ async function cloudClearActiveTimerIfMine(){
 }
 
 async function syncActiveTimerFromCloud(force=false){
+  return;
+}
+
+async function applyCentralActiveTimerRow(row){
+  // record.html intentionally does not use active_timer.
   return;
 }
 
@@ -3925,32 +4063,18 @@ async function applyRealtimeMonthRow(payload){
 }
 
 function startActiveTimerRealtime(){
-  if(!sbClient || !cloudUser || activeTimerRealtimeChannel) return;
-  try{
-    activeTimerRealtimeChannel = sbClient
-      .channel(`record-data-${cloudUser.id}`)
-      .on(
-        'postgres_changes',
-        {event:'*',schema:'public',table:'study_months',filter:`user_id=eq.${cloudUser.id}`},
-        (payload)=>{ void applyRealtimeMonthRow(payload); }
-      )
-      .subscribe();
-  }catch(e){
-    activeTimerRealtimeChannel = null;
-  }
+  // Realtime is owned centrally by index.html.
+  return;
 }
 
 function stopActiveTimerRealtime(){
-  if(activeTimerRealtimeChannel && sbClient){
-    try{ sbClient.removeChannel(activeTimerRealtimeChannel); }catch(e){}
-  }
-  activeTimerRealtimeChannel = null;
+  // Realtime is owned centrally by index.html.
+  return;
 }
 
 window.yangStudyAppResume = async function(){
   try{
-    if(!cloudUser) return;
-    void calibrateServerClock(true);
+    if(!cloudUser || __journalPaused) return;
     startBackgroundSensitiveLoops();
     await recoverFromBackground();
   }catch(e){
@@ -4056,7 +4180,7 @@ setTimeout(()=>renderDay(), 0);
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.29', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=11.05', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });
