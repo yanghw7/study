@@ -836,7 +836,11 @@ eruda.init();
 (function paintErudaLauncherBlue(){
   const paint = () => {
     const el = document.querySelector('.eruda-entry-btn');
-    if(el){ el.style.setProperty('background', '#1976d2', 'important'); return true; }
+    if(el){
+      el.style.setProperty('background', '#1976d2', 'important');
+      el.style.setProperty('bottom', '90px', 'important');
+      return true;
+    }
     return false;
   };
   if(!paint()) setTimeout(paint, 300);
