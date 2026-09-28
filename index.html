@@ -764,7 +764,7 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=11.01', { scope: './' })
+      navigator.serviceWorker.register('./sw.js?v=11.02', { scope: './' })
         .then(reg => reg.update())
         .catch(err => console.error('Service worker registration failed:', err));
     });

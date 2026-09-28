@@ -1,4 +1,4 @@
-const CACHE='study-pwa-v11.01';
+const CACHE='study-pwa-v11.02';
 const CORE=['./','./index.html','./study.html','./lecture.html','./sleep.html','./record.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',e=>e.waitUntil(

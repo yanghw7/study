@@ -842,7 +842,7 @@ body{background:#FCF6F7!important}
         <button class="data-btn" id="cloudLogin">로그인</button>
         <button class="data-btn" id="cloudGoogle">Google로 로그인</button>
       </div>
-      <div class="cloud-note">Supabase 연결 정보는 이미 설정되어 있습니다. 로그인 후에는 강의 기록이 브라우저와 클라우드에 함께 자동 저장됩니다.</div>
+      <div class="cloud-note">Supabase 연결 정보는 이미 설정되어 있습니다. 로그인 후에는 기록이 브라우저와 클라우드에 함께 자동 저장됩니다.</div>
     </div>
   </div>
 
@@ -867,7 +867,7 @@ body{background:#FCF6F7!important}
     <div class="setting-row">
       <div>
         <div class="setting-label">하루 집계 기준시간</div>
-        <div class="setting-desc">00:00~11:00 중 1시간 단위로 선택합니다. 변경한 시간은 현재 강의일을 건드리지 않고 다음 적용 시점부터 사용됩니다.</div>
+        <div class="setting-desc">00:00~11:00 중 1시간 단위로 선택합니다. 변경한 시간은 현재 기록일을 건드리지 않고 다음 적용 시점부터 사용됩니다.</div>
         <div class="setting-status" id="dayStartStatus"></div>
       </div>
       <select class="setting-select" id="dayStartSelect" aria-label="하루 집계 기준시간"></select>
@@ -885,7 +885,7 @@ body{background:#FCF6F7!important}
     </div>
     <div class="settings-danger-wrap">
       <button class="settings-danger" id="deleteAllRecords">모든 기록 삭제</button>
-      <div class="settings-danger-note">강의 기록만 삭제하며 설정과 로그인 정보는 유지됩니다.</div>
+      <div class="settings-danger-note">기록만 삭제하며 설정과 로그인 정보는 유지됩니다.</div>
     </div>
   </div>
 </div>
@@ -1239,6 +1239,13 @@ async function persistToday(){
   });
 }
 
+async function persistTodayImmediate(){
+  const ym = ymKey(cur);
+  clearTimeout(saveTimers[ym]);
+  delete saveTimers[ym];
+  return await saveMonth(ym);
+}
+
 function showToast(msg){
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(showToast._t);
@@ -1413,12 +1420,12 @@ function updateStudyTimer(){
   const info = timerPeriodForCurrentDay();
   if(!info){
     timeEl.textContent = '00:00:00';
-    labelEl.textContent = '강의시간';
+    labelEl.textContent = '기록시간';
     box.classList.remove('running');
     return;
   }
   timeEl.textContent = formatTimer(timerElapsedMs(info.p));
-  labelEl.textContent = info.running ? `${info.idx+1}강의 · 진행 중` : `${info.idx+1}강의 · 종료`;
+  labelEl.textContent = info.running ? `${info.idx+1}기록 · 진행 중` : `${info.idx+1}기록 · 종료`;
   box.classList.toggle('running', !!info.running);
 }
 
@@ -1428,11 +1435,11 @@ function updateWasteTimer(){
   const info = wasteTimerForCurrentDay();
   if(!info){
     timeEl.textContent = '00:00:00';
-    labelEl.textContent = '강의 종료 후 시간';
+    labelEl.textContent = '기록 종료 후 시간';
     return;
   }
   timeEl.textContent = formatTimer(Math.max(0, serverNowMs() - info.startedAt));
-  labelEl.textContent = `${info.idx+1}강의 후 · 강의 종료 후 시간`;
+  labelEl.textContent = `${info.idx+1}기록 후 · 기록 종료 후 시간`;
 }
 
 setInterval(()=>{
@@ -1823,7 +1830,7 @@ function syncAndroidTimer(){
       const localWasteStarted = Math.round(
         (Number(wasteInfo.startedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
       ) * 1000;
-      const wasteLabel = `${wasteInfo.idx+1}강의 종료 · 강의 종료 후 시간`;
+      const wasteLabel = `${wasteInfo.idx+1}기록 종료 · 기록 종료 후 시간`;
       const key = `waste:${localWasteStarted}:${wasteLabel}`;
       if(key !== lastAndroidTimerKey){
         window.AndroidTimer.startTimer(localWasteStarted, wasteLabel);
@@ -1833,7 +1840,7 @@ function syncAndroidTimer(){
     }
 
     const p = info.p;
-    const label = `${info.idx+1}강의`;
+    const label = `${info.idx+1}기록`;
 
     if(info.running && Number(p.timerStartedAt) > 0){
       const localEpochStarted = Math.round(
@@ -1881,7 +1888,7 @@ function isWithinSelectedStudyDay(dt){
   return dt >= start && dt < endExclusive;
 }
 function recordRangeAlert(){
-  alert(`이 강의일의 기록 가능 시간은 ${studyDayRangeText(cur)}입니다.`);
+  alert(`이 기록일의 기록 가능 시간은 ${studyDayRangeText(cur)}입니다.`);
 }
 
 function minutesBetween(p){
@@ -2041,14 +2048,14 @@ function renderPeriods(){
     const hasStart = !!(p.startDate && p.startTime);
     const hasEnd = !!(p.endDate && p.endTime);
 
-    let startAction = 'start', startLabel = '▶ 강의 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
+    let startAction = 'start', startLabel = '▶ 기록 시작', startDisabled = !isCurrentLectureDay, startClass = 'start';
     if(hasStart){
       startAction = 'cancel-start';
       startLabel = '시작 취소';
       startDisabled = false;
       startClass = 'start cancel-start';
     }
-    let endAction = 'end', endLabel = '■ 강의 종료', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
+    let endAction = 'end', endLabel = '■ 기록 종료', endDisabled = !isCurrentLectureDay || !hasStart || hasEnd, endClass = 'end';
     if(hasEnd){
       endAction = 'cancel-end';
       endLabel = '종료 취소';
@@ -2148,14 +2155,14 @@ function refreshLectureTimeFieldDisabled(idx){
   if(startLabel){
     startLabel.textContent = hasStart
       ? (koDateTimeLabel(p.startDate, p.startTime) || '시간을 눌러 수정')
-      : '강의 시작을 누르면 자동 기록';
+      : '기록 시작을 누르면 자동 기록';
   }
   const endLabel = endField?.querySelector('.ko-time-label');
   if(endLabel){
     endLabel.textContent = !hasStart
-      ? '강의 시작을 누르면 자동 기록'
+      ? '기록 시작을 누르면 자동 기록'
       : (!hasEnd
-          ? '강의 종료를 누르면 자동 기록'
+          ? '기록 종료를 누르면 자동 기록'
           : (koDateTimeLabel(p.endDate, p.endTime) || '시간을 눌러 수정'));
   }
 }
@@ -2271,7 +2278,7 @@ $('#addPeriod').onclick = async () => {
       await autoSyncFromCloud();
       await renderCurrentView();
     }catch(e){
-      console.warn('강의 추가 후 재동기화 실패:', e);
+      console.warn('기록 추가 후 재동기화 실패:', e);
     }
   }
 };
@@ -2292,7 +2299,7 @@ $('#periodList').addEventListener('click', async (e) => {
     day.periods.splice(idx,1);
     renderPeriods();
     updateStudyTimer();
-    await persistToday();
+    await persistTodayImmediate();
   }
 });
 
@@ -2311,7 +2318,7 @@ $('#periodList').addEventListener('paste', (e) => {
   const text = (e.clipboardData || window.clipboardData)?.getData('text') ?? '';
   if(!/^[1-9]\d*$/.test(text.trim())){
     e.preventDefault();
-    showToast('강의 횟수는 1 이상의 정수만 입력할 수 있어요');
+    showToast('기록 횟수는 1 이상의 정수만 입력할 수 있어요');
   }
 });
 
@@ -2328,7 +2335,7 @@ $('#periodList').addEventListener('input', async (e) => {
     if(raw === ''){
     } else if(!/^\d+$/.test(raw)){
       t.value = '';
-      showToast('강의 횟수는 1 이상의 정수만 입력할 수 있어요');
+      showToast('기록 횟수는 1 이상의 정수만 입력할 수 있어요');
     } else {
       const normalized = raw.replace(/^0+/, '');
       t.value = normalized;
@@ -2410,7 +2417,7 @@ $('#periodList').addEventListener('input', async (e) => {
           const di = dtInput(); if(di) di.value = `${p[dateKey]}T${p[timeKey]}`;
         } else {
           const di = dtInput(); if(di) di.value = '';
-          showToast('과거 강의일은 일시를 직접 입력해 주세요');
+          showToast('과거 기록일은 일시를 직접 입력해 주세요');
         }
       }
       if(isWithinSelectedStudyDay(now)){
@@ -2547,7 +2554,7 @@ $('#periodList').addEventListener('click', async (e) => {
   }
   const now = new Date(serverNowMs());
   if(!isCancel && !isWithinSelectedStudyDay(now)){
-    showToast('오늘 강의에서만 시작/종료 버튼을 사용할 수 있어요');
+    showToast('오늘 기록일에서만 시작/종료 버튼을 사용할 수 있어요');
     return;
   }
 
@@ -2574,7 +2581,7 @@ $('#periodList').addEventListener('click', async (e) => {
     }
   }else if(action === 'end'){
     if(!p.startDate || !p.startTime){
-      showToast('먼저 강의 시작을 눌러주세요');
+      showToast('먼저 기록 시작을 눌러주세요');
       return;
     }
     p.endDate = ymd(now);
@@ -2593,8 +2600,8 @@ $('#periodList').addEventListener('click', async (e) => {
     }
   }else if(action === 'cancel-start'){
     const msg = (p.endDate || p.endTime)
-      ? `${idx+1}강의의 시작·종료 기록을 모두 지울까요?`
-      : `${idx+1}강의 시작을 취소할까요?`;
+      ? `${idx+1}기록의 시작·종료 기록을 모두 지울까요?`
+      : `${idx+1}기록 시작을 취소할까요?`;
     if(!(await askConfirm(msg, true))) return;
     p.startDate = '';
     p.startTime = '';
@@ -2607,7 +2614,7 @@ $('#periodList').addEventListener('click', async (e) => {
     }
     showToast('시작 기록을 취소했어요');
   }else if(action === 'cancel-end'){
-    if(!(await askConfirm(`${idx+1}강의 종료를 취소할까요?`, true))) return;
+    if(!(await askConfirm(`${idx+1}기록 종료를 취소할까요?`, true))) return;
     p.endDate = '';
     p.endTime = '';
     p.timerEndedAt = null;
@@ -2628,7 +2635,8 @@ $('#periodList').addEventListener('click', async (e) => {
   markChangedPeriodFields(p, beforeSync);
   p._updatedAt = syncNow();
   if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
-  await persistToday();
+  if(action === 'cancel-start' || action === 'cancel-end') await persistTodayImmediate();
+  else await persistToday();
   renderPeriods();
   updateStudyTimer();
   updateWasteTimer();
@@ -3132,7 +3140,7 @@ function showChartTooltip(bar, clientX, clientY){
       const maxDate = logicalToday();
       if(next > maxDate){
         snapBack();
-        showToast('아직 시작되지 않은 강의일입니다.');
+        showToast('아직 시작되지 않은 기록일입니다.');
         return;
       }
       cur = next;
@@ -3292,7 +3300,7 @@ async function deleteAllStudyRecords(){
     }
   }catch(_){}
 
-  showToast('모든 강의 기록을 삭제했어요');
+  showToast('모든 기록을 삭제했어요');
   if(window.parent !== window){
     window.parent.postMessage({type:'journal-delete-done', kind:'record', ok:true}, location.origin);
   }
@@ -3580,7 +3588,10 @@ let fullCloudSyncRunning = false;
 
 $('#cloudUpload').onclick = uploadAllToCloud;
 $('#cloudDownload').onclick = downloadAllFromCloud;
-$('#cloudSync').onclick = () => location.reload();
+$('#cloudSync').onclick = () => {
+  if(window.top && window.top !== window) window.top.location.reload();
+  else location.reload();
+};
 
 initSupabase();
 
@@ -3844,21 +3855,7 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
-<script id="lecture-after-end-labels">
-document.addEventListener('DOMContentLoaded',()=>{
-  const rewrite=()=>{
-    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
-    for(const n of nodes){
-      if(n.nodeValue.includes('낭비시간')) n.nodeValue=n.nodeValue.replaceAll('낭비시간','강의 종료 후 시간');
-      if(n.nodeValue.includes('낭비 시간')) n.nodeValue=n.nodeValue.replaceAll('낭비 시간','강의 종료 후 시간');
-      if(n.nodeValue.includes('교시 선택')) n.nodeValue=n.nodeValue.replaceAll('교시 선택','강의 선택');
-      if(n.nodeValue.includes('공부 선택')) n.nodeValue=n.nodeValue.replaceAll('공부 선택','강의 선택');
-    }
-  };
-  rewrite();
-});
-
+<script id="record-timers">
 const recordTimerStarts = [null,null,null];
 let recordTimerTick = null;
 
@@ -3968,7 +3965,7 @@ document.addEventListener('click', async (e)=>{
     renderPeriods();
     updateRecordSummary();
     showToast('기록을 취소했어요');
-    void persistToday();
+    await persistTodayImmediate();
   }
 });
 
@@ -4069,7 +4066,7 @@ document.addEventListener('visibilitychange',()=>{
  async function fire(){const a=read();if(!a?.enabled)return;clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent=fmt(a.due);let sounded=false;try{if(!ring){const u=await audioURL();if(u)ring=new Audio(u)}if(ring){ring.loop=true;ring.volume=1;ring.currentTime=0;await ring.play();sounded=!ring.paused}}catch(e){sounded=false}if(!sounded){try{await beep();sounded=true}catch(e){}}try{const buzz=()=>{navigator.vibrate?.([900,250,900,250,1200,300]);notifyRing()};buzz();clearInterval(vibeTimer);vibeTimer=setInterval(buzz,4000)}catch(e){};notifyRing();write({...a,enabled:false,ringing:true});const b=$('#alarmStop');b.hidden=false;b.classList.add('show');b.style.display='inline-block';if(!sounded){$('#alarmStatus').textContent='🔔 알람 시간! (소리 재생이 막혀 진동/알림으로 대신 울리는 중)'}}
  function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500);requestWake()}
  function catchUp(){const x=read();if(!x)return;if(x.enabled&&Date.now()>=x.due){fire()}else if(x.enabled){arm(x)}}
- document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',updatePreview);$('#alarmMinutes').addEventListener('input',updatePreview);$('#alarmPreview').onclick=async()=>{await cacheSelected();const u=await audioURL();if(!u)return alert('알람음을 선택해주세요.');try{const preview=new Audio(u);preview.volume=1;await preview.play();setTimeout(()=>{try{preview.pause();preview.currentTime=0}catch(e){}},2500)}catch(e){alert('미리듣기를 재생할 수 없습니다.')}};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await ensureNotifyPermission();await cacheSelected();stopRing();try{const u=await audioURL();if(u){ring=new Audio(u);ring.loop=true;ring.volume=1;await ring.play();ring.pause();ring.currentTime=0}ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(e){}const a={enabled:true,ringing:false,due:alignedDue(ms),sound:$('#alarmSoundSelect').value};write(a);arm(a)};$('#alarmCancel').onclick=()=>{if(!confirm('알람을 정말 해제하시겠습니까?'))return;resetAlarm()};$('#alarmStop').onclick=()=>{resetAlarm()};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp();requestWake()}});window.addEventListener('pageshow',()=>{catchUp();requestWake()});window.addEventListener('focus',()=>{catchUp()})});
+ document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',updatePreview);$('#alarmMinutes').addEventListener('input',updatePreview);$('#alarmPreview').onclick=async()=>{await cacheSelected();const u=await audioURL();if(!u)return alert('알람음을 선택해주세요.');try{const preview=new Audio(u);preview.volume=1;await preview.play();setTimeout(()=>{try{preview.pause();preview.currentTime=0}catch(e){}},2500)}catch(e){alert('미리듣기를 재생할 수 없습니다.')}};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(48,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await ensureNotifyPermission();await cacheSelected();stopRing();try{const u=await audioURL();if(u){ring=new Audio(u);ring.loop=true;ring.volume=1;await ring.play();ring.pause();ring.currentTime=0}ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(e){}const a={enabled:true,ringing:false,due:alignedDue(ms),sound:$('#alarmSoundSelect').value};write(a);arm(a)};$('#alarmCancel').onclick=async()=>{if(!(await askConfirm('알람을 정말 해제하시겠습니까?', true)))return;resetAlarm()};$('#alarmStop').onclick=()=>{resetAlarm()};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp();requestWake()}});window.addEventListener('pageshow',()=>{catchUp();requestWake()});window.addEventListener('focus',()=>{catchUp()})});
 })();
 
 </script>
