@@ -635,6 +635,44 @@
     }
 
     let ch = null;
+    let chGeneration = 0;
+    let realtimeRetryTimer = null;
+
+    function clearRealtimeRetry(){
+      if(realtimeRetryTimer){
+        clearTimeout(realtimeRetryTimer);
+        realtimeRetryTimer = null;
+      }
+    }
+
+    function scheduleRealtimeRetry(delay=5000){
+      clearRealtimeRetry();
+      realtimeRetryTimer = setTimeout(()=>{
+        realtimeRetryTimer = null;
+        startRealtime(0);
+      }, delay);
+    }
+
+    async function stopRealtime(){
+      clearRealtimeRetry();
+      chGeneration++;
+
+      const old = ch;
+      ch = null;
+
+      if(old){
+        const sb = initSettingsClient();
+        try{
+          if(sb) await sb.removeChannel(old);
+          else await old.unsubscribe();
+        }catch(_){
+          try{ await old.unsubscribe(); }catch(__){}
+        }
+      }
+
+      exclusiveActive = null;
+      setExclusiveTabStatus(null);
+    }
 
     function applyFromRow(row, opts){
       const autoSwitch = opts && opts.autoSwitch === true;
@@ -673,30 +711,67 @@
       }catch(e){}
     }
 
-    function startRealtime(retry){
+    function startRealtime(retry=0){
       const sb = initSettingsClient();
       if(!sb || ch) return;
+
+      const generation = ++chGeneration;
+
       sb.auth.getSession().then(({data:{session}})=>{
+        if(generation !== chGeneration || ch) return;
+
         const user = session?.user;
         if(!user){
-          if((retry||0) < 20) setTimeout(()=>startRealtime((retry||0)+1), 500 + (retry||0)*200);
+          if(retry < 20){
+            clearRealtimeRetry();
+            realtimeRetryTimer = setTimeout(()=>{
+              realtimeRetryTimer = null;
+              startRealtime(retry + 1);
+            }, 500 + retry * 200);
+          }
           return;
         }
-        if(ch) return;
-        ch = sb.channel(`gongbujang-tab-${user.id}`)
-          .on('postgres_changes',
-              {event:'*', schema:'public', table:'active_timer', filter:`user_id=eq.${user.id}`},
-              (payload)=>applyFromRow(payload.new, {autoSwitch:true}))
-          .subscribe((status)=>{
-            if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
-              ch = null;
-              setTimeout(startRealtime, 5000);
-            }
-          });
+
+        if(generation !== chGeneration || ch) return;
+
+        const next = sb.channel(`gongbujang-tab-${user.id}-${generation}`)
+          .on(
+            'postgres_changes',
+            {event:'*', schema:'public', table:'active_timer', filter:`user_id=eq.${user.id}`},
+            (payload)=>applyFromRow(payload.new, {autoSwitch:true})
+          );
+
+        ch = next;
+
+        next.subscribe((status)=>{
+          if(ch !== next) return;
+
+          if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+            ch = null;
+
+            Promise.resolve(sb.removeChannel(next))
+              .catch(async ()=>{
+                try{ await next.unsubscribe(); }catch(_){}
+              })
+              .finally(()=>{
+                if(generation === chGeneration){
+                  scheduleRealtimeRetry(5000);
+                }
+              });
+          }
+        });
+      }).catch(()=>{
+        if(generation === chGeneration && !ch){
+          scheduleRealtimeRetry(5000);
+        }
       });
     }
 
     window.refreshExclusiveServerState = fetchOnce;
+    window.stopExclusiveTabRealtime = ()=>{ void stopRealtime(); };
+    window.restartExclusiveTabRealtime = ()=>{
+      void stopRealtime().finally(()=>startRealtime(0));
+    };
 
     startRealtime();
     fetchOnce();
@@ -837,8 +912,18 @@
       sb.auth.onAuthStateChange((event, session)=>{
         window.__yangStudyLastAuthEvent = event;
         window.__yangStudyLastAuthSession = session || null;
+
         if(event === 'TOKEN_REFRESHED') return;
-        if(event === 'SIGNED_OUT') return;
+
+        if(event === 'SIGNED_OUT'){
+          window.stopExclusiveTabRealtime?.();
+          return;
+        }
+
+        if(event === 'SIGNED_IN'){
+          window.restartExclusiveTabRealtime?.();
+        }
+
         setTimeout(status, 500);
       });
     }

@@ -1064,6 +1064,35 @@ function hasPeriodCreatedAfter(monthData, ts){
   }
   return false;
 }
+function keepOnlyPeriodsCreatedAfter(monthData, ts){
+  const out = deepClone(monthData || {});
+  for(const dk of Object.keys(out)){
+    if(!/^\d{1,2}$/.test(dk)) continue;
+    const day = out[dk];
+    if(!day || typeof day !== 'object'){
+      delete out[dk];
+      continue;
+    }
+
+    day.periods = (Array.isArray(day.periods) ? day.periods : [])
+      .filter(p => Number(p?._createdAt) > ts);
+
+    if(Array.isArray(day._deletedPeriods)){
+      day._deletedPeriods = day._deletedPeriods
+        .filter(x => Number(x?.ts) > ts);
+    }
+
+    const metaCreatedAfterDelete = Number(day._metaUpdatedAt) > ts;
+    if(!metaCreatedAfterDelete && Object.prototype.hasOwnProperty.call(day,'wake')){
+      day.wake = null;
+    }
+
+    if(day.periods.length === 0 && !metaCreatedAfterDelete){
+      delete out[dk];
+    }
+  }
+  return out;
+}
 function tombstonePeriod(day, p){
   ensureDaySync(day);
   if(!p?._id) return;
@@ -1210,7 +1239,7 @@ async function saveMonth(ym){
     return false;
   }
   try{
-    await cloudSaveMonth(ym); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
+    await cloudSaveMonth(ym);
     return true;
   }catch(e){
     console.error('클라우드 저장 실패:', e);
@@ -1230,6 +1259,27 @@ function getDayData(){
 }
 
 const saveTimers = {};
+const saveWaiters = {};
+
+function settleSaveWaiters(ym, error=null, value=false){
+  const waiters = saveWaiters[ym] || [];
+  delete saveWaiters[ym];
+  for(const w of waiters){
+    try{
+      if(error) w.reject(error);
+      else w.resolve(value);
+    }catch(_){}
+  }
+}
+
+function cancelPendingSaves(){
+  const keys = new Set([...Object.keys(saveTimers), ...Object.keys(saveWaiters)]);
+  for(const ym of keys){
+    if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
+    delete saveTimers[ym];
+    settleSaveWaiters(ym, null, false);
+  }
+}
 
 let periodRenderPending = false;
 let userActionCount = 0;
@@ -1247,20 +1297,37 @@ function isPeriodInputEditing(){
 
 async function persistToday(){
   const ym = ymKey(cur);
-  clearTimeout(saveTimers[ym]);
-  return new Promise(resolve => {
+  if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
+
+  return new Promise((resolve,reject) => {
+    if(!saveWaiters[ym]) saveWaiters[ym] = [];
+    saveWaiters[ym].push({resolve,reject});
+
     saveTimers[ym] = setTimeout(async () => {
-      await saveMonth(ym);
-      resolve();
+      delete saveTimers[ym];
+      try{
+        const result = await saveMonth(ym);
+        settleSaveWaiters(ym, null, result);
+      }catch(e){
+        settleSaveWaiters(ym, e, false);
+      }
     }, 400);
   });
 }
 
 async function persistTodayImmediate(){
   const ym = ymKey(cur);
-  clearTimeout(saveTimers[ym]);
+  if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
   delete saveTimers[ym];
-  return await saveMonth(ym);
+
+  try{
+    const result = await saveMonth(ym);
+    settleSaveWaiters(ym, null, result);
+    return result;
+  }catch(e){
+    settleSaveWaiters(ym, e, false);
+    throw e;
+  }
 }
 
 function showToast(msg){
@@ -3604,7 +3671,7 @@ async function deleteAllStudyRecords(){
     await cloudClearActiveTimerIfMine();
   }
 
-  Object.keys(saveTimers).forEach(k=>{ clearTimeout(saveTimers[k]); delete saveTimers[k]; });
+  cancelPendingSaves();
 
   monthCache = {};
   cur = logicalToday();
@@ -3663,6 +3730,45 @@ setInterval(async ()=>{
 
 let sbClient = null;
 let cloudUser = null;
+let cloudDataOwnerId = null;
+let cloudSessionEpoch = 0;
+
+function resetCloudAccountState(){
+  cloudSessionEpoch++;
+  cancelPendingSaves();
+  monthCache = {};
+  lastMonthSyncAt = null;
+  periodRenderPending = false;
+  try{ stopActiveTimerRealtime(); }catch(_){}
+}
+
+function setCloudUser(nextUser){
+  const next = nextUser || null;
+  const nextId = next?.id || null;
+
+  if(cloudDataOwnerId !== nextId){
+    resetCloudAccountState();
+    cloudDataOwnerId = nextId;
+  }
+
+  cloudUser = next;
+  return cloudUser;
+}
+
+function advanceLastMonthSyncAtFromRows(rows){
+  let maxMs = Number.isFinite(Date.parse(lastMonthSyncAt || ''))
+    ? Date.parse(lastMonthSyncAt)
+    : -Infinity;
+
+  for(const row of (rows || [])){
+    const ms = Date.parse(row?.updated_at || '');
+    if(Number.isFinite(ms) && ms > maxMs) maxMs = ms;
+  }
+
+  if(Number.isFinite(maxMs)){
+    lastMonthSyncAt = new Date(maxMs).toISOString();
+  }
+}
 
 function initSupabase(){
   if(sbClient) return true;
@@ -3682,10 +3788,10 @@ function initSupabase(){
 async function refreshCloudStatus(){
   const status = $('#cloudStatus');
   if(!sbClient && !initSupabase()){
-    cloudUser = null; status.textContent='설정 안 됨'; $('#cloudLogout').style.display='none'; return;
+    setCloudUser(null); status.textContent='설정 안 됨'; $('#cloudLogout').style.display='none'; return;
   }
   const {data:{session}} = await sbClient.auth.getSession();
-  cloudUser = session?.user || null;
+  setCloudUser(session?.user || null);
   status.textContent = cloudUser ? `연결됨 · ${cloudUser.email || '사용자'}` : '로그인 필요';
   $('#cloudLogout').style.display = cloudUser ? '' : 'none';
 }
@@ -3695,11 +3801,15 @@ function sleepLocalYm(v){ return String(v||'').startsWith('S:') ? String(v).slic
 
 async function cloudSaveMonth(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
+  const userId = cloudUser.id;
+  const sessionEpoch = cloudSessionEpoch;
   let local = ensureMonthSync(deepClone(monthCache[ym]), ym);
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
+    if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
     const {data:rows,error:readErr} = await sbClient.from('study_months')
-      .select('data,updated_at,deleted_at').eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym)).limit(1);
+      .select('data,updated_at,deleted_at').eq('user_id',userId).eq('ym',sleepCloudYm(ym)).limit(1);
+    if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
     if(readErr){
       console.error('클라우드 저장 전 읽기 실패:', readErr);
       throw new Error('study_months 저장 전 읽기 실패: ' + (readErr.message||readErr.code||String(readErr)));
@@ -3707,22 +3817,19 @@ async function cloudSaveMonth(ym){
     const row = rows && rows[0];
     if(row?.deleted_at){
       const delTs = Date.parse(row.deleted_at);
-      const localHasPeriods = Object.keys(local).some(dk => {
-        const day = local[dk];
-        return day && Array.isArray(day.periods) && day.periods.length > 0;
-      });
-      if(!localHasPeriods && !hasPeriodCreatedAfter(local, delTs)){
+      local = keepOnlyPeriodsCreatedAfter(local, delTs);
+      if(!hasPeriodCreatedAfter(local, delTs)){
         delete monthCache[ym];
         throw new Error('이 달의 기록이 다른 기기에서 삭제되었습니다.');
       }
       const nowIso2 = new Date(serverNowMs()).toISOString();
       let q2 = sbClient.from('study_months').update({data:local, deleted_at:null, updated_at:nowIso2})
-        .eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym));
+        .eq('user_id',userId).eq('ym',sleepCloudYm(ym));
       if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
       const {data:w2,error:wErr2} = await q2.select('updated_at');
       if(!wErr2 && w2 && w2.length){
-        const current = ensureMonthSync(monthCache[ym] || {}, ym);
-        monthCache[ym] = mergeMonths(local, current, ym);
+        if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
+        monthCache[ym] = local;
         return;
       }
       lastSaveErr = wErr2 || new Error('삭제 후 재생성 실패');
@@ -3734,18 +3841,19 @@ async function cloudSaveMonth(ym){
     let writeOk=false;
     if(row){
       let q = sbClient.from('study_months').update({data:merged,updated_at:nowIso})
-        .eq('user_id',cloudUser.id).eq('ym',sleepCloudYm(ym));
+        .eq('user_id',userId).eq('ym',sleepCloudYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
       if(!wErr && w && w.length){ writeOk=true; }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
-      const {error:iErr} = await sbClient.from('study_months').insert({user_id:cloudUser.id,ym:sleepCloudYm(ym),data:merged,updated_at:nowIso});
+      const {error:iErr} = await sbClient.from('study_months').insert({user_id:userId,ym:sleepCloudYm(ym),data:merged,updated_at:nowIso});
       if(!iErr) writeOk=true;
       else { lastSaveErr=iErr; console.warn('동기화 신규 저장 재시도:', iErr.message); }
     }
     if(writeOk){
+      if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
       const current = ensureMonthSync(monthCache[ym] || {}, ym);
       monthCache[ym] = mergeMonths(merged, current, ym);
       return;
@@ -3756,59 +3864,107 @@ async function cloudSaveMonth(ym){
   throw new Error('study_months 저장 실패(' + ym + '): ' + (lastSaveErr?.message || lastSaveErr?.code || '원인 불명'));
 }
 
+
+async function applyRemoteDeletedMonth(ym, deletedAt){
+  const delTs = Date.parse(deletedAt || '');
+  const existing = monthCache[ym];
+
+  if(!existing || !Number.isFinite(delTs)){
+    delete monthCache[ym];
+    return true;
+  }
+
+  const kept = keepOnlyPeriodsCreatedAfter(existing, delTs);
+  if(!hasPeriodCreatedAfter(kept, delTs)){
+    delete monthCache[ym];
+    return true;
+  }
+
+  monthCache[ym] = ensureMonthSync(kept, ym);
+
+  try{
+    await cloudSaveMonth(ym);
+    return true;
+  }catch(e){
+    console.warn('삭제 이후 생성한 로컬 기록 보존 실패:', ym, e);
+    return false;
+  }
+}
+
 async function uploadAllToCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
+  const userId = cloudUser.id;
+  const sessionEpoch = cloudSessionEpoch;
   const backup = collectBackupData();
   const months = Object.entries(backup.months);
   if(months.length===0){ showToast('저장할 기록이 없어요'); return; }
   for(const [ym,data] of months){
+    if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
     monthCache[ym]=ensureMonthSync(deepClone(data),ym);
-    await cloudSaveMonth(ym); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
+    await cloudSaveMonth(ym);
   }
   showToast('전체 기록을 병합해서 클라우드에 저장했어요');
 }
 
 async function autoSyncFromCloud(lockOwned=false){
   if(!sbClient || !cloudUser) return;
+
   if(userActionCount > 0){
     periodRenderPending = true;
     return;
   }
+
+  const userId = cloudUser.id;
+  const sessionEpoch = cloudSessionEpoch;
+
   if(!lockOwned){
     if(fullCloudSyncRunning) return;
     fullCloudSyncRunning = true;
   }
+
   try{
-const {data,error} = await sbClient.from('study_months').select('ym,data,updated_at,deleted_at').eq('user_id',cloudUser.id).like('ym','S:%').gt('updated_at', lastMonthSyncAt || '1970-01-01T00:00:00Z').order('ym');
-  if(error){
-    console.error('자동 동기화 불러오기 실패:', error);
-    throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
-  }
-  if(userActionCount > 0){
-    periodRenderPending = true;
-    return;
-  }
-  const sleepRows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:')); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
+    const {data,error} = await sbClient.from('study_months').select('ym,data,updated_at,deleted_at').eq('user_id',userId).like('ym','S:%').gt('updated_at', lastMonthSyncAt || '1970-01-01T00:00:00Z').order('ym');
 
-  for(const row of sleepRows){
-    const ym=sleepLocalYm(row.ym);
-    if(!ym) continue;
-    if(row.deleted_at){
-      delete monthCache[ym];
-      continue;
+    if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
+
+    if(error){
+      console.error('자동 동기화 불러오기 실패:', error);
+      throw new Error('study_months 불러오기 실패: ' + (error.message||error.code||String(error)));
     }
-    const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
-    const existing=monthCache[ym];
-    monthCache[ym]= existing ? mergeMonths(existing, remoteNorm, ym) : remoteNorm;
-  }
-  enforceStudyDayLimit();
-  if(isPeriodInputEditing() || userActionCount > 0){
-    periodRenderPending = true;
-  }else{
-    periodRenderPending = false;
-    await renderCurrentView();
-  }
 
+    if(userActionCount > 0){
+      periodRenderPending = true;
+      return;
+    }
+
+    const rows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:'));
+    let rowsApplied = true;
+
+    for(const row of rows){
+      const ym=sleepLocalYm(row.ym);
+      if(!ym) continue;
+
+      if(row.deleted_at){
+        const ok = await applyRemoteDeletedMonth(ym, row.deleted_at);
+        if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
+        if(!ok) rowsApplied = false;
+        continue;
+      }
+
+      const remoteNorm=ensureMonthSync(deepClone(row.data||{}),ym);
+      const existing=monthCache[ym];
+      monthCache[ym]= existing ? mergeMonths(existing, remoteNorm, ym) : remoteNorm;
+    }
+
+    if(rowsApplied) advanceLastMonthSyncAtFromRows(rows);
+
+    enforceStudyDayLimit();
+    if(isPeriodInputEditing() || userActionCount > 0){
+      periodRenderPending = true;
+    }else{
+      periodRenderPending = false;
+      await renderCurrentView();
+    }
   }finally{
     if(!lockOwned) fullCloudSyncRunning = false;
   }
@@ -3816,16 +3972,39 @@ const {data,error} = await sbClient.from('study_months').select('ym,data,updated
 
 async function downloadAllFromCloud(){
   if(!cloudUser){ alert('먼저 클라우드에 로그인해 주세요.'); return; }
-  const {data,error} = await sbClient.from('study_months').select('ym,data').eq('user_id',cloudUser.id).order('ym');
-  if(error){ alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)'); return; }
-  const sleepRows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:')); lastMonthSyncAt = new Date(serverNowMs() - 5000).toISOString();
-  if(sleepRows.length===0){ showToast('클라우드에 저장된 기록이 없어요'); return; }
+
+  const userId = cloudUser.id;
+  const sessionEpoch = cloudSessionEpoch;
+
+  const {data,error} = await sbClient.from('study_months')
+    .select('ym,data,updated_at,deleted_at')
+    .eq('user_id',userId)
+    .order('ym');
+
+  if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
+
+  if(error){
+    alert('클라우드 불러오기 실패: '+(error.message||error.code||error)+'\n(RLS 정책 또는 로그인 상태를 확인하세요)');
+    return;
+  }
+
+  const rows=(data||[]).filter(row=>String(row.ym||'').startsWith('S:'));
+  const liveRows=rows.filter(row=>!row.deleted_at);
+
+  if(liveRows.length===0){
+    showToast('클라우드에 저장된 기록이 없어요');
+    return;
+  }
+
   if(!(await askConfirm('클라우드 기록으로 이 브라우저의 수면 기록을 교체할까요?', true))) return;
+  if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
+
   monthCache={};
-  sleepRows.forEach(row=>{
+  liveRows.forEach(row=>{
     const ym=sleepLocalYm(row.ym);
     if(ym) monthCache[ym]=ensureMonthSync(deepClone(row.data||{}),ym);
   });
+  advanceLastMonthSyncAtFromRows(rows);
   enforceStudyDayLimit();
   await renderCurrentView();
   showToast('클라우드 기록을 불러왔어요');
@@ -3838,7 +4017,7 @@ $('#cloudSignUp').onclick = async () => {
   if(!email || password.length<6){ alert('이메일과 6자 이상의 비밀번호를 입력해 주세요.'); return; }
   const {data,error}=await sbClient.auth.signUp({email,password});
   if(error){ alert('회원가입 실패: '+error.message); return; }
-  cloudUser=data.user || null;
+  setCloudUser(data.user || null);
   await refreshCloudStatus();
   alert(data.session ? '회원가입과 로그인이 완료됐어요.' : '회원가입됐어요. Supabase 설정에 따라 이메일 확인 후 로그인해 주세요.');
 };
@@ -3847,7 +4026,7 @@ $('#cloudLogin').onclick = async () => {
   const email=$('#cloudEmail').value.trim(), password=$('#cloudPassword').value;
   const {data,error}=await sbClient.auth.signInWithPassword({email,password});
   if(error){ alert('로그인 실패: '+error.message); return; }
-  cloudUser=data.user;
+  setCloudUser(data.user);
   await refreshCloudStatus();
   await autoSyncFromCloud();
   showToast('클라우드에 로그인했어요');
@@ -3906,7 +4085,7 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
       authData = data;
     }
 
-    cloudUser = authData?.session?.user || authData?.user || null;
+    setCloudUser(authData?.session?.user || authData?.user || null);
     await refreshCloudStatus();
 
     if(cloudUser){
@@ -3928,7 +4107,11 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
 
 $('#cloudLogout').onclick = async () => {
   if(sbClient) await sbClient.auth.signOut();
-  cloudUser=null; await refreshCloudStatus(); showToast('로그아웃했어요');
+  setCloudUser(null);
+  await refreshCloudStatus();
+  enforceStudyDayLimit();
+  await renderCurrentView();
+  showToast('로그아웃했어요');
 };
 let fullCloudSyncRunning = false;
 
@@ -3948,7 +4131,7 @@ if(sbClient){
     __authBusy = true;
     setTimeout(async () => {
       try {
-    cloudUser = session?.user || null;
+    setCloudUser(session?.user || null);
     const status = $('#cloudStatus');
     if(status){
       status.textContent = cloudUser ? `연결됨 · ${cloudUser.email || '사용자'}` : '로그인 필요';
@@ -3973,6 +4156,8 @@ if(sbClient){
       }
 } else if(!cloudUser){
   stopActiveTimerRealtime();
+  enforceStudyDayLimit();
+  await renderCurrentView();
 }
   } finally {
     __authBusy = false;
@@ -4276,18 +4461,28 @@ function __scheduleRtRender(){
     await renderCurrentView();
   }, 250);
 }
-function applyRealtimeMonthRow(payload){
+async function applyRealtimeMonthRow(payload){
   try{
     const row = payload?.new;
     if(!row){ autoSyncFromCloud(); return; }
+
+    if(row.user_id && cloudUser?.id && String(row.user_id) !== String(cloudUser.id)) return;
+
     const ymRaw = String(row.ym || '');
     if(!ymRaw.startsWith('S:')) return;
-    const ym = ymRaw.slice(2);
-    if(!/^\d{4}-\d{2}$/.test(ym)) return;
-    if(row.deleted_at){ delete monthCache[ym]; __scheduleRtRender(); return; }
-    if(!row.data || typeof row.data !== 'object' || Array.isArray(row.data)){
-      autoSyncFromCloud(); return;
+    const ym = sleepLocalYm(ymRaw);
+    if(!ym) return;
+    if(row.deleted_at){
+      await applyRemoteDeletedMonth(ym, row.deleted_at);
+      __scheduleRtRender();
+      return;
     }
+
+    if(!row.data || typeof row.data !== 'object' || Array.isArray(row.data)){
+      autoSyncFromCloud();
+      return;
+    }
+
     const remote = ensureMonthSync(deepClone(row.data || {}), ym);
     const existing = monthCache[ym];
     monthCache[ym] = existing ? mergeMonths(existing, remote, ym) : remote;
@@ -4297,6 +4492,7 @@ function applyRealtimeMonthRow(payload){
     autoSyncFromCloud();
   }
 }
+
 function startActiveTimerRealtime(){
   if(!sbClient || !cloudUser || activeTimerRealtimeChannel) return;
   try{
@@ -4310,7 +4506,7 @@ function startActiveTimerRealtime(){
       .on(
         'postgres_changes',
         {event:'*',schema:'public',table:'study_months',filter:`user_id=eq.${cloudUser.id}`},
-        (payload)=>applyRealtimeMonthRow(payload)
+        (payload)=>{ void applyRealtimeMonthRow(payload); }
       )
       .subscribe();
   }catch(e){
@@ -4405,33 +4601,7 @@ async function collectBackupData(){
   };
 }
 
-(() => {
-  const _b = document.getElementById('backupData');
-  const _r = document.getElementById('restoreData');
-  const _f = document.getElementById('restoreFile');
-  if (!_b || !_r || !_f) { console.info('[sleep] 백업/복원 UI 없음 — skip'); return; }
 
-$('#backupData').onclick = () => {
-  const data = collectBackupData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `sleep-log-backup-${ymd(new Date())}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-showToast('백업 파일을 저장했어요');
-};
-
-$('#restoreData').onclick = () => $('#restoreFile').click();
-
-$('#restoreFile').addEventListener('change', async (e) => {
-  alert('복원은 홈 화면의 데이터 복원 버튼을 사용해주세요.');
-  e.target.value = '';
-});
-})();
 
 renderDay();
 </script>
@@ -4560,6 +4730,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
-<div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
+
 </body>
 </html>
