@@ -4325,7 +4325,12 @@ initSupabase();
 
 // 로그인 세션을 계속 유지하고, 세션이 복원/갱신될 때 자동으로 상태와 데이터를 맞춘다.
 if(sbClient){
-  sbClient.auth.onAuthStateChange(async (event, session) => {
+  let __authBusy = false;
+  sbClient.auth.onAuthStateChange((event, session) => {
+    if(__authBusy) return;
+    __authBusy = true;
+    setTimeout(async () => {
+      try {
     cloudUser = session?.user || null;
     const status = $('#cloudStatus');
     if(status){
@@ -4352,10 +4357,14 @@ if(sbClient){
         enforceStudyDayLimit();
         await renderCurrentView();
       }
-    } else if(!cloudUser){
-      stopActiveTimerRealtime();
-    }
-  });
+} else if(!cloudUser){
+  stopActiveTimerRealtime();
+}
+  } finally {
+    __authBusy = false;
+  }
+}, 0);
+});
 }
 
 (async () => {
@@ -4464,6 +4473,11 @@ async function cloudCancelActiveTimerStart(ym, dayKey, periodId){
     p_period_id: String(periodId || '')
   });
   if(error){
+    if(error.code === 'P0001' || String(error.message||'').includes('active timer not found')){
+      console.warn('서버 타이머가 이미 취소되었거나 존재하지 않습니다.');
+      activeTimerLastFingerprint = '';
+      return null;
+    }
     console.error('서버 타이머 시작 취소 실패:', error);
     showToast('서버 타이머 시작 취소 실패');
     throw error;

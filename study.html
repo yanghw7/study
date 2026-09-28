@@ -4204,6 +4204,11 @@ async function cloudCancelActiveTimerStart(ym, dayKey, periodId){
     p_period_id: String(periodId || '')
   });
   if(error){
+    if(error.code === 'P0001' || String(error.message||'').includes('active timer not found')){
+      console.warn('서버 타이머가 이미 취소되었거나 존재하지 않습니다.');
+      activeTimerLastFingerprint = '';
+      return null;
+    }
     console.error('서버 타이머 시작 취소 실패:', error);
     showToast('서버 타이머 시작 취소 실패');
     throw error;
