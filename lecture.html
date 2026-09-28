@@ -761,6 +761,21 @@ body{background:#f7f5fb!important}
 <style id="locked-card-style">
 .period-card.locked-card{opacity:.5;pointer-events:none;}
 </style>
+
+<!-- DEV ONLY: Eruda mobile developer console -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>
+eruda.init();
+(function paintErudaLauncherBlue(){
+  const paint = () => {
+    const el = document.querySelector('.eruda-entry-btn');
+    if(el){ el.style.setProperty('background', '#1976d2', 'important'); return true; }
+    return false;
+  };
+  if(!paint()) setTimeout(paint, 300);
+  setTimeout(paint, 1000);
+})();
+</script>
 </head>
 
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
