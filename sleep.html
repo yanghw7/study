@@ -828,10 +828,6 @@ body{background:#EEF3F8!important}
   font-size:19px!important;
 }
 </style>
-
-<!-- DEV ONLY: Eruda mobile developer console -->
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
 </head>
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
 <div id="pullRefresh" class="pull-refresh" aria-hidden="true">↓ 당겨서 동기화</div>
@@ -3681,17 +3677,7 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,10px)';
-      Promise.resolve()
-        .then(() => runManualCloudSync(true))
-        .then(ok => {
-          if(ok) showToast('↕ 스와이프 동기화 성공');
-          else showToast('↕ 스와이프 동기화 실패');
-        })
-        .catch(e => {
-          console.error('스와이프 동기화 실패:', e);
-          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
-        })
-        .finally(() => { refreshing = false; reset(); });
+      location.reload();
     }else{
       reset();
     }
@@ -3759,17 +3745,7 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,0px)';
-      Promise.resolve()
-        .then(() => runManualCloudSync(true))
-        .then(ok => {
-          if(ok) showToast('↕ 스와이프 동기화 성공');
-          else showToast('↕ 스와이프 동기화 실패');
-        })
-        .catch(e => {
-          console.error('스와이프 동기화 실패:', e);
-          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
-        })
-        .finally(() => { refreshing = false; reset(); });
+      location.reload();
     } else reset();
   }, {passive:true});
   document.addEventListener('touchcancel', reset, {passive:true});
@@ -4367,7 +4343,7 @@ async function runManualCloudSync(fromSwipe=false){
 
 $('#cloudUpload').onclick = uploadAllToCloud;
 $('#cloudDownload').onclick = downloadAllFromCloud;
-$('#cloudSync').onclick = runManualCloudSync;
+$('#cloudSync').onclick = () => location.reload();
 
 
 // PWA Service Worker는 수면 횟수 하단에서 등록합니다.
@@ -4627,7 +4603,10 @@ async function applyActiveTimerRow(row){
     await autoSyncFromCloud();
     found = findPeriodForActiveTimer(row);
   }
-  if(!found){ if (window.isCleaningOrphan) return false; window.isCleaningOrphan = true; console.warn('[orphan] 수면 타이머 정리'); try{ await cloudClearActiveTimerIfMine(); }catch(_){} finally { window.isCleaningOrphan = false; } if(window.parent !== window){ window.parent.postMessage({type:'exclusive-session-ended', kind:'sleep'}, location.origin); } return false; }
+  if(!found){
+    console.warn('[pending] 수면 데이터 대기 중 (재시도 예정)');
+    return false;
+  }
 
   const started = Date.parse(row.started_at);
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;

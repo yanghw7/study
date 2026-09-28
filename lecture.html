@@ -761,10 +761,6 @@ body{background:#f7f5fb!important}
 <style id="locked-card-style">
 .period-card.locked-card{opacity:.5;pointer-events:none;}
 </style>
-
-<!-- DEV ONLY: Eruda mobile developer console -->
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
 </head>
 
 <body><div id="pullRefreshBlur" class="pull-refresh-blur" aria-hidden="true"></div>
@@ -3636,17 +3632,7 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,10px)';
-      Promise.resolve()
-        .then(() => runManualCloudSync(true))
-        .then(ok => {
-          if(ok) showToast('↕ 스와이프 동기화 성공');
-          else showToast('↕ 스와이프 동기화 실패');
-        })
-        .catch(e => {
-          console.error('스와이프 동기화 실패:', e);
-          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
-        })
-        .finally(() => { refreshing = false; reset(); });
+      location.reload();
     }else{
       reset();
     }
@@ -3714,17 +3700,7 @@ function showChartTooltip(bar, clientX, clientY){
       indicator.classList.add('show','ready');
       indicator.textContent = '↻ 동기화 중…';
       indicator.style.transform = 'translate(-50%,0px)';
-      Promise.resolve()
-        .then(() => runManualCloudSync(true))
-        .then(ok => {
-          if(ok) showToast('↕ 스와이프 동기화 성공');
-          else showToast('↕ 스와이프 동기화 실패');
-        })
-        .catch(e => {
-          console.error('스와이프 동기화 실패:', e);
-          showToast('↕ 스와이프 동기화 실패: ' + (e?.message || String(e)));
-        })
-        .finally(() => { refreshing = false; reset(); });
+      location.reload();
     } else reset();
   }, {passive:true});
   document.addEventListener('touchcancel', reset, {passive:true});
@@ -4320,7 +4296,7 @@ async function runManualCloudSync(fromSwipe=false){
 
 $('#cloudUpload').onclick = uploadAllToCloud;
 $('#cloudDownload').onclick = downloadAllFromCloud;
-$('#cloudSync').onclick = runManualCloudSync;
+$('#cloudSync').onclick = () => location.reload();
 
 
 // PWA Service Worker는 강의 횟수 하단에서 등록합니다.
