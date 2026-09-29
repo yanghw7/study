@@ -630,7 +630,14 @@
     let ch = null;
     let chGeneration = 0;
     let realtimeRetryTimer = null;
+    let realtimeStableResetTimer = null;
     let realtimeSubscribed = false;
+    let realtimeRetryDelayMs = 5000;
+    let lastSubscribeRecoveryAt = 0;
+
+    const REALTIME_RETRY_MAX_MS = 5 * 60 * 1000;
+    const REALTIME_STABLE_RESET_MS = 60 * 1000;
+    const SUBSCRIBE_RECOVERY_THROTTLE_MS = 60 * 1000;
 
     function updateSyncConnectionStatus(){
       const el = document.getElementById('syncConnectionStatus');
@@ -799,10 +806,23 @@
       }
     }
 
-    function scheduleRealtimeRetry(delay=5000){
+    function clearRealtimeStableReset(){
+      if(realtimeStableResetTimer){
+        clearTimeout(realtimeStableResetTimer);
+        realtimeStableResetTimer = null;
+      }
+    }
+
+    function scheduleRealtimeRetry(){
       clearRealtimeRetry();
+      if(navigator.onLine === false || document.visibilityState === 'hidden') return;
+
+      const delay = realtimeRetryDelayMs;
+      realtimeRetryDelayMs = Math.min(realtimeRetryDelayMs * 2, REALTIME_RETRY_MAX_MS);
+
       realtimeRetryTimer = setTimeout(()=>{
         realtimeRetryTimer = null;
+        if(navigator.onLine === false || document.visibilityState === 'hidden') return;
         startRealtime(0);
       }, delay);
     }
@@ -978,6 +998,9 @@
 
     async function stopRealtime(){
       clearRealtimeRetry();
+      clearRealtimeStableReset();
+      realtimeRetryDelayMs = 5000;
+      lastSubscribeRecoveryAt = 0;
       stopCentralPollTimer();
       chGeneration++;
 
@@ -1005,6 +1028,7 @@
     function startRealtime(retry=0){
       const sb = initSettingsClient();
       if(!sb || ch) return;
+      if(navigator.onLine === false || document.visibilityState === 'hidden') return;
 
       const generation = ++chGeneration;
 
@@ -1078,14 +1102,28 @@
           if(status === 'SUBSCRIBED'){
             realtimeSubscribed = true;
             updateSyncConnectionStatus();
-            void fetchOnce(true, true);
-            void calibrateCentralServerClock(false);
-            void centralPoll(true);
+
+            clearRealtimeStableReset();
+            realtimeStableResetTimer = setTimeout(()=>{
+              realtimeStableResetTimer = null;
+              if(ch === next && realtimeSubscribed){
+                realtimeRetryDelayMs = 5000;
+              }
+            }, REALTIME_STABLE_RESET_MS);
+
+            const now = Date.now();
+            if(now - lastSubscribeRecoveryAt >= SUBSCRIBE_RECOVERY_THROTTLE_MS){
+              lastSubscribeRecoveryAt = now;
+              void fetchOnce(true, true);
+              void calibrateCentralServerClock(false);
+              void centralPoll(true);
+            }
             return;
           }
 
           if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
             realtimeSubscribed = false;
+            clearRealtimeStableReset();
             updateSyncConnectionStatus();
             ch = null;
 
@@ -1095,14 +1133,14 @@
               })
               .finally(()=>{
                 if(generation === chGeneration){
-                  scheduleRealtimeRetry(5000);
+                  scheduleRealtimeRetry();
                 }
               });
           }
         });
       }).catch(()=>{
         if(generation === chGeneration && !ch){
-          scheduleRealtimeRetry(5000);
+          scheduleRealtimeRetry();
         }
       });
     }
@@ -1145,14 +1183,18 @@
     startRealtime();
 
     document.addEventListener('visibilitychange', ()=>{
-      if(document.visibilityState === 'visible'){
-        void fetchOnce(false, false);
-        void calibrateCentralServerClock(false);
-        void centralPoll(false);
+      if(document.visibilityState === 'hidden'){
+        clearRealtimeRetry();
+        return;
       }
+      if(navigator.onLine !== false && !ch) startRealtime(0);
+      void fetchOnce(false, false);
+      void calibrateCentralServerClock(false);
+      void centralPoll(false);
     });
 
     window.addEventListener('pageshow', ()=>{
+      if(navigator.onLine !== false && !ch && document.visibilityState !== 'hidden') startRealtime(0);
       void fetchOnce(false, false);
       void calibrateCentralServerClock(false);
       void centralPoll(false);
@@ -1161,11 +1203,13 @@
     // Network can recover while the app stays visible, so do not wait for
     // visibility/pageshow or the next periodic poll. Reconcile immediately.
     window.addEventListener('offline', ()=>{
+      clearRealtimeRetry();
       updateSyncConnectionStatus();
     });
 
     window.addEventListener('online', ()=>{
       updateSyncConnectionStatus();
+      if(document.visibilityState === 'hidden') return;
       if(!ch) startRealtime(0);
       void fetchOnce(false, true);
       void calibrateCentralServerClock(false);
