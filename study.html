@@ -4243,11 +4243,22 @@ async function cloudClearActiveTimerIfMine(){
   if(!sbClient || !cloudUser) return;
   try{
     const {data,error:readErr} = await sbClient.from('active_timer')
-      .select('ym').eq('user_id',cloudUser.id).maybeSingle();
+      .select('ym,day_key,period_id,started_at').eq('user_id',cloudUser.id).maybeSingle();
     if(readErr){ console.warn('active_timer 조회 실패:', readErr); return; }
     const ym = String(data?.ym || '');
     if(!/^\d{4}-\d{2}$/.test(ym)) return;
-    const {error} = await sbClient.from('active_timer').delete().eq('user_id',cloudUser.id);
+    if(!data?.started_at) return;
+
+    let q = sbClient.from('active_timer').delete()
+      .eq('user_id',cloudUser.id)
+      .eq('ym',ym)
+      .eq('started_at',data.started_at);
+    if(data?.day_key == null) q = q.is('day_key', null);
+    else q = q.eq('day_key', data.day_key);
+    if(data?.period_id == null) q = q.is('period_id', null);
+    else q = q.eq('period_id', data.period_id);
+
+    const {error} = await q;
     if(error) console.warn('서버 타이머 삭제 실패:', error);
     else activeTimerLastFingerprint = '';
   }catch(e){

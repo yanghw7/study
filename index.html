@@ -230,6 +230,15 @@
   const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
   let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
   let sharedSettingsLoaded=false;
+  let sharedSettingsUserId=null;
+  let sharedSettingsRowExists=false;
+
+  function resetSharedSettingsCache(userId=null){
+    sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
+    sharedSettingsLoaded=false;
+    sharedSettingsUserId=userId ? String(userId) : null;
+    sharedSettingsRowExists=false;
+  }
   window.getSupabaseClient = () => initSettingsClient();
   function initSettingsClient(){
     if(sbSettingsClient) return sbSettingsClient;
@@ -248,19 +257,29 @@
   }
   async function loadSharedSettingsFromCloud(){
     const sb=initSettingsClient();
-    if(!sb) return {...SHARED_SETTINGS_DEFAULT};
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session?.user){
-      sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
+    if(!sb){
       sharedSettingsLoaded=false;
-      return {...SHARED_SETTINGS_DEFAULT};
+      return {...sharedSettingsCache};
     }
+    const {data:{session}}=await sb.auth.getSession();
+    const user=session?.user;
+    if(!user){
+      resetSharedSettingsCache(null);
+      return {...sharedSettingsCache};
+    }
+
+    const uid=String(user.id);
+    if(sharedSettingsUserId!==uid){
+      resetSharedSettingsCache(uid);
+    }
+
     const {data,error}=await sb.from('journal_settings')
       .select('day_start_hour,pending_day_start,week_start_day')
-      .eq('user_id',session.user.id).maybeSingle();
+      .eq('user_id',uid).maybeSingle();
     if(error){
-      console.warn('설정 로드 실패, 기본값 사용:',error);
-      return {...SHARED_SETTINGS_DEFAULT};
+      sharedSettingsLoaded=false;
+      console.warn('설정 로드 실패, 기존 캐시 유지:',error);
+      return {...sharedSettingsCache};
     }
     const norm={
       dayStartHour:Number.isInteger(data?.day_start_hour)&&data.day_start_hour>=0&&data.day_start_hour<=11?data.day_start_hour:SHARED_SETTINGS_DEFAULT.dayStartHour,
@@ -268,6 +287,8 @@
       pendingDayStart:data?.pending_day_start||null
     };
     sharedSettingsCache=norm;
+    sharedSettingsUserId=uid;
+    sharedSettingsRowExists=!!data;
     sharedSettingsLoaded=true;
     return norm;
   }
@@ -287,7 +308,6 @@
     try{
       if(!sharedSettingsLoaded){
         await loadSharedSettingsFromCloud();
-        sharedSettingsLoaded = true;
       }
       ev.source?.postMessage({
         type:'journal-shared-settings-changed',
@@ -300,18 +320,49 @@
     if(!sb) throw new Error('클라우드 연결 실패');
     const {data:{session}}=await sb.auth.getSession();
     if(!session?.user) throw new Error('로그인이 필요합니다. 설정은 클라우드에만 저장됩니다.');
-    const current=await readSharedSettings();
+
+    const uid=String(session.user.id);
+    if(sharedSettingsUserId!==uid){
+      resetSharedSettingsCache(uid);
+    }
+    if(!sharedSettingsLoaded){
+      await loadSharedSettingsFromCloud();
+    }
+    if(!sharedSettingsLoaded || sharedSettingsUserId!==uid){
+      throw new Error('공통 설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+    }
+
+    const current={...sharedSettingsCache};
     const next={...current,...patch};
-    const payload={
-      user_id:session.user.id,
-      day_start_hour:next.dayStartHour,
-      pending_day_start:next.pendingDayStart??null,
-      week_start_day:next.weekStartDay,
-      updated_at:new Date().toISOString()
-    };
-    const {error}=await sb.from('journal_settings').upsert(payload,{onConflict:'user_id'});
+    const changed={updated_at:new Date().toISOString()};
+    if(Object.prototype.hasOwnProperty.call(patch,'dayStartHour')) changed.day_start_hour=next.dayStartHour;
+    if(Object.prototype.hasOwnProperty.call(patch,'pendingDayStart')) changed.pending_day_start=next.pendingDayStart??null;
+    if(Object.prototype.hasOwnProperty.call(patch,'weekStartDay')) changed.week_start_day=next.weekStartDay;
+
+    let error=null;
+    if(sharedSettingsRowExists){
+      const updated=await sb.from('journal_settings')
+        .update(changed).eq('user_id',uid).select('user_id').maybeSingle();
+      error=updated.error;
+      if(!error && !updated.data){
+        sharedSettingsRowExists=false;
+      }
+    }
+    if(!sharedSettingsRowExists && !error){
+      const payload={
+        user_id:uid,
+        day_start_hour:next.dayStartHour,
+        pending_day_start:next.pendingDayStart??null,
+        week_start_day:next.weekStartDay,
+        updated_at:changed.updated_at
+      };
+      ({error}=await sb.from('journal_settings').upsert(payload,{onConflict:'user_id'}));
+    }
     if(error) throw error;
     sharedSettingsCache=next;
+    sharedSettingsUserId=uid;
+    sharedSettingsRowExists=true;
+    sharedSettingsLoaded=true;
     notifySharedSettings(next);
     return next;
   }
@@ -435,22 +486,8 @@
       try{
         const h=Number(ev.data.hour);
         if(!Number.isInteger(h)||h<0||h>11) return;
-        sharedSettingsCache.dayStartHour=h;
-        sharedSettingsCache.pendingDayStart=null;
-        const sb=initSettingsClient();
-        if(sb){
-          const {data:{session}}=await sb.auth.getSession();
-          if(session?.user){
-            await sb.from('journal_settings').upsert({
-              user_id:session.user.id,
-              day_start_hour:h,
-              pending_day_start:null,
-              updated_at:new Date().toISOString()
-            },{onConflict:'user_id'});
-          }
-        }
+        await writeSharedSettingsToCloud({dayStartHour:h,pendingDayStart:null});
         await paint();
-        notifySharedSettings(sharedSettingsCache);
       }catch(e){ console.warn('[pending-activate] 반영 실패', e); }
     });
 
@@ -591,8 +628,7 @@
 
   loadSharedSettingsFromCloud()
     .then(()=>{
-      sharedSettingsLoaded = true;
-      notifySharedSettings(sharedSettingsCache);
+      if(sharedSettingsLoaded) notifySharedSettings(sharedSettingsCache);
     })
     .catch(e => console.warn('[FIX3] 초기 설정 브로드캐스트 실패', e));
 
@@ -996,7 +1032,7 @@
       }
     }
 
-    async function stopRealtime(){
+    async function stopRealtime(clearUserState=false){
       clearRealtimeRetry();
       clearRealtimeStableReset();
       realtimeRetryDelayMs = 5000;
@@ -1019,10 +1055,12 @@
         }
       }
 
-      resetCentralUser(null);
-      exclusiveActive = null;
-      setExclusiveTabStatus(null);
-      broadcastActiveTimer(null, 'signed-out');
+      if(clearUserState){
+        resetCentralUser(null);
+        exclusiveActive = null;
+        setExclusiveTabStatus(null);
+        broadcastActiveTimer(null, 'signed-out');
+      }
     }
 
     function startRealtime(retry=0){
@@ -1114,7 +1152,7 @@
             const now = Date.now();
             if(now - lastSubscribeRecoveryAt >= SUBSCRIBE_RECOVERY_THROTTLE_MS){
               lastSubscribeRecoveryAt = now;
-              void fetchOnce(true, true);
+              void fetchOnce(false, true);
               void calibrateCentralServerClock(false);
               void centralPoll(true);
             }
@@ -1146,9 +1184,22 @@
     }
 
     window.refreshExclusiveServerState = fetchOnce;
-    window.stopExclusiveTabRealtime = ()=>{ void stopRealtime(); };
+    window.stopExclusiveTabRealtime = ()=>{ void stopRealtime(true); };
     window.restartExclusiveTabRealtime = ()=>{
-      void stopRealtime().finally(()=>startRealtime(0));
+      void stopRealtime(false).finally(()=>startRealtime(0));
+    };
+    window.ensureExclusiveTabRealtimeForUser = (userId)=>{
+      const uid=userId ? String(userId) : null;
+      if(!uid) return;
+
+      if(centralUserId && centralUserId!==uid){
+        void stopRealtime(true).finally(()=>startRealtime(0));
+        return;
+      }
+
+      if(!ch && navigator.onLine!==false && document.visibilityState!=='hidden'){
+        startRealtime(0);
+      }
     };
     window.runCentralJournalSync = ()=>centralPoll(true);
     window.getCentralActiveTimerSnapshot = ()=>{
@@ -1360,12 +1411,21 @@
         if(event === 'TOKEN_REFRESHED') return;
 
         if(event === 'SIGNED_OUT'){
+          resetSharedSettingsCache(null);
           window.stopExclusiveTabRealtime?.();
+          setTimeout(status, 500);
           return;
         }
 
         if(event === 'SIGNED_IN'){
-          window.restartExclusiveTabRealtime?.();
+          const uid=session?.user?.id ? String(session.user.id) : null;
+          if(uid && sharedSettingsUserId!==uid){
+            resetSharedSettingsCache(uid);
+            void loadSharedSettingsFromCloud().then(()=>{
+              if(sharedSettingsLoaded) notifySharedSettings(sharedSettingsCache);
+            }).catch(e=>console.warn('[settings] 계정 전환 후 설정 로드 실패',e));
+          }
+          window.ensureExclusiveTabRealtimeForUser?.(uid);
         }
 
         setTimeout(status, 500);
