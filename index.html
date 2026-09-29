@@ -40,7 +40,7 @@
     .alarmstatusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;min-height:30px}.alarmstatusline:has(#alarmStatus:empty){display:none}#alarmStatus{display:block;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}.alarmstatusline #alarmStop{display:none;height:27px;padding:0 8px;border:1px solid #b42318;border-radius:8px;background:#b42318;color:#fff;font-size:10.5px;font-weight:800;white-space:nowrap}.alarmstatusline #alarmStop.show{display:inline-block}
     @media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmStatus{font-size:13px}}
 
-    .cloudbar{flex:0 0 auto;margin:4px 8px 0;padding:4px 6px;border:1px solid #dbe4e0;border-radius:10px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font:700 10px Inter,system-ui,sans-serif;color:#34423d}.cloudline{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:nowrap}.cloudline strong{font-size:11px;white-space:nowrap}.cloudline button{height:27px;border:1px solid #dbe4e0;border-radius:7px;background:#fff;padding:0 6px;font:800 9px Inter,system-ui,sans-serif;white-space:nowrap;color:#34423d}.cloudline button.primary{background:#285f50;border-color:#285f50;color:#fff}.cloudline input{height:27px;min-width:90px;flex:1;border:1px solid #dbe4e0;border-radius:7px;padding:0 6px;font:700 10px Inter,system-ui,sans-serif}.cloudstatus{margin-left:0;font-size:9px;color:#60706a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.cloudsetup{display:none;margin-top:4px;gap:4px;align-items:center}.cloudsetup.show{display:flex}.cloudlogout{display:none!important}.cloudlogout.show{display:inline-block!important}@media(max-width:560px){.cloudbar{padding:4px 5px}.cloudline{gap:3px}.cloudline strong{font-size:10px}.cloudline button{padding:0 5px;font-size:8.5px}.cloudsetup{flex-wrap:wrap}.cloudsetup input{min-width:0;width:calc(50% - 2px);flex:auto}.cloudstatus{font-size:8.5px}}
+    .cloudbar{flex:0 0 auto;margin:4px 8px 0;padding:4px 6px;border:1px solid #dbe4e0;border-radius:10px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.035);font:700 10px Inter,system-ui,sans-serif;color:#34423d}.cloudline{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:nowrap}.cloudline strong{font-size:11px;white-space:nowrap}.cloudline button{height:27px;border:1px solid #dbe4e0;border-radius:7px;background:#fff;padding:0 6px;font:800 9px Inter,system-ui,sans-serif;white-space:nowrap;color:#34423d}.cloudline button.primary{background:#285f50;border-color:#285f50;color:#fff}.cloudline input{height:27px;min-width:90px;flex:1;border:1px solid #dbe4e0;border-radius:7px;padding:0 6px;font:700 10px Inter,system-ui,sans-serif}.cloudstatus{margin-left:0;font-size:9px;color:#60706a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.sync-connection-status{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;margin:0 5px;font-size:9px;font-weight:850;color:#60706a;white-space:nowrap}.sync-connection-dot{width:8px;height:8px;border-radius:50%;background:#d97706;box-shadow:0 0 0 2px rgba(217,119,6,.10)}.sync-connection-status.online .sync-connection-dot{background:#1f9d63;box-shadow:0 0 0 2px rgba(31,157,99,.10)}.sync-connection-status.offline .sync-connection-dot{background:#d64545;box-shadow:0 0 0 2px rgba(214,69,69,.10)}.cloudsetup{display:none;margin-top:4px;gap:4px;align-items:center}.cloudsetup.show{display:flex}.cloudlogout{display:none!important}.cloudlogout.show{display:inline-block!important}@media(max-width:560px){.cloudbar{padding:4px 5px}.cloudline{gap:3px}.cloudline strong{font-size:10px}.cloudline button{padding:0 5px;font-size:8.5px}.cloudsetup{flex-wrap:wrap}.cloudsetup input{min-width:0;width:calc(50% - 2px);flex:auto}.cloudstatus{font-size:8.5px}}
 
     .shared-settings-btn{font-size:17px!important;padding:0!important;background:#e8eeeb!important;color:#53615c!important}
     .shared-settings-panel{display:none;position:fixed;top:50px;right:8px;z-index:10050;width:min(290px,calc(100vw - 16px));padding:12px;border:1px solid #dbe4e0;border-radius:12px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.16);color:#34423d;max-height:calc(100dvh - 60px);overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -164,6 +164,7 @@
   <div class="cloudbar" id="sharedCloudBar">
     <div class="cloudline">
       <strong>☁ 클라우드</strong><span id="sharedCloudStatus" class="cloudstatus">로그인 확인 중…</span>
+      <span id="syncConnectionStatus" class="sync-connection-status" aria-live="polite"><span class="sync-connection-dot" aria-hidden="true"></span><span id="syncConnectionText">서버 연결 중</span></span>
       <button id="sharedCloudToggle" type="button">로그인</button>
 
       <button id="sharedCloudLogout" class="cloudlogout" type="button">로그아웃</button>
@@ -629,6 +630,28 @@
     let ch = null;
     let chGeneration = 0;
     let realtimeRetryTimer = null;
+    let realtimeSubscribed = false;
+
+    function updateSyncConnectionStatus(){
+      const el = document.getElementById('syncConnectionStatus');
+      const textEl = document.getElementById('syncConnectionText');
+      if(!el || !textEl) return;
+
+      el.classList.remove('online','offline');
+      if(navigator.onLine === false){
+        el.classList.add('offline');
+        textEl.textContent = '오프라인';
+        return;
+      }
+      if(realtimeSubscribed){
+        el.classList.add('online');
+        textEl.textContent = '동기화 연결';
+        return;
+      }
+      textEl.textContent = '서버 연결 중';
+    }
+
+    updateSyncConnectionStatus();
 
     let centralPollTimer = null;
     let centralPollBusy = false;
@@ -960,6 +983,8 @@
 
       const old = ch;
       ch = null;
+      realtimeSubscribed = false;
+      updateSyncConnectionStatus();
 
       if(old){
         const sb = initSettingsClient();
@@ -1051,6 +1076,8 @@
           if(ch !== next) return;
 
           if(status === 'SUBSCRIBED'){
+            realtimeSubscribed = true;
+            updateSyncConnectionStatus();
             void fetchOnce(true, true);
             void calibrateCentralServerClock(false);
             void centralPoll(true);
@@ -1058,6 +1085,8 @@
           }
 
           if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+            realtimeSubscribed = false;
+            updateSyncConnectionStatus();
             ch = null;
 
             Promise.resolve(sb.removeChannel(next))
@@ -1129,6 +1158,20 @@
       void centralPoll(false);
     });
 
+    // Network can recover while the app stays visible, so do not wait for
+    // visibility/pageshow or the next periodic poll. Reconcile immediately.
+    window.addEventListener('offline', ()=>{
+      updateSyncConnectionStatus();
+    });
+
+    window.addEventListener('online', ()=>{
+      updateSyncConnectionStatus();
+      if(!ch) startRealtime(0);
+      void fetchOnce(false, true);
+      void calibrateCentralServerClock(false);
+      void centralPoll(true);
+    });
+
   })();
 
   async function ensureExclusiveFrameLoaded(kind){
@@ -1173,7 +1216,7 @@
       return;
     }
     if(type==='exclusive-session-cancel-start'){
-      window.refreshExclusiveServerState?.(true);
+      window.refreshExclusiveServerState?.(false, true);
       return;
     }
     if(type!=='exclusive-session-start')return;
@@ -1616,7 +1659,7 @@
           ym: r.ym,
           data: r.data,
           deleted_at: r.deleted_at || null,
-          updated_at: r.updated_at || nowIso
+          updated_at: nowIso
         }));
         const { error: insErr } = await sb.from('study_months').upsert(inserts, { onConflict: 'user_id,ym' });
         if(insErr) throw insErr;
