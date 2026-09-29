@@ -2877,6 +2877,16 @@ window.addEventListener('message',async ev=>{
     if(!found) return;
     lastAutoStoppedId=null;
     const {ym,dk,day,p,idx}=found;
+
+    // 다른 기록장 시작 취소로 이 교시가 다시 진행 상태가 되면,
+    // 강제 종료 뒤에 추가된 후속 교시 카드는 모두 닫는다(삭제 처리).
+    // tombstone을 남겨 다른 기기와 동기화할 때 삭제된 카드가 되살아나지 않게 한다.
+    if(Array.isArray(day.periods) && idx >= 0 && idx < day.periods.length - 1){
+      const laterPeriods = day.periods.slice(idx + 1);
+      for(const later of laterPeriods) tombstonePeriod(day, later);
+      day.periods.splice(idx + 1);
+    }
+
     const before=deepClone(p);
     p.endDate=''; p.endTime=''; p.timerEndedAt=null;
     if(cloudUser) await cloudResumeActiveTimer(ym, dk, p, idx);
