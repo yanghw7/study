@@ -1531,11 +1531,58 @@ async function calibrateServerClock(force=false){
   return serverClockOffsetMs;
 }
 
+function recordedStartMsFromFields(p){
+  const dt = periodStartDT(p);
+  const ms = dt ? dt.getTime() : NaN;
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function recordedEndMsFromFields(p){
+  const dt = periodEndDT(p);
+  const ms = dt ? dt.getTime() : NaN;
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+// 시작/종료 입력 필드를 타이머의 1차 기준으로 사용합니다.
+// timerStartedAt/timerEndedAt가 stale해도 사용자가 수정한 완료 기록이 다시 진행 상태로 바뀌지 않습니다.
+function effectiveTimerStartedAt(p){
+  const fieldStart = recordedStartMsFromFields(p);
+  if(fieldStart > 0) return fieldStart;
+  const storedStart = Number(p?.timerStartedAt);
+  return Number.isFinite(storedStart) && storedStart > 0 ? storedStart : 0;
+}
+
+function effectiveTimerEndedAt(p){
+  const start = effectiveTimerStartedAt(p);
+  if(start <= 0) return 0;
+  const fieldEnd = recordedEndMsFromFields(p);
+  if(fieldEnd > 0 && fieldEnd >= start) return fieldEnd;
+  const storedEnd = Number(p?.timerEndedAt);
+  if(Number.isFinite(storedEnd) && storedEnd >= start) return storedEnd;
+  return 0;
+}
+
+function hasRecordedStart(p){
+  return effectiveTimerStartedAt(p) > 0;
+}
+
+function syncTimerAnchorsToFields(p, hadTimerStart = hasRecordedStart(p)){
+  const startMs = recordedStartMsFromFields(p);
+  const endMs = recordedEndMsFromFields(p);
+  if(!hadTimerStart && startMs <= 0){
+    p.timerStartedAt = null;
+    p.timerEndedAt = null;
+    return;
+  }
+  p.timerStartedAt = startMs > 0 ? startMs : null;
+  p.timerEndedAt = endMs > 0 && startMs > 0 && endMs >= startMs ? endMs : null;
+}
+
 function timerElapsedMs(p, nowMs = serverNowMs()){
-  const start = Number(p?.timerStartedAt);
-  if(!Number.isFinite(start) || start <= 0) return 0;
-  const end = Number(p?.timerEndedAt);
-  const until = Number.isFinite(end) && end >= start ? end : nowMs;
+  const start = recordedStartMsFromFields(p) || effectiveTimerStartedAt(p);
+  if(start <= 0) return 0;
+  const end = recordedEndMsFromFields(p);
+  const until = end > 0 ? end : nowMs;
   return Math.max(0, until - start);
 }
 function formatTimer(ms){
@@ -1547,18 +1594,23 @@ function formatTimer(ms){
 }
 function timerPeriodForCurrentDay(){
   const day = getDayData();
-  for(let i=day.periods.length-1; i>=0; i--){
-    const p = day.periods[i];
-    if(Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))){
-      return {p, idx:i, running:true};
-    }
-  }
-  let best = null;
+  let latest = null;
+
+  // 가장 최근 시작시각의 강의 하나를 기준으로 상태를 결정합니다.
+  // 종료시간 필드가 존재하면 timerEndedAt이 stale해도 반드시 종료 상태입니다.
   day.periods.forEach((p, idx)=>{
-    const started = Number(p.timerStartedAt);
-    if(started > 0 && (!best || started > best.started)) best = {p, idx, started, running:false};
+    const started = recordedStartMsFromFields(p);
+    if(started <= 0) return;
+    if(!latest || started > latest.started || (started === latest.started && idx > latest.idx)){
+      latest = {p, idx, started};
+    }
   });
-  return best;
+
+  if(!latest) return null;
+
+  const ended = recordedEndMsFromFields(latest.p);
+  latest.running = !(ended > 0 && ended >= latest.started);
+  return latest;
 }
 
 function wasteTimerForCurrentDay(){
@@ -1568,18 +1620,20 @@ function wasteTimerForCurrentDay(){
   const day = getDayData();
   if(!day.periods.length) return null;
 
-  const running = day.periods.some(p =>
-    Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
-  );
+  const running = day.periods.some(p => {
+    const started = recordedStartMsFromFields(p);
+    const ended = recordedEndMsFromFields(p);
+    return started > 0 && !(ended > 0 && ended >= started);
+  });
   if(running) return null;
 
   for(let i=day.periods.length-1; i>=0; i--){
     const p = day.periods[i];
-    const started = Number(p.timerStartedAt);
-    const ended = Number(p.timerEndedAt);
+    const started = recordedStartMsFromFields(p);
+    const ended = recordedEndMsFromFields(p);
     if(started > 0 && ended >= started){
       const laterStarted = day.periods.slice(i+1).some(x =>
-        Number(x.timerStartedAt) > 0 || !!periodStartDT(x)
+        recordedStartMsFromFields(x) > 0
       );
       if(laterStarted) return null;
       return {p, idx:i, startedAt:ended};
@@ -2021,9 +2075,11 @@ function startBackgroundSensitiveLoops(){
   if(!rolloverCheckId){
     rolloverCheckId = setInterval(()=>{
       const _d = monthCache[ymKey(cur)]?.[dKey(cur)];
-      const _hasRunning = (_d?.periods || []).some(p =>
-        Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))
-      );
+      const _hasRunning = (_d?.periods || []).some(p => {
+        const st = recordedStartMsFromFields(p);
+        const en = recordedEndMsFromFields(p);
+        return st > 0 && !(en > 0 && en >= st);
+      });
       if(_hasRunning) checkStudyDayBoundaryRollover();
     }, 60000);
   }
@@ -2107,7 +2163,7 @@ function syncAndroidTimer(){
 
     if(!info){
       if(lastAndroidTimerKey !== 'clear'){
-        ;
+        window.AndroidTimer.clearTimer('lecture');
         lastAndroidTimerKey = 'clear';
       }
       return;
@@ -2115,27 +2171,42 @@ function syncAndroidTimer(){
 
     const p = info.p;
     const label = `${info.idx+1}강의`;
+    // ★ 알림바도 화면 타이머와 동일하게 날짜/시간 필드를 1차 기준으로 사용
+    const startServerMs = effectiveTimerStartedAt(p);
+    const endServerMs = effectiveTimerEndedAt(p);
 
-    if(info.running && Number(p.timerStartedAt) > 0){
-      const localEpochStarted = Math.round(
-        (Number(p.timerStartedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
-      ) * 1000;
+    if(info.running && Number.isFinite(startServerMs) && startServerMs > 0){
+      const localEpochStarted = localEpochFromServerMs(startServerMs);
       const key = `run:${localEpochStarted}:${label}`;
       if(key !== lastAndroidTimerKey){
         window.AndroidTimer.startTimer('lecture', localEpochStarted, label);
         lastAndroidTimerKey = key;
       }
-    }else if(Number(p.timerStartedAt) > 0){
-      const elapsed = Math.floor(timerElapsedMs(p));
-      const key = `stop:${p.timerStartedAt}`;
+    }else if(Number.isFinite(startServerMs) && startServerMs > 0 && Number.isFinite(endServerMs) && endServerMs > 0){
+      // ★ 종료 후 "경과"도 HTML과 동일한 종료시각을 Native에 전달합니다.
+      const localEpochEnded = localEpochFromServerMs(endServerMs);
+      const key = `stop:${localEpochFromServerMs(startServerMs)}:${localEpochEnded}:${label}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.stopTimer('lecture', elapsed, label);
+        if(typeof window.AndroidTimer.stopTimerAt === 'function'){
+          window.AndroidTimer.stopTimerAt('lecture', localEpochEnded, label);
+        }else{
+          // 기존 stopTimer 브리지를 쓰는 구버전 앱도 정확한 종료시각을 전달할 수 있도록
+          // 화면에 보이지 않는 marker로 종료 epoch을 함께 전달합니다.
+          const legacyLabel = `${label}\u0001ENDMS=${localEpochEnded}`;
+          window.AndroidTimer.stopTimer('lecture', Math.floor(timerElapsedMs(p)), legacyLabel);
+        }
         lastAndroidTimerKey = key;
       }
     }
   }catch(e){
     console.warn('Android 타이머 브리지 실패:', e);
   }
+}
+
+function localEpochFromServerMs(serverMs){
+  return Math.round(
+    (Number(serverMs) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
+  ) * 1000;
 }
 
 function cutoffForDate(date = cur){
@@ -2239,7 +2310,9 @@ const sErr = studyInvalid(p) || day.periods.slice(0, idx).some(function(q){var q
     const isLatestLectureCard = idx === day.periods.length - 1;
     const hasStart = !!(p.startDate && p.startTime);
     const hasEnd = !!(p.endDate && p.endTime);
-    const isRunning = Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt));
+    const fieldStartMs = recordedStartMsFromFields(p);
+    const fieldEndMs = recordedEndMsFromFields(p);
+    const isRunning = fieldStartMs > 0 && !(fieldEndMs > 0 && fieldEndMs >= fieldStartMs);
     const startTimeDisabled = isRunning ? true : (isCurrentLectureDay && !hasStart);
     const endTimeDisabled   = isRunning ? true : (isCurrentLectureDay && (!hasStart || !hasEnd));
 
@@ -2369,7 +2442,9 @@ function refreshLectureTimeFieldDisabled(idx){
   const hasStart = !!(p.startDate && p.startTime);
   const hasEnd   = !!(p.endDate && p.endTime);
   const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
-  const isRunning = Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt));
+  const fieldStartMs = recordedStartMsFromFields(p);
+  const fieldEndMs = recordedEndMsFromFields(p);
+  const isRunning = fieldStartMs > 0 && !(fieldEndMs > 0 && fieldEndMs >= fieldStartMs);
   const startDisabled = isRunning ? true : (isCurrentLectureDay && !hasStart);
   const endDisabled   = isRunning ? true : (isCurrentLectureDay && (!hasStart || !hasEnd));
 
@@ -2645,29 +2720,49 @@ $('#periodList').addEventListener('input', async (e) => {
           t.value = prevDTVal;
           return;
         }
-        const myIdx = day.periods.indexOf(p);
-        for(let i = myIdx + 1; i < day.periods.length; i++){
-          const np = day.periods[i];
-          const ns = combineDT(np.startDate, np.startTime);
-          if(!ns) continue;
-          break;
-        }
       }
+
+      const oldStartMs = recordedStartMsFromFields(p);
+      const oldEndMs = recordedEndMsFromFields(p);
+      const wasCompleted = oldStartMs > 0 && oldEndMs >= oldStartMs;
+      const wasStarted = oldStartMs > 0 || Number(p.timerStartedAt) > 0;
 
       p[dateKey] = d || '';
       p[timeKey] = tm || '';
 
+      const newStartMs = recordedStartMsFromFields(p);
+      const newEndMs = recordedEndMsFromFields(p);
+
+      if(k === 'end'){
+        if(newStartMs > 0 && newEndMs > 0 && newEndMs >= newStartMs){
+          p.timerStartedAt = newStartMs;
+          p.timerEndedAt = newEndMs;
+        }else if(wasStarted){
+          p.timerStartedAt = newStartMs > 0 ? newStartMs : (Number(p.timerStartedAt) || null);
+          p.timerEndedAt = null;
+        }
+      }else{
+        if(newStartMs > 0){
+          p.timerStartedAt = newStartMs;
+          if(wasCompleted){
+            p.timerEndedAt = newEndMs > 0 ? newEndMs : oldEndMs;
+          }else{
+            p.timerEndedAt = null;
+          }
+        }else{
+          p.timerStartedAt = null;
+          p.timerEndedAt = null;
+        }
+      }
+    }else{
+      p[dateKey] = '';
+      p[timeKey] = '';
       if(k === 'start'){
         p.timerStartedAt = null;
         p.timerEndedAt = null;
-      } else if(k === 'end'){
+      }else if(k === 'end'){
         p.timerEndedAt = null;
       }
-    } else {
-      p[dateKey] = '';
-      p[timeKey] = '';
-      if(k === 'start') p.timerStartedAt = null;
-      if(k === 'end') p.timerEndedAt = null;
     }
   } else {
     p[k] = t.value;
@@ -2772,6 +2867,8 @@ $('#periodList').addEventListener('input', async (e) => {
     refreshStats();
     updateStudyTimer();
     updateWasteTimer();
+    // 시간 편집 직후 알림바의 시작/경과 기준시각도 즉시 갱신합니다.
+    if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
     const reordered = (k === 'start' && p.startDate && p.startTime)
       ? autoSortPeriodsByStart(day) : false;
     await persistToday();
@@ -4610,9 +4707,9 @@ async function closeLocalRunningPeriodsForForeignTimer(row){
     for(const day of Object.values(month)){
       if(!day || !Array.isArray(day.periods)) continue;
       for(const p of day.periods){
-        const st = Number(p?.timerStartedAt);
-        const en = Number(p?.timerEndedAt);
-        if(Number.isFinite(st) && st > 0 && !(Number.isFinite(en) && en >= st) && p?._id){
+        const st = recordedStartMsFromFields(p);
+        const en = recordedEndMsFromFields(p);
+        if(st > 0 && !(en > 0 && en >= st) && p?._id){
           runningIds.add(String(p._id));
         }
       }
@@ -4670,26 +4767,73 @@ async function applyActiveTimerRow(row){
   if(!Number.isFinite(started)) return false;
 
   const beforeApply = deepClone(found.p);
-  if(found.p._autoSplit !== 'start'){
-    const startDT = new Date(started);
-    found.p.startDate = ymd(startDT);
-    found.p.startTime = hm(startDT);
+  const localFieldStart = recordedStartMsFromFields(found.p);
+  const localFieldEnd = recordedEndMsFromFields(found.p);
+
+  // 완료된 로컬 기록은 화면의 시작/종료 시간이 원본입니다.
+  // 서버 active_timer가 늦게 running으로 들어와도 완료 기록을 진행 상태로 되돌리지 않습니다.
+  if(localFieldStart > 0 && localFieldEnd >= localFieldStart){
+    syncTimerAnchorsToFields(found.p, true);
+    markChangedPeriodFields(found.p, beforeApply);
+    if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
+      if(typeof isPeriodInputEditing === 'function'
+         && (isPeriodInputEditing() || (typeof userActionCount === 'number' && userActionCount > 0))){
+        periodRenderPending = true;
+      }else{
+        await renderCurrentView();
+      }
+    }else{
+      updateStudyTimer();
+      updateWasteTimer();
+    }
+    syncAndroidTimer();
+    return true;
   }
-  found.p.timerStartedAt = started;
+
+  const localStartEditTs = Math.max(
+    Number(found.p._fieldUpdatedAt?.timerStartedAt || 0),
+    Number(found.p._fieldUpdatedAt?.startDate || 0),
+    Number(found.p._fieldUpdatedAt?.startTime || 0)
+  );
+  const localEndEditTs = Math.max(
+    Number(found.p._fieldUpdatedAt?.timerEndedAt || 0),
+    Number(found.p._fieldUpdatedAt?.endDate || 0),
+    Number(found.p._fieldUpdatedAt?.endTime || 0)
+  );
+  const keepLocalStart = localStartEditTs > started;
+  const keepLocalEnd = Number.isFinite(stopped) && localEndEditTs > stopped;
+
+  if(!keepLocalStart){
+    if(found.p._autoSplit !== 'start'){
+      const startDT = new Date(started);
+      found.p.startDate = ymd(startDT);
+      found.p.startTime = hm(startDT);
+    }
+    found.p.timerStartedAt = started;
+  }else{
+    syncTimerAnchorsToFields(found.p, true);
+  }
+
   if(row.status === 'stopped' && Number.isFinite(stopped)){
-    const stopDT = new Date(stopped);
-    found.p.endDate = ymd(stopDT);
-    found.p.endTime = hm(stopDT);
-    found.p.timerEndedAt = stopped;
+    if(!keepLocalEnd){
+      const stopDT = new Date(stopped);
+      found.p.endDate = ymd(stopDT);
+      found.p.endTime = hm(stopDT);
+      found.p.timerEndedAt = stopped;
+    }else{
+      const endMs = recordedEndMsFromFields(found.p);
+      found.p.timerEndedAt = endMs > 0 ? endMs : null;
+    }
   }else if(row.status === 'running'){
-    const localEnd = Number(found.p.timerEndedAt);
-    if(!(Number.isFinite(localEnd) && localEnd > started)){
+    const localEnd = recordedEndMsFromFields(found.p);
+    if(!keepLocalEnd && !(localEnd > started)){
       found.p.endDate = '';
       found.p.endTime = '';
       found.p.timerEndedAt = null;
     }
   }
 
+  syncTimerAnchorsToFields(found.p, true);
   markChangedPeriodFields(found.p, beforeApply);
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
@@ -4700,6 +4844,7 @@ async function applyActiveTimerRow(row){
     }
   }else{
     updateStudyTimer();
+    updateWasteTimer();
   }
   syncAndroidTimer();
   return true;

@@ -1334,11 +1334,59 @@ async function calibrateServerClock(force=false){
   return serverClockOffsetMs;
 }
 
+function recordedStartMsFromFields(p){
+  const dt = periodStartDT(p);
+  const ms = dt ? dt.getTime() : NaN;
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function recordedEndMsFromFields(p){
+  const dt = periodEndDT(p);
+  const ms = dt ? dt.getTime() : NaN;
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+// 화면에 표시되는 시작/종료 시간 필드를 타이머의 1차 기준으로 사용합니다.
+// timerStartedAt/timerEndedAt가 잠깐 stale 상태여도 수정된 기록이 다시 진행 상태로
+// 돌아가지 않도록 시간 필드를 우선합니다.
+function effectiveTimerStartedAt(p){
+  const fieldStart = recordedStartMsFromFields(p);
+  if(fieldStart > 0) return fieldStart;
+  const storedStart = Number(p?.timerStartedAt);
+  return Number.isFinite(storedStart) && storedStart > 0 ? storedStart : 0;
+}
+
+function effectiveTimerEndedAt(p){
+  const start = effectiveTimerStartedAt(p);
+  if(start <= 0) return 0;
+  const fieldEnd = recordedEndMsFromFields(p);
+  if(fieldEnd > 0 && fieldEnd >= start) return fieldEnd;
+  const storedEnd = Number(p?.timerEndedAt);
+  if(Number.isFinite(storedEnd) && storedEnd >= start) return storedEnd;
+  return 0;
+}
+
+function hasRecordedStart(p){
+  return effectiveTimerStartedAt(p) > 0;
+}
+
+function syncTimerAnchorsToFields(p, hadTimerStart = hasRecordedStart(p)){
+  const startMs = recordedStartMsFromFields(p);
+  const endMs = recordedEndMsFromFields(p);
+  if(!hadTimerStart && startMs <= 0){
+    p.timerStartedAt = null;
+    p.timerEndedAt = null;
+    return;
+  }
+  p.timerStartedAt = startMs > 0 ? startMs : null;
+  p.timerEndedAt = endMs > 0 && startMs > 0 && endMs >= startMs ? endMs : null;
+}
+
 function timerElapsedMs(p, nowMs = serverNowMs()){
-  const start = Number(p?.timerStartedAt);
-  if(!Number.isFinite(start) || start <= 0) return 0;
-  const end = Number(p?.timerEndedAt);
-  const until = Number.isFinite(end) && end >= start ? end : nowMs;
+  const start = recordedStartMsFromFields(p) || effectiveTimerStartedAt(p);
+  if(start <= 0) return 0;
+  const end = recordedEndMsFromFields(p);
+  const until = end > 0 ? end : nowMs;
   return Math.max(0, until - start);
 }
 function formatTimer(ms){
@@ -1350,18 +1398,23 @@ function formatTimer(ms){
 }
 function timerPeriodForCurrentDay(){
   const day = getDayData();
-  for(let i=day.periods.length-1; i>=0; i--){
-    const p = day.periods[i];
-    if(Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt))){
-      return {p, idx:i, running:true};
-    }
-  }
-  let best = null;
+  let latest = null;
+
+  // 타이머 상태는 가장 최근 시작시각의 교시 하나만 결정합니다.
+  // 종료시각 필드가 존재하면 반드시 종료 상태로 취급합니다.
   day.periods.forEach((p, idx)=>{
-    const started = Number(p.timerStartedAt);
-    if(started > 0 && (!best || started > best.started)) best = {p, idx, started, running:false};
+    const started = recordedStartMsFromFields(p);
+    if(started <= 0) return;
+    if(!latest || started > latest.started || (started === latest.started && idx > latest.idx)){
+      latest = {p, idx, started};
+    }
   });
-  return best;
+
+  if(!latest) return null;
+
+  const ended = recordedEndMsFromFields(latest.p);
+  latest.running = !(ended > 0 && ended >= latest.started);
+  return latest;
 }
 
 function wasteTimerForCurrentDay(){
@@ -1371,17 +1424,12 @@ function wasteTimerForCurrentDay(){
   const day = getDayData();
   if(!day.periods.length) return null;
 
-  const getStart = p => {
-    const ts = Number(p.timerStartedAt);
-    if(ts > 0) return ts;
-    const dt = periodStartDT(p);
-    return dt ? dt.getTime() : 0;
-  };
+  const getStart = p => recordedStartMsFromFields(p) || Number(p?.timerStartedAt) || 0;
   const getEnd = p => {
-    const te = Number(p.timerEndedAt);
-    const dt = periodEndDT(p);
-    const dtMs = dt ? dt.getTime() : 0;
-    return Math.max(te || 0, dtMs);
+    const fieldEnd = recordedEndMsFromFields(p);
+    if(fieldEnd > 0) return fieldEnd;
+    const stored = Number(p?.timerEndedAt);
+    return Number.isFinite(stored) && stored > 0 ? stored : 0;
   };
 
   const running = day.periods.some(p => {
@@ -1401,7 +1449,6 @@ function wasteTimerForCurrentDay(){
   }
   return null;
 }
-
 function updateStudyTimer(){
   const box = $('#studyTimer'), timeEl = $('#studyTimerTime'), labelEl = $('#studyTimerLabel');
   if(!box || !timeEl || !labelEl) return;
@@ -1934,27 +1981,46 @@ function syncAndroidTimer(){
 
     const p = info.p;
     const label = `${info.idx+1}교시`;
+    // ★ 알림바도 화면 타이머와 동일하게 날짜/시간 필드를 1차 기준으로 사용
+    const startServerMs = effectiveTimerStartedAt(p);
+    const endServerMs = effectiveTimerEndedAt(p);
 
-    if(info.running && Number(p.timerStartedAt) > 0){
+    if(info.running && Number.isFinite(startServerMs) && startServerMs > 0){
       const localEpochStarted = Math.round(
-        (Number(p.timerStartedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
+        (startServerMs - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
       ) * 1000;
       const key = `run:${localEpochStarted}:${label}`;
       if(key !== lastAndroidTimerKey){
         window.AndroidTimer.startTimer('study', localEpochStarted, label);
         lastAndroidTimerKey = key;
       }
-    }else if(Number(p.timerStartedAt) > 0){
-      const elapsed = Math.floor(timerElapsedMs(p));
-      const key = `stop:${p.timerStartedAt}`;
+    }else if(Number.isFinite(startServerMs) && startServerMs > 0 && Number.isFinite(endServerMs) && endServerMs > 0){
+      // ★ 종료 후 "경과"도 HTML과 동일한 종료시각을 Native에 전달합니다.
+      const localEpochEnded = Math.round(
+        (endServerMs - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
+      ) * 1000;
+      const key = `stop:${localEpochStartedKey(startServerMs)}:${localEpochEnded}:${label}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.stopTimer('study', elapsed, label);
+        if(typeof window.AndroidTimer.stopTimerAt === 'function'){
+          window.AndroidTimer.stopTimerAt('study', localEpochEnded, label);
+        }else{
+          // 기존 stopTimer 브리지를 쓰는 구버전 앱도 정확한 종료시각을 전달할 수 있도록
+          // 화면에 보이지 않는 marker로 종료 epoch을 함께 전달합니다.
+          const legacyLabel = `${label}\u0001ENDMS=${localEpochEnded}`;
+          window.AndroidTimer.stopTimer('study', Math.floor(timerElapsedMs(p)), legacyLabel);
+        }
         lastAndroidTimerKey = key;
       }
     }
   }catch(e){
     console.warn('Android 타이머 브리지 실패:', e);
   }
+}
+
+function localEpochStartedKey(serverMs){
+  return Math.round(
+    (Number(serverMs) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
+  ) * 1000;
 }
 
 function cutoffForDate(date = cur){
@@ -2062,7 +2128,9 @@ function renderPeriods(){
     const logical = logicalToday();
     const selectedDay = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
     const isPastDay = selectedDay < logical;
-    const isRunning = Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt));
+    const fieldStartMs = recordedStartMsFromFields(p);
+  const fieldEndMs = recordedEndMsFromFields(p);
+  const isRunning = fieldStartMs > 0 && !(fieldEndMs > 0 && fieldEndMs >= fieldStartMs);
     const startTimeDisabled = isRunning ? true : (isPastDay ? false : !hasStart);
     const endTimeDisabled   = isRunning ? true : (isPastDay ? false : (!hasStart || !hasEnd));
     const startAction = hasStart ? 'cancel-start' : 'start';
@@ -2184,7 +2252,9 @@ function refreshTimeFieldDisabled(idx){
   const endPageInput = document.querySelector(`#periodList input[data-k="endPage"][data-idx="${idx}"]`);
   const startField = startInput?.closest('.field.time');
   const endField = endInput?.closest('.field.time');
-  const isRunning = Number(p.timerStartedAt) > 0 && !(Number(p.timerEndedAt) >= Number(p.timerStartedAt));
+  const fieldStartMs = recordedStartMsFromFields(p);
+  const fieldEndMs = recordedEndMsFromFields(p);
+  const isRunning = fieldStartMs > 0 && !(fieldEndMs > 0 && fieldEndMs >= fieldStartMs);
   const startDisabled = isRunning ? true : (isPastDay ? false : !hasStart);
   const endDisabled   = isRunning ? true : (isPastDay ? false : (!hasStart || !hasEnd));
   if(startInput) startInput.disabled = startDisabled;
@@ -2819,20 +2889,50 @@ $('#periodList').addEventListener('input', async (e) => {
         }
       }
 
+      const oldStartMs = recordedStartMsFromFields(p);
+      const oldEndMs = recordedEndMsFromFields(p);
+      const wasCompleted = oldStartMs > 0 && oldEndMs >= oldStartMs;
+      const wasStarted = oldStartMs > 0 || Number(p.timerStartedAt) > 0;
+
       p[dateKey] = d || '';
       p[timeKey] = tm || '';
 
       if(k === 'start'){
-        p.timerStartedAt = null;
-        p.timerEndedAt = null;
-      } else if(k === 'end'){
-        p.timerEndedAt = null;
+        const newStartMs = recordedStartMsFromFields(p);
+        const newEndMs = recordedEndMsFromFields(p);
+        if(newStartMs > 0){
+          p.timerStartedAt = newStartMs;
+          if(wasCompleted){
+            // 종료된 기록의 시작시각만 수정하면 기존 종료 상태를 유지합니다.
+            p.timerEndedAt = newEndMs > 0 ? newEndMs : oldEndMs;
+          }else{
+            p.timerEndedAt = null;
+          }
+        }else{
+          p.timerStartedAt = null;
+          p.timerEndedAt = null;
+        }
+      }else if(k === 'end'){
+        const newStartMs = recordedStartMsFromFields(p);
+        const newEndMs = recordedEndMsFromFields(p);
+        if(newStartMs > 0 && newEndMs > 0 && newEndMs >= newStartMs){
+          p.timerStartedAt = newStartMs;
+          p.timerEndedAt = newEndMs;
+        }else if(wasStarted){
+          // 종료시각을 실제로 비운 경우에만 진행 상태로 되돌립니다.
+          p.timerStartedAt = newStartMs > 0 ? newStartMs : (Number(p.timerStartedAt) || null);
+          p.timerEndedAt = null;
+        }
       }
     } else {
       p[dateKey] = '';
       p[timeKey] = '';
-      if(k === 'start') p.timerStartedAt = null;
-      if(k === 'end') p.timerEndedAt = null;
+      if(k === 'start'){
+        p.timerStartedAt = null;
+        p.timerEndedAt = null;
+      }else if(k === 'end'){
+        p.timerEndedAt = null;
+      }
     }
   } else {
     p[k] = t.value;
@@ -2854,6 +2954,10 @@ $('#periodList').addEventListener('input', async (e) => {
     updateStudyTimer();
   }
   if(k === 'start' || k === 'end'){
+    syncTimerAnchorsToFields(p, true);
+    if(k === 'end' && p.startDate && p.startTime && p.endDate && p.endTime && cloudUser){
+      try{ await cloudClearActiveTimerIfMine(); }catch(_){ }
+    }
     const labelEl = t.parentElement && t.parentElement.querySelector('.ko-time-label');
     if(labelEl){
       const dateKey = k==='start' ? 'startDate' : 'endDate';
@@ -2862,6 +2966,8 @@ $('#periodList').addEventListener('input', async (e) => {
     }
     updateStudyTimer();
     updateWasteTimer();
+    // 시간 편집 직후 알림바의 시작/경과 기준시각도 즉시 갱신합니다.
+    if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
   }
   markChangedPeriodFields(p, beforeSync);
   if(k !== 'subject') refreshStats();
@@ -4415,23 +4521,70 @@ async function applyActiveTimerRow(row){
   const stopped = row.stopped_at ? Date.parse(row.stopped_at) : NaN;
   if(!Number.isFinite(started)) return false;
 
-  if(found.p._autoSplit !== 'start'){ const startDT = new Date(started);
-  found.p.startDate = ymd(startDT);
-  found.p.startTime = hm(startDT); }
-  found.p.timerStartedAt = started;
+  const beforeApply = deepClone(found.p);
+  const localFieldStart = recordedStartMsFromFields(found.p);
+  const localFieldEnd = recordedEndMsFromFields(found.p);
+
+  // 완료된 로컬 기록은 화면의 시작/종료 시간이 원본입니다.
+  // 늦게 도착한 서버 active_timer가 종료된 기록을 다시 진행 중으로 돌리지 않습니다.
+  if(localFieldStart > 0 && localFieldEnd >= localFieldStart){
+    syncTimerAnchorsToFields(found.p, true);
+    markChangedPeriodFields(found.p, beforeApply);
+    if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
+      if(typeof isPeriodInputEditing === 'function'
+         && (isPeriodInputEditing() || (typeof userActionCount === 'number' && userActionCount > 0))){
+        periodRenderPending = true;
+      }else{
+        await renderCurrentView();
+      }
+    }else{
+      updateStudyTimer();
+      updateWasteTimer();
+    }
+    syncAndroidTimer();
+    return true;
+  }
+
+  const localStartEditTs = Math.max(
+    Number(found.p._fieldUpdatedAt?.timerStartedAt || 0),
+    Number(found.p._fieldUpdatedAt?.startDate || 0),
+    Number(found.p._fieldUpdatedAt?.startTime || 0)
+  );
+  const localEndEditTs = Math.max(
+    Number(found.p._fieldUpdatedAt?.timerEndedAt || 0),
+    Number(found.p._fieldUpdatedAt?.endDate || 0),
+    Number(found.p._fieldUpdatedAt?.endTime || 0)
+  );
+  const keepLocalStart = localStartEditTs > started;
+  const keepLocalEnd = Number.isFinite(stopped) && localEndEditTs > stopped;
+
+  if(!keepLocalStart){
+    if(found.p._autoSplit !== 'start'){
+      const startDT = new Date(started);
+      found.p.startDate = ymd(startDT);
+      found.p.startTime = hm(startDT);
+    }
+    found.p.timerStartedAt = started;
+  }
+
   if(row.status === 'stopped' && Number.isFinite(stopped)){
-    const stopDT = new Date(stopped);
-    found.p.endDate = ymd(stopDT);
-    found.p.endTime = hm(stopDT);
-    found.p.timerEndedAt = stopped;
+    if(!keepLocalEnd){
+      const stopDT = new Date(stopped);
+      found.p.endDate = ymd(stopDT);
+      found.p.endTime = hm(stopDT);
+      found.p.timerEndedAt = stopped;
+    }
   }else if(row.status === 'running'){
-    const localEnd = Number(found.p.timerEndedAt);
-    if(!(Number.isFinite(localEnd) && localEnd > started)){
+    const localEnd = effectiveTimerEndedAt(found.p);
+    if(!keepLocalEnd && !keepLocalStart && !(Number.isFinite(localEnd) && localEnd > started)){
       found.p.endDate = '';
       found.p.endTime = '';
       found.p.timerEndedAt = null;
     }
   }
+
+  syncTimerAnchorsToFields(found.p, true);
+  markChangedPeriodFields(found.p, beforeApply);
 
   if(ymKey(cur) === found.ym && dKey(cur) === found.dk){
     if(typeof isPeriodInputEditing === 'function'
