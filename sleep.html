@@ -1235,17 +1235,31 @@ async function loadMonth(ym){
 
 async function saveMonth(ym){
   if(!sbClient || !cloudUser){
+    dirtySaveMonths.add(String(ym));
     showToast('로그인 후에만 저장할 수 있어요');
+    return false;
+  }
+  if(navigator.onLine === false){
+    dirtySaveMonths.add(String(ym));
+    showToast('오프라인이라 저장을 보류했어요. 연결되면 다시 저장합니다.');
     return false;
   }
   try{
     await cloudSaveMonth(ym);
+    dirtySaveMonths.delete(String(ym));
     return true;
   }catch(e){
+    dirtySaveMonths.add(String(ym));
     console.error('클라우드 저장 실패:', e);
     showToast('클라우드 저장에 실패했어요. 인터넷 연결을 확인해주세요.');
     return false;
   }
+}
+
+async function requireSaveMonth(ym){
+  const ok=await saveMonth(ym);
+  if(ok !== true) throw new Error('월 기록을 서버에 저장하지 못했습니다: '+ym);
+  return true;
 }
 
 function getDayData(){
@@ -1260,6 +1274,37 @@ function getDayData(){
 
 const saveTimers = {};
 const saveWaiters = {};
+const dirtySaveMonths = new Set();
+let dirtySaveRetryBusy = false;
+let dirtySaveRetryAt = 0;
+
+async function retryDirtySavesOnce(force=false){
+  if(dirtySaveRetryBusy || !sbClient || !cloudUser || navigator.onLine === false) return false;
+  if(!dirtySaveMonths.size) return true;
+  const now=Date.now();
+  if(!force && now-dirtySaveRetryAt < 30000) return false;
+  dirtySaveRetryAt=now;
+  dirtySaveRetryBusy=true;
+  try{
+    for(const ym of [...dirtySaveMonths]){
+      if(saveTimers[ym]) continue;
+      const ok=await saveMonth(ym);
+      if(ok) dirtySaveMonths.delete(ym);
+    }
+    return dirtySaveMonths.size===0;
+  }finally{
+    dirtySaveRetryBusy=false;
+  }
+}
+
+window.addEventListener('online',()=>{
+  void retryDirtySavesOnce(true);
+  try{
+    if(cloudUser && cloudBootstrapDoneUserId !== String(cloudUser.id)){
+      void ensureCloudBootstrap().catch(e=>console.warn('온라인 복구 동기화 실패:', e));
+    }
+  }catch(_){}
+});
 
 function settleSaveWaiters(ym, error=null, value=false){
   const waiters = saveWaiters[ym] || [];
@@ -1289,6 +1334,7 @@ async function flushPendingSavesNow(){
       delete saveTimers[ym];
       try{
         const result = await saveMonth(ym);
+        if(result !== true) throw new Error('대기 중인 기록 저장 실패: '+ym);
         settleSaveWaiters(ym, null, result);
       }catch(e){
         settleSaveWaiters(ym, e, false);
@@ -1319,6 +1365,7 @@ function isPeriodInputEditing(){
 
 async function persistToday(){
   const ym = ymKey(cur);
+  dirtySaveMonths.add(String(ym));
   if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
 
   return new Promise((resolve,reject) => {
@@ -1339,16 +1386,30 @@ async function persistToday(){
 
 async function persistTodayImmediate(){
   const ym = ymKey(cur);
+  dirtySaveMonths.add(String(ym));
   if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
   delete saveTimers[ym];
 
   try{
     const result = await saveMonth(ym);
+    if(result !== true) throw new Error('즉시 기록 저장 실패: '+ym);
     settleSaveWaiters(ym, null, result);
     return result;
   }catch(e){
     settleSaveWaiters(ym, e, false);
     throw e;
+  }
+}
+
+
+async function persistCriticalToday(label='기록'){
+  try{
+    return await persistTodayImmediate();
+  }catch(e){
+    console.error(label+' 저장 실패:', e);
+    showToast(label+' 저장 실패 · 연결되면 자동 재시도합니다.');
+    setTimeout(()=>{ void retryDirtySavesOnce(true); }, 3000);
+    return false;
   }
 }
 
@@ -1774,7 +1835,7 @@ async function splitRunningPeriodAtBoundary(running){
   oldP._autoSplit = 'end';
 
   markChangedPeriodFields(oldP, beforeOld);
-  await saveMonth(running.ym);
+  await requireSaveMonth(running.ym);
 
   const next = nextStudyDayKey(running.ym, running.dk);
   await loadMonth(next.ym);
@@ -1853,7 +1914,7 @@ async function splitRunningPeriodAtBoundary(running){
     newIdx = 0;
   }
 
-  void saveMonth(next.ym);
+  void requireSaveMonth(next.ym).catch(e=>console.warn('자동 전환 저장 실패:',e));
 
   if(cloudUser){
     try{
@@ -1967,6 +2028,7 @@ window.addEventListener('message', (ev)=>{
     startBackgroundSensitiveLoops();
 
     if(wasPaused){
+      void retryDirtySavesOnce(false);
       // No child polling/read here. Parent sends its current central snapshot.
       requestCentralSync(false);
       if(!(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing())
@@ -2055,6 +2117,10 @@ function stopBackgroundSensitiveLoops(){
 async function recoverFromBackground(){
   try{
     if(cloudUser){
+      if(cloudBootstrapDoneUserId !== String(cloudUser.id)){
+        await ensureCloudBootstrap();
+      }
+      await retryDirtySavesOnce(false);
       if(window.parent !== window){
         requestCentralSync(true);
         await calibrateServerClock(false);
@@ -2687,7 +2753,7 @@ $('#periodList').addEventListener('input', async (e) => {
       if(k==='startPage'){
         p.timerStartedAt = null;
         p.timerEndedAt = null;
-        if(cloudUser) await cloudClearActiveTimer();
+        if(cloudUser) await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), p._id);
       } else if(k==='endPage' && Number(p.timerStartedAt) > 0){
         p.timerEndedAt = null;
         if(cloudUser) void cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
@@ -2719,13 +2785,13 @@ $('#periodList').addEventListener('input', async (e) => {
             }
             const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
             p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            void calibrateServerClock(true);
+            void calibrateServerClock(false);
           }else{
             p.timerStartedAt = Math.round(serverNowMs());
           }
         } else if(k==='endPage' && Number(p.timerStartedAt) > 0 && !Number(p.timerEndedAt)){
           if(cloudUser){
-            const row = await cloudStopActiveTimer();
+            const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
             if(!row){
               const failedState = deepClone(p);
               restorePeriodSnapshotAfterTimerFailure(p, beforeSync, failedState);
@@ -2734,7 +2800,7 @@ $('#periodList').addEventListener('input', async (e) => {
             }
             const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
             p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            void calibrateServerClock(true);
+            void calibrateServerClock(false);
           }else{
             p.timerEndedAt = Math.round(serverNowMs());
           }
@@ -3110,7 +3176,7 @@ $('#periodList').addEventListener('click', async (e) => {
         p.timerStartedAt = ts;
         markChangedPeriodFields(p, beforeSync);
       }
-      void calibrateServerClock(true);
+      void calibrateServerClock(false);
       if(!refetch()) return;
     }
   }else if(action === 'end'){
@@ -3140,7 +3206,7 @@ $('#periodList').addEventListener('click', async (e) => {
         p.timerEndedAt = ts;
         markChangedPeriodFields(p, beforeSync);
       }
-      void calibrateServerClock(true);
+      void calibrateServerClock(false);
       if(!refetch()) return;
     }
     if(window.parent!==window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
@@ -3174,7 +3240,7 @@ $('#periodList').addEventListener('click', async (e) => {
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
         await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx, true);
-        await calibrateServerClock(true);
+        await calibrateServerClock(false);
         if(!refetch()) return;
       }catch(e){
           if(e?.code === 'ACTIVE_TIMER_CONFLICT'){
@@ -3201,21 +3267,8 @@ $('#periodList').addEventListener('click', async (e) => {
 
   p._updatedAt = syncNow();
   if(action === 'end' || action === 'cancel-end' || action === 'cancel-start') autoSortPeriodsByStart(day);
-  if(action === 'cancel-start' || action === 'cancel-end') await persistTodayImmediate();
+  if(action === 'cancel-start' || action === 'cancel-end' || action === 'end') await persistCriticalToday(action === 'end' ? '종료 기록' : '취소 기록');
   else await persistToday();
-  if(cloudUser && (action === 'start' || action === 'end')){
-    try{
-      const {data:verifyRow,error:verifyErr} = await sbClient
-        .from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
-      if(verifyErr) throw verifyErr;
-      if(verifyRow
-         && String(verifyRow.ym || '') === sleepCloudYm(ymKey(cur))
-         && String(verifyRow.day_key || '') === String(dKey(cur))
-         && String(verifyRow.period_id || '') === String(pid)){
-        await applyActiveTimerRow(verifyRow);
-      }
-    }catch(e){ console.warn('타이머 동작 후 서버 1회 확인 실패:', e); }
-  }
   renderPeriods();
   updateStudyTimer();
   updateWasteTimer();
@@ -3917,6 +3970,7 @@ $('#settingsSave').onclick = async () => {
 };
 
 setInterval(async ()=>{
+  if(__journalPaused || document.visibilityState === 'hidden') return;
   const before = appSettings.dayStartHour;
   if(maybeActivatePending()){
     const latest = logicalToday();
@@ -3930,13 +3984,18 @@ let sbClient = null;
 let cloudUser = null;
 let cloudDataOwnerId = null;
 let cloudSessionEpoch = 0;
+let cloudBootstrapDoneUserId = null;
+let cloudBootstrapPromise = null;
+let cloudBootstrapPromiseUserId = null;
 
 function resetCloudAccountState(){
   cloudSessionEpoch++;
   cancelPendingSaves();
   monthCache = {};
   lastMonthSyncAt = null;
+  dirtySaveMonths.clear();
   periodRenderPending = false;
+  cloudBootstrapDoneUserId = null;
   try{ stopActiveTimerRealtime(); }catch(_){}
 }
 
@@ -3951,6 +4010,41 @@ function setCloudUser(nextUser){
 
   cloudUser = next;
   return cloudUser;
+}
+
+async function ensureCloudBootstrap(){
+  if(!cloudUser) return false;
+  const uid=String(cloudUser.id);
+  if(cloudBootstrapDoneUserId === uid) return true;
+  if(cloudBootstrapPromise && cloudBootstrapPromiseUserId === uid) return cloudBootstrapPromise;
+
+  const sessionEpoch=cloudSessionEpoch;
+  const promise=(async()=>{
+    await calibrateServerClock(false);
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    await autoSyncFromCloud();
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    enforceStudyDayLimit();
+    await renderCurrentView();
+    startActiveTimerRealtime();
+    await syncActiveTimerFromCloud(true);
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    await checkStudyDayBoundaryRollover();
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    cloudBootstrapDoneUserId=uid;
+    return true;
+  })();
+
+  cloudBootstrapPromise=promise;
+  cloudBootstrapPromiseUserId=uid;
+  try{
+    return await promise;
+  }finally{
+    if(cloudBootstrapPromise === promise){
+      cloudBootstrapPromise=null;
+      cloudBootstrapPromiseUserId=null;
+    }
+  }
 }
 
 function advanceLastMonthSyncAtFromRows(rows){
@@ -4226,7 +4320,7 @@ $('#cloudLogin').onclick = async () => {
   if(error){ alert('로그인 실패: '+error.message); return; }
   setCloudUser(data.user);
   await refreshCloudStatus();
-  await autoSyncFromCloud();
+  await ensureCloudBootstrap();
   showToast('클라우드에 로그인했어요');
 };
 $('#cloudGoogle').onclick = async () => {
@@ -4287,10 +4381,7 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     await refreshCloudStatus();
 
     if(cloudUser){
-      void calibrateServerClock(true);
-      await autoSyncFromCloud();
-      startActiveTimerRealtime();
-      await syncActiveTimerFromCloud(true);
+      await ensureCloudBootstrap();
     }
     enforceStudyDayLimit();
     await renderCurrentView();
@@ -4332,7 +4423,6 @@ initSupabase();
 if(sbClient){
   let __authBusy = false;
   sbClient.auth.onAuthStateChange((event, session) => {
-    if(__authBusy) return;
     __authBusy = true;
     setTimeout(async () => {
       try {
@@ -4350,14 +4440,7 @@ if(sbClient){
 
     if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')){
       try{
-        void calibrateServerClock(true);
-        await autoSyncFromCloud();
-        enforceStudyDayLimit();
-        await renderCurrentView();
-        startActiveTimerRealtime();
-        await syncActiveTimerFromCloud(true);
-
-        await checkStudyDayBoundaryRollover();
+        await ensureCloudBootstrap();
       }catch(e){
         console.error('세션 자동 동기화 실패:', e);
         enforceStudyDayLimit();
@@ -4378,12 +4461,7 @@ if(sbClient){
 (async () => {
   await refreshCloudStatus();
   if(cloudUser){
-    void calibrateServerClock(true);
-    await autoSyncFromCloud();
-    startActiveTimerRealtime();
-    await syncActiveTimerFromCloud(true);
-
-    await checkStudyDayBoundaryRollover();
+    await ensureCloudBootstrap();
   }
   enforceStudyDayLimit();
   await renderCurrentView();
@@ -4427,7 +4505,7 @@ function restorePeriodSnapshotAfterTimerFailure(target, snapshot, failedState){
 async function cloudStartActiveTimer(ym, dayKey, p, idx){
   if(!sbClient || !cloudUser) return null;
   try{
-    await saveMonth(ym);
+    await requireSaveMonth(ym);
   }catch(e){
     console.error('타이머 시작 전 기록 저장 실패:', e);
     showToast('기록 저장 실패로 타이머 시작을 중단했어요');
@@ -4623,7 +4701,7 @@ async function closeLocalRunningPeriodsForForeignTimer(row){
     }
   }
   if(!changed) return false;
-  for(const ym of touched) await saveMonth(ym);
+  for(const ym of touched) await requireSaveMonth(ym);
   try{ await renderCurrentView(); }catch(_){ updateStudyTimer(); }
   syncAndroidTimer();
   if(window.parent !== window) window.parent.postMessage({type:'exclusive-session-ended',kind:'sleep'},location.origin);
@@ -4824,7 +4902,8 @@ async function applyRealtimeMonthRow(payload){
     const ym = sleepLocalYm(ymRaw);
     if(!ym) return;
     if(row.deleted_at){
-      await applyRemoteDeletedMonth(ym, row.deleted_at);
+      const appliedDelete = await applyRemoteDeletedMonth(ym, row.deleted_at);
+      if(appliedDelete) advanceLastMonthSyncAtFromRows([row]);
       __scheduleRtRender();
       return;
     }
@@ -4837,6 +4916,7 @@ async function applyRealtimeMonthRow(payload){
     const remote = ensureMonthSync(deepClone(row.data || {}), ym);
     const existing = monthCache[ym];
     monthCache[ym] = existing ? mergeMonths(existing, remote, ym) : remote;
+    advanceLastMonthSyncAtFromRows([row]);
     __scheduleRtRender();
     if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
   }catch(e){
@@ -4940,9 +5020,9 @@ renderDay();
 </script>
 
 <script>
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && window.parent === window) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=11.06', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=11.07', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });

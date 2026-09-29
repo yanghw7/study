@@ -667,11 +667,12 @@
     let chGeneration = 0;
     let realtimeRetryTimer = null;
     let realtimeStableResetTimer = null;
+    let realtimeRecoveryTimer = null;
     let realtimeSubscribed = false;
     let realtimeRetryDelayMs = 5000;
     let lastSubscribeRecoveryAt = 0;
 
-    const REALTIME_RETRY_MAX_MS = 5 * 60 * 1000;
+    const REALTIME_RETRY_MAX_MS = 60 * 1000;
     const REALTIME_STABLE_RESET_MS = 60 * 1000;
     const SUBSCRIBE_RECOVERY_THROTTLE_MS = 60 * 1000;
 
@@ -760,10 +761,12 @@
         try{
           const {data:{session}}=await sb.auth.getSession();
           if(!session?.user) return centralServerClockOffsetMs;
+          const uid=String(session.user.id);
           const t0=Date.now();
           const {data,error}=await sb.rpc('server_now');
           const t1=Date.now();
           if(error) throw error;
+          if(centralUserId && String(centralUserId) !== uid) return centralServerClockOffsetMs;
           const serverMs=Date.parse(data);
           if(!Number.isFinite(serverMs)) throw new Error('서버 시간을 읽지 못했습니다.');
           centralServerClockOffsetMs=Math.round(serverMs-((t0+t1)/2));
@@ -849,6 +852,36 @@
       }
     }
 
+    function clearRealtimeRecovery(){
+      if(realtimeRecoveryTimer){
+        clearTimeout(realtimeRecoveryTimer);
+        realtimeRecoveryTimer = null;
+      }
+    }
+
+    function runSubscribeRecovery(){
+      if(navigator.onLine === false || document.visibilityState === 'hidden') return;
+      lastSubscribeRecoveryAt = Date.now();
+      void fetchOnce(false, true);
+      void calibrateCentralServerClock(false);
+      void centralPoll(true);
+    }
+
+    function scheduleSubscribeRecovery(){
+      clearRealtimeRecovery();
+      const now = Date.now();
+      const wait = Math.max(0, SUBSCRIBE_RECOVERY_THROTTLE_MS - (now - lastSubscribeRecoveryAt));
+      if(wait === 0){
+        runSubscribeRecovery();
+        return;
+      }
+      // 재연결이 60초 안에 반복돼도 복구를 버리지 않고, 제한 시점에 1회만 실행한다.
+      realtimeRecoveryTimer = setTimeout(()=>{
+        realtimeRecoveryTimer = null;
+        runSubscribeRecovery();
+      }, wait);
+    }
+
     function scheduleRealtimeRetry(){
       clearRealtimeRetry();
       if(navigator.onLine === false || document.visibilityState === 'hidden') return;
@@ -881,7 +914,7 @@
     }
 
     function resetCentralUser(userId){
-      const id = userId || null;
+      const id = userId ? String(userId) : null;
       if(centralUserId === id) return;
       centralUserId = id;
       centralLastMonthSyncAt = null;
@@ -967,6 +1000,7 @@
           .maybeSingle();
 
         if(error) throw error;
+        if(String(centralUserId || '') !== String(user.id)) return;
 
         handleActiveRow(row, {
           autoSwitch: autoSwitch === true,
@@ -1015,6 +1049,7 @@
         }
 
         const monthRes = await monthQuery;
+        if(String(centralUserId || '') !== String(user.id)) return;
 
         if(monthRes.error){
           console.warn('[central] study_months 폴링 실패:', monthRes.error);
@@ -1035,6 +1070,7 @@
     async function stopRealtime(clearUserState=false){
       clearRealtimeRetry();
       clearRealtimeStableReset();
+      clearRealtimeRecovery();
       realtimeRetryDelayMs = 5000;
       lastSubscribeRecoveryAt = 0;
       stopCentralPollTimer();
@@ -1149,13 +1185,7 @@
               }
             }, REALTIME_STABLE_RESET_MS);
 
-            const now = Date.now();
-            if(now - lastSubscribeRecoveryAt >= SUBSCRIBE_RECOVERY_THROTTLE_MS){
-              lastSubscribeRecoveryAt = now;
-              void fetchOnce(false, true);
-              void calibrateCentralServerClock(false);
-              void centralPoll(true);
-            }
+            scheduleSubscribeRecovery();
             return;
           }
 
@@ -1255,6 +1285,8 @@
     // visibility/pageshow or the next periodic poll. Reconcile immediately.
     window.addEventListener('offline', ()=>{
       clearRealtimeRetry();
+      clearRealtimeRecovery();
+      realtimeSubscribed = false;
       updateSyncConnectionStatus();
     });
 
@@ -1325,8 +1357,7 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=11.06', { scope: './' })
-        .then(reg => reg.update())
+      navigator.serviceWorker.register('./sw.js?v=11.07', { scope: './' })
         .catch(err => console.error('Service worker registration failed:', err));
     });
   }

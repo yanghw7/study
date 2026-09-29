@@ -1218,17 +1218,31 @@ async function loadMonth(ym){
 
 async function saveMonth(ym){
   if(!sbClient || !cloudUser){
+    dirtySaveMonths.add(String(ym));
     showToast('로그인 후에만 저장할 수 있어요');
+    return false;
+  }
+  if(navigator.onLine === false){
+    dirtySaveMonths.add(String(ym));
+    showToast('오프라인이라 저장을 보류했어요. 연결되면 다시 저장합니다.');
     return false;
   }
   try{
     await cloudSaveMonth(ym);
+    dirtySaveMonths.delete(String(ym));
     return true;
   }catch(e){
+    dirtySaveMonths.add(String(ym));
     console.error('클라우드 저장 실패:', e);
     showToast('클라우드 저장에 실패했어요. 인터넷 연결을 확인해주세요.');
     return false;
   }
+}
+
+async function requireSaveMonth(ym){
+  const ok=await saveMonth(ym);
+  if(ok !== true) throw new Error('월 기록을 서버에 저장하지 못했습니다: '+ym);
+  return true;
 }
 
 function getDayData(){
@@ -1243,6 +1257,37 @@ function getDayData(){
 
 const saveTimers = {};
 const saveWaiters = {};
+const dirtySaveMonths = new Set();
+let dirtySaveRetryBusy = false;
+let dirtySaveRetryAt = 0;
+
+async function retryDirtySavesOnce(force=false){
+  if(dirtySaveRetryBusy || !sbClient || !cloudUser || navigator.onLine === false) return false;
+  if(!dirtySaveMonths.size) return true;
+  const now=Date.now();
+  if(!force && now-dirtySaveRetryAt < 30000) return false;
+  dirtySaveRetryAt=now;
+  dirtySaveRetryBusy=true;
+  try{
+    for(const ym of [...dirtySaveMonths]){
+      if(saveTimers[ym]) continue;
+      const ok=await saveMonth(ym);
+      if(ok) dirtySaveMonths.delete(ym);
+    }
+    return dirtySaveMonths.size===0;
+  }finally{
+    dirtySaveRetryBusy=false;
+  }
+}
+
+window.addEventListener('online',()=>{
+  void retryDirtySavesOnce(true);
+  try{
+    if(cloudUser && cloudBootstrapDoneUserId !== String(cloudUser.id)){
+      void ensureCloudBootstrap().catch(e=>console.warn('온라인 복구 동기화 실패:', e));
+    }
+  }catch(_){}
+});
 
 function settleSaveWaiters(ym, error=null, value=false){
   const waiters = saveWaiters[ym] || [];
@@ -1272,6 +1317,7 @@ async function flushPendingSavesNow(){
       delete saveTimers[ym];
       try{
         const result = await saveMonth(ym);
+        if(result !== true) throw new Error('대기 중인 기록 저장 실패: '+ym);
         settleSaveWaiters(ym, null, result);
       }catch(e){
         settleSaveWaiters(ym, e, false);
@@ -1302,6 +1348,7 @@ function isPeriodInputEditing(){
 
 async function persistToday(){
   const ym = ymKey(cur);
+  dirtySaveMonths.add(String(ym));
   if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
 
   return new Promise((resolve,reject) => {
@@ -1322,11 +1369,13 @@ async function persistToday(){
 
 async function persistTodayImmediate(){
   const ym = ymKey(cur);
+  dirtySaveMonths.add(String(ym));
   if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
   delete saveTimers[ym];
 
   try{
     const result = await saveMonth(ym);
+    if(result !== true) throw new Error('즉시 기록 저장 실패: '+ym);
     settleSaveWaiters(ym, null, result);
     return result;
   }catch(e){
@@ -1574,10 +1623,19 @@ function updateWasteTimer(){
   labelEl.textContent = `${info.idx+1}기록 후 · 기록 종료 후 시간`;
 }
 
-setInterval(()=>{
+let legacyDisplayTimerTickId = null;
+function startLegacyDisplayTimerTick(){
+  if(legacyDisplayTimerTickId || __journalPaused || document.visibilityState === 'hidden') return;
   updateStudyTimer();
   updateWasteTimer();
-}, 250);
+  legacyDisplayTimerTickId=setInterval(()=>{
+    updateStudyTimer();
+    updateWasteTimer();
+  }, 1000);
+}
+function stopLegacyDisplayTimerTick(){
+  if(legacyDisplayTimerTickId){ clearInterval(legacyDisplayTimerTickId); legacyDisplayTimerTickId=null; }
+}
 
 let studyDayRolloverBusy = false;
 
@@ -1876,6 +1934,7 @@ window.addEventListener('message', (ev)=>{
     startBackgroundSensitiveLoops();
 
     if(wasPaused){
+      void retryDirtySavesOnce(false);
       // No child polling/read here. Parent sends its current central snapshot.
       requestCentralSync(false);
       if(!(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing())
@@ -1925,6 +1984,8 @@ window.addEventListener('message', (ev)=>{
 function startBackgroundSensitiveLoops(){
   if(document.visibilityState === 'hidden') return;
 
+  startLegacyDisplayTimerTick();
+  startAndroidTimerSyncTick();
 
   if(!rolloverCheckId){
     rolloverCheckId = setInterval(()=>{
@@ -1938,6 +1999,8 @@ function startBackgroundSensitiveLoops(){
 }
 
 function stopBackgroundSensitiveLoops(){
+  stopLegacyDisplayTimerTick();
+  stopAndroidTimerSyncTick();
 
   if(clockCalibrateId){
     clearInterval(clockCalibrateId);
@@ -1953,6 +2016,10 @@ function stopBackgroundSensitiveLoops(){
 async function recoverFromBackground(){
   try{
     if(cloudUser){
+      if(cloudBootstrapDoneUserId !== String(cloudUser.id)){
+        await ensureCloudBootstrap();
+      }
+      await retryDirtySavesOnce(false);
       if(window.parent !== window){
         requestCentralSync(true);
         await calibrateServerClock(false);
@@ -2046,7 +2113,16 @@ function syncAndroidTimer(){
     console.warn('Android 타이머 브리지 실패:', e);
   }
 }
-setInterval(syncAndroidTimer, 1000);
+let androidTimerSyncTickId = null;
+function startAndroidTimerSyncTick(){
+  if(androidTimerSyncTickId || __journalPaused || document.visibilityState === 'hidden') return;
+  syncAndroidTimer();
+  androidTimerSyncTickId=setInterval(syncAndroidTimer, 5000);
+}
+function stopAndroidTimerSyncTick(){
+  if(androidTimerSyncTickId){ clearInterval(androidTimerSyncTickId); androidTimerSyncTickId=null; }
+}
+
 
 function cutoffForDate(date = cur){
   const ym = ymKey(date), dk = dKey(date);
@@ -2610,7 +2686,7 @@ $('#periodList').addEventListener('input', async (e) => {
             const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
             const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
             p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            void calibrateServerClock(true);
+            void calibrateServerClock(false);
           }else{
             p.timerStartedAt = Math.round(serverNowMs());
           }
@@ -2619,7 +2695,7 @@ $('#periodList').addEventListener('input', async (e) => {
             const row = await cloudStopActiveTimer();
             const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
             p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            void calibrateServerClock(true);
+            void calibrateServerClock(false);
           }else{
             p.timerEndedAt = Math.round(serverNowMs());
           }
@@ -2755,7 +2831,7 @@ $('#periodList').addEventListener('click', async (e) => {
         const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
         const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
         p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
-        void calibrateServerClock(true);
+        void calibrateServerClock(false);
       }catch(_){
         p.timerStartedAt = Math.round(now.getTime());
       }
@@ -2774,7 +2850,7 @@ $('#periodList').addEventListener('click', async (e) => {
         const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
         const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
         p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-        void calibrateServerClock(true);
+        void calibrateServerClock(false);
       }catch(_){
         p.timerEndedAt = Math.round(serverNowMs());
       }
@@ -2804,7 +2880,7 @@ $('#periodList').addEventListener('click', async (e) => {
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
         await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
-        void calibrateServerClock(true);
+        void calibrateServerClock(false);
       }catch(_){}
     }
     if(window.parent!==window){
@@ -3522,6 +3598,7 @@ $('#settingsSave').onclick = async () => {
 };
 
 setInterval(async ()=>{
+  if(__journalPaused || document.visibilityState === 'hidden') return;
   const before = appSettings.dayStartHour;
   if(maybeActivatePending()){
     const latest = logicalToday();
@@ -3535,13 +3612,18 @@ let sbClient = null;
 let cloudUser = null;
 let cloudDataOwnerId = null;
 let cloudSessionEpoch = 0;
+let cloudBootstrapDoneUserId = null;
+let cloudBootstrapPromise = null;
+let cloudBootstrapPromiseUserId = null;
 
 function resetCloudAccountState(){
   cloudSessionEpoch++;
   cancelPendingSaves();
   monthCache = {};
   lastMonthSyncAt = null;
+  dirtySaveMonths.clear();
   periodRenderPending = false;
+  cloudBootstrapDoneUserId = null;
   try{ stopActiveTimerRealtime(); }catch(_){}
 }
 
@@ -3556,6 +3638,41 @@ function setCloudUser(nextUser){
 
   cloudUser = next;
   return cloudUser;
+}
+
+async function ensureCloudBootstrap(){
+  if(!cloudUser) return false;
+  const uid=String(cloudUser.id);
+  if(cloudBootstrapDoneUserId === uid) return true;
+  if(cloudBootstrapPromise && cloudBootstrapPromiseUserId === uid) return cloudBootstrapPromise;
+
+  const sessionEpoch=cloudSessionEpoch;
+  const promise=(async()=>{
+    await calibrateServerClock(false);
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    await autoSyncFromCloud();
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    enforceStudyDayLimit();
+    await renderCurrentView();
+    startActiveTimerRealtime();
+    await syncActiveTimerFromCloud(true);
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    await checkStudyDayBoundaryRollover();
+    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
+    cloudBootstrapDoneUserId=uid;
+    return true;
+  })();
+
+  cloudBootstrapPromise=promise;
+  cloudBootstrapPromiseUserId=uid;
+  try{
+    return await promise;
+  }finally{
+    if(cloudBootstrapPromise === promise){
+      cloudBootstrapPromise=null;
+      cloudBootstrapPromiseUserId=null;
+    }
+  }
 }
 
 function advanceLastMonthSyncAtFromRows(rows){
@@ -3830,7 +3947,7 @@ $('#cloudLogin').onclick = async () => {
   if(error){ alert('로그인 실패: '+error.message); return; }
   setCloudUser(data.user);
   await refreshCloudStatus();
-  await autoSyncFromCloud();
+  await ensureCloudBootstrap();
   showToast('클라우드에 로그인했어요');
 };
 $('#cloudGoogle').onclick = async () => {
@@ -3878,10 +3995,7 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     await refreshCloudStatus();
 
     if(cloudUser){
-      void calibrateServerClock(true);
-      await autoSyncFromCloud();
-      startActiveTimerRealtime();
-      await syncActiveTimerFromCloud(true);
+      await ensureCloudBootstrap();
     }
     enforceStudyDayLimit();
     await renderCurrentView();
@@ -3923,7 +4037,6 @@ initSupabase();
 if(sbClient){
   let __authBusy = false;
   sbClient.auth.onAuthStateChange((event, session) => {
-    if(__authBusy) return;
     __authBusy = true;
     setTimeout(async () => {
       try {
@@ -3941,14 +4054,7 @@ if(sbClient){
 
     if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')){
       try{
-        void calibrateServerClock(true);
-        await autoSyncFromCloud();
-        enforceStudyDayLimit();
-        await renderCurrentView();
-        startActiveTimerRealtime();
-        await syncActiveTimerFromCloud(true);
-
-        await checkStudyDayBoundaryRollover();
+        await ensureCloudBootstrap();
       }catch(e){
         console.error('세션 자동 동기화 실패:', e);
         enforceStudyDayLimit();
@@ -3969,12 +4075,7 @@ if(sbClient){
 (async () => {
   await refreshCloudStatus();
   if(cloudUser){
-    void calibrateServerClock(true);
-    await autoSyncFromCloud();
-    startActiveTimerRealtime();
-    await syncActiveTimerFromCloud(true);
-
-    await checkStudyDayBoundaryRollover();
+    await ensureCloudBootstrap();
   }
   enforceStudyDayLimit();
   await renderCurrentView();
@@ -4042,7 +4143,8 @@ async function applyRealtimeMonthRow(payload){
     const ym = recordLocalYm(ymRaw);
     if(!ym) return;
     if(row.deleted_at){
-      await applyRemoteDeletedMonth(ym, row.deleted_at);
+      const appliedDelete = await applyRemoteDeletedMonth(ym, row.deleted_at);
+      if(appliedDelete) advanceLastMonthSyncAtFromRows([row]);
       __scheduleRtRender();
       return;
     }
@@ -4055,6 +4157,7 @@ async function applyRealtimeMonthRow(payload){
     const remote = ensureMonthSync(deepClone(row.data || {}), ym);
     const existing = monthCache[ym];
     monthCache[ym] = existing ? mergeMonths(existing, remote, ym) : remote;
+    advanceLastMonthSyncAtFromRows([row]);
     __scheduleRtRender();
   }catch(e){
     console.warn('[7단계] Realtime 병합 실패, 폴백:', e);
@@ -4178,9 +4281,9 @@ setTimeout(()=>renderDay(), 0);
 </script>
 
 <script>
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && window.parent === window) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=11.06', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=11.07', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });
