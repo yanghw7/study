@@ -2325,6 +2325,9 @@ $('#periodList').addEventListener('click', async (e) => {
         const ts=row?.started_at?Date.parse(row.started_at):NaN;
         if(Number.isFinite(ts) && ts>0){
           if(!refetch()) return;
+          const startDT=new Date(ts);
+          p.startDate=ymd(startDT); p.startTime=hm(startDT);
+          p.endDate=''; p.endTime=''; p.timerEndedAt=null;
           p.timerStartedAt=ts;
           markChangedPeriodFields(p, beforeSync);
         }
@@ -2364,6 +2367,8 @@ $('#periodList').addEventListener('click', async (e) => {
         const ts=row?.stopped_at?Date.parse(row.stopped_at):NaN;
         if(Number.isFinite(ts) && ts>0){
           if(!refetch()) return;
+          const endDT=new Date(ts);
+          p.endDate=ymd(endDT); p.endTime=hm(endDT);
           p.timerEndedAt=ts;
           markChangedPeriodFields(p, beforeSync);
         }
@@ -2401,6 +2406,19 @@ $('#periodList').addEventListener('click', async (e) => {
     if(action !== 'start') autoSortPeriodsByStart(day);
     if(action==='cancel-start' || action==='cancel-end') await persistTodayImmediate();
     else await persistToday();
+    if(cloudUser && (action === 'start' || action === 'end')){
+      try{
+        const {data:verifyRow,error:verifyErr} = await sbClient
+          .from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
+        if(verifyErr) throw verifyErr;
+        if(verifyRow
+           && String(verifyRow.ym || '') === String(ymKey(cur))
+           && String(verifyRow.day_key || '') === String(dKey(cur))
+           && String(verifyRow.period_id || '') === String(pid)){
+          await applyActiveTimerRow(verifyRow);
+        }
+      }catch(e){ console.warn('타이머 동작 후 서버 1회 확인 실패:', e); }
+    }
     renderPeriods(); updateStudyTimer(); updateWasteTimer();
     if(typeof syncAndroidTimer === 'function') syncAndroidTimer();
   } finally {
