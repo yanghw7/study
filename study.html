@@ -5024,6 +5024,7 @@ if ('serviceWorker' in navigator && window.parent === window) {
   function sync(){
     const bridge=window.NativeWidget;
     if(!bridge||typeof bridge.updateSummary!=='function')return;
+    if(typeof bridge.updateDayStartHour==='function')bridge.updateDayStartHour(appSettings.dayStartHour);
     const box=document.getElementById('studyTimer');
     const running=!!box?.classList.contains('running');
     const elapsed=seconds(text('studyTimerTime'));
