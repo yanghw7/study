@@ -1219,7 +1219,7 @@ async function saveMonth(ym){
     return true;
   }catch(e){
     console.error('클라우드 저장 실패:', e);
-    showToast('클라우드 저장에 실패했어요. 인터넷 연결을 확인해주세요.');
+    showToast('클라우드 저장에 실패했어요: '+String((e&&(e.message||e.code))||e||'원인 불명').slice(0,140));
     return false;
   }
 }

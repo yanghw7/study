@@ -1113,6 +1113,18 @@
       void stopRealtime().finally(()=>startRealtime(0));
     };
     window.runCentralJournalSync = ()=>centralPoll(true);
+    window.runWidgetSync = async ()=>{
+      while(centralPollBusy) await new Promise(resolve=>setTimeout(resolve,100));
+      await centralPoll(true);
+      // 강의·수면 화면이 모두 로드되고 자기 타이머를 위젯에 보낼 시간을 준 뒤에 종료
+      try{
+        await Promise.race([
+          window.__preloadFramesPromise||Promise.resolve(),
+          new Promise(r=>setTimeout(r,9000))
+        ]);
+      }catch(_){}
+      setTimeout(()=>window.NativeWidget?.finishBackgroundSync?.(), 4500);
+    };
     window.getCentralActiveTimerSnapshot = ()=>{
       return centralActiveTimerRow ? {...centralActiveTimerRow} : null;
     };
@@ -1713,5 +1725,55 @@
   })();
 </script>
 
+<script id="preload-record-frames">
+// 위젯 3칸(공부/강의/수면) 모두 경과 타이머를 보내도록, 탭을 열지 않아도 강의·수면 화면을 미리 로드
+let __resolvePreload;
+window.__preloadFramesPromise=new Promise(r=>{__resolvePreload=r});
+function __loadFrameOnce(id){
+  const f=document.getElementById(id);
+  if(!f)return Promise.resolve();
+  return new Promise(res=>{
+    const done=()=>res();
+    let ready=false;
+    try{ready=!!f.getAttribute('src')&&f.contentDocument&&f.contentDocument.readyState==='complete'}catch(_){}
+    if(ready)return res();
+    f.addEventListener('load',done,{once:true});
+    if(!f.getAttribute('src')&&f.dataset.src)f.src=f.dataset.src;
+  });
+}
+function __preloadFrames(){
+  Promise.all([__loadFrameOnce('lectureFrame'),__loadFrameOnce('sleepFrame')]).then(()=>__resolvePreload());
+}
+// 이미 로드가 끝난 뒤(load 이벤트 이후)에 실행돼도 동작하도록 처리
+if(document.readyState==='complete')setTimeout(__preloadFrames,300);
+else window.addEventListener('load',()=>setTimeout(__preloadFrames,300));
+</script>
+<script id="fcm-token-register">
+// 이 기기의 푸시 주소(토큰)를 로그인한 계정으로 Supabase(device_tokens)에 등록
+(()=>{
+  let lastSent='';
+  async function register(){
+    try{
+      const nw=window.NativeWidget;
+      if(!nw||typeof nw.getFcmToken!=='function')return;
+      const token=nw.getFcmToken();
+      if(!token)return;
+      const sb=window.getSupabaseClient&&window.getSupabaseClient();
+      if(!sb)return;
+      const {data}=await sb.auth.getSession();
+      const uid=data&&data.session&&data.session.user&&data.session.user.id;
+      if(!uid)return;
+      const key=uid+'|'+token;
+      if(key===lastSent)return;
+      const {error}=await sb.from('device_tokens').upsert(
+        {user_id:uid,device_id:nw.getDeviceId(),token:token,updated_at:new Date().toISOString()},
+        {onConflict:'user_id,device_id'});
+      if(!error)lastSent=key;
+    }catch(e){}
+  }
+  setTimeout(register,4000);
+  setInterval(register,30000);
+})();
+</script>
 </body>
 </html>

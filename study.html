@@ -994,7 +994,7 @@ async function saveMonth(ym){
   }catch(e){
     dirtySaveMonths.add(String(ym));
     console.error('클라우드 저장 실패:', e);
-    showToast('클라우드 저장에 실패했어요. 인터넷 연결을 확인해주세요.');
+    showToast('클라우드 저장에 실패했어요: '+String((e&&(e.message||e.code))||e||'원인 불명').slice(0,140));
     return false;
   }
 }
@@ -5019,6 +5019,7 @@ if ('serviceWorker' in navigator && window.parent === window) {
 <script id="native-widget-sync">
 (()=>{
   let last='';
+  let lastWasteKey='';
   const text=id=>document.getElementById(id)?.textContent?.trim()||'';
   const seconds=value=>{const n=value.split(':').map(Number);return n.length===3?n[0]*3600+n[1]*60+n[2]:0};
   function sync(){
@@ -5029,12 +5030,30 @@ if ('serviceWorker' in navigator && window.parent === window) {
     const running=!!box?.classList.contains('running');
     const elapsed=seconds(text('studyTimerTime'));
     const total=text('sumStudy')||'오늘 합계 없음';
-    const detail=[text('sumPages'),text('sumWaste')&&`휴식 ${text('sumWaste')}`].filter(Boolean).join(String.fromCharCode(10,10));
+    const detail=[text('sumPages'),text('sumWaste')&&`휴식 ${text('sumWaste')}`].filter(Boolean).join(String.fromCharCode(10));
     const label=running?text('studyTimerLabel').replace(/\s*[·•]\s*진행 중\s*$/,'')+' · 진행 중':'';
     const key=[total,detail,label,elapsed,running].join('|');
-    if(key===last)return;
-    last=key;
-    bridge.updateSummary('study',total,detail,label,elapsed,running);
+    if(key!==last){
+      last=key;
+      bridge.updateSummary('study',total,detail,label,elapsed,running);
+    }
+    // 종료 후 타이머(빨간색): 진행 중 타이머가 없을 때만 위젯에 표시
+    let wasteOn=false,wasteElapsed=0,wasteLabel='',wasteStart=0;
+    try{
+      if(!running&&typeof wasteTimerForCurrentDay==='function'){
+        const w=wasteTimerForCurrentDay();
+        if(w&&Number(w.startedAt)>0){
+          wasteOn=true;wasteStart=Number(w.startedAt);
+          wasteElapsed=Math.max(0,Math.floor((serverNowMs()-wasteStart)/1000));
+          wasteLabel=`${w.idx+1}교시 후`;
+        }
+      }
+    }catch(e){}
+    const wkey=[wasteOn,wasteStart,wasteLabel].join('|');
+    if(wkey!==lastWasteKey&&typeof bridge.updateWaste==='function'){
+      lastWasteKey=wkey;
+      bridge.updateWaste('study',wasteLabel,wasteElapsed,wasteOn);
+    }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{sync();setInterval(sync,2000)});
   else{sync();setInterval(sync,2000)}
