@@ -1990,26 +1990,40 @@ startBackgroundSensitiveLoops();
 let lastAndroidTimerKey = '';
 function syncAndroidTimer(){
   try{
-    if(!window.AndroidTimer) return;
+    const T = window.AndroidTimer;
+    if(!T) return;
+    // 다른 날짜를 보고 있을 때는 알림바를 건드리지 않음 (오늘의 시작/종료 타이머를 유지)
+    try{ if(ymd(cur) !== ymd(logicalToday())) return; }catch(_){}
     const info = timerPeriodForCurrentDay();
 
     if(!info){
       if(lastAndroidTimerKey !== 'clear'){
-        window.AndroidTimer.clearTimer();
+        T.clearTimer('record');
         lastAndroidTimerKey = 'clear';
       }
       return;
     }
 
+    const toLocal = ms => Math.round(
+      (Number(ms) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
+    ) * 1000;
+
+    // 종료시각(epoch)을 Native 알림바에 그대로 전달 → 종료시간을 고치면 경과시간도 함께 바뀜
+    const sendStop = (endLocal, label, elapsed) => {
+      if(typeof T.stopTimerAt === 'function'){
+        T.stopTimerAt('record', endLocal, label);
+      }else{
+        T.stopTimer('record', elapsed, `${label}\u0001ENDMS=${endLocal}`);
+      }
+    };
+
     const wasteInfo = wasteTimerForCurrentDay();
     if(!info?.running && wasteInfo){
-      const localWasteStarted = Math.round(
-        (Number(wasteInfo.startedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
-      ) * 1000;
-      const wasteLabel = `${wasteInfo.idx+1}기록 종료 · 기록 종료 후 시간`;
-      const key = `waste:${localWasteStarted}:${wasteLabel}`;
+      const localEnd = toLocal(wasteInfo.startedAt);          // 마지막 기록의 종료시각
+      const label = `${wasteInfo.idx+1}기록`;
+      const key = `stop:${localEnd}:${label}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.startTimer(localWasteStarted, wasteLabel);
+        sendStop(localEnd, label, Math.floor(timerElapsedMs(wasteInfo.p)));
         lastAndroidTimerKey = key;
       }
       return;
@@ -2019,19 +2033,21 @@ function syncAndroidTimer(){
     const label = `${info.idx+1}기록`;
 
     if(info.running && Number(p.timerStartedAt) > 0){
-      const localEpochStarted = Math.round(
-        (Number(p.timerStartedAt) - (serverClockCalibrated ? serverClockOffsetMs : 0)) / 1000
-      ) * 1000;
+      const localEpochStarted = toLocal(p.timerStartedAt);
       const key = `run:${localEpochStarted}:${label}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.startTimer(localEpochStarted, label);
+        T.startTimer('record', localEpochStarted, label);
         lastAndroidTimerKey = key;
       }
     }else if(Number(p.timerStartedAt) > 0){
       const elapsed = Math.floor(timerElapsedMs(p));
-      const key = `stop:${elapsed}:${label}`;
+      const endMs = Number(p.timerEndedAt) >= Number(p.timerStartedAt)
+        ? Number(p.timerEndedAt)
+        : Number(p.timerStartedAt) + elapsed;
+      const localEnd = toLocal(endMs);
+      const key = `stop:${localEnd}:${label}`;
       if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.stopTimer(elapsed, label);
+        sendStop(localEnd, label, elapsed);
         lastAndroidTimerKey = key;
       }
     }

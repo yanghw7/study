@@ -2249,52 +2249,64 @@ window.addEventListener('pageshow', async ()=>{
 startBackgroundSensitiveLoops();
 
 let lastAndroidTimerKey = '';
+let lastAndroidTimerSent = {type:'', label:'', ms:0, at:0};
 function syncAndroidTimer(){
   try{
-    if(!window.AndroidTimer) return;
-    const info = timerPeriodForCurrentDay();
+    const T = window.AndroidTimer;
+    if(!T) return;
+    // 화면(오늘)의 타이머와 알림바 시계를 항상 같은 값으로 맞춥니다.
+    // 다른 날짜를 보는 중에는 알림바를 건드리지 않습니다.
+    try{ if(ymd(cur) !== ymd(logicalToday())) return; }catch(_){}
+    if(lastAndroidTimerKey === '') lastAndroidTimerSent = {type:'', label:'', ms:0, at:0};
 
+    const info = timerPeriodForCurrentDay();
     if(!info){
-      if(lastAndroidTimerKey !== 'clear'){
-        window.AndroidTimer.clearTimer('sleep');
+      if(lastAndroidTimerSent.type !== 'clear'){
+        T.clearTimer('sleep');
+        lastAndroidTimerSent = {type:'clear', label:'', ms:0, at:Date.now()};
         lastAndroidTimerKey = 'clear';
       }
       return;
     }
 
-    const p = info.p;
-    const label = `${info.idx+1}회 수면`;
-    // ★ 알림바도 화면 타이머와 동일하게 날짜/시간 필드를 1차 기준으로 사용
-    const startServerMs = effectiveTimerStartedAt(p);
-    const endServerMs = effectiveTimerEndedAt(p);
+    const off = serverClockCalibrated ? serverClockOffsetMs : 0;   // 화면 시계(serverNowMs)와 같은 보정값
+    const send = (type, label, ms, fn) => {
+      const l = lastAndroidTimerSent;
+      // 같은 값이면 다시 보내지 않음 (30초마다는 안전하게 재전송)
+      if(l.type === type && l.label === label && Math.abs(l.ms - ms) < 300 && (Date.now() - l.at) < 30000) return;
+      fn();
+      lastAndroidTimerSent = {type, label, ms, at:Date.now()};
+      lastAndroidTimerKey = type;
+    };
 
-    if(info.running && Number.isFinite(startServerMs) && startServerMs > 0){
-      const localEpochStarted = localEpochFromServerMs(startServerMs);
-      const key = `run:${localEpochStarted}:${label}`;
-      if(key !== lastAndroidTimerKey){
-        window.AndroidTimer.startTimer('sleep', localEpochStarted, label);
-        lastAndroidTimerKey = key;
+    if(info.running){
+      // 시작 타이머: 화면 "진행 중" 타이머와 같은 시작시각
+      const start = effectiveTimerStartedAt(info.p);
+      if(Number.isFinite(start) && start > 0){
+        const label = `${info.idx+1}회 수면`;
+        const ms = Math.round(start - off);
+        send('run', label, ms, () => T.startTimer('sleep', ms, label));
       }
-    }else if(Number.isFinite(startServerMs) && startServerMs > 0 && Number.isFinite(endServerMs) && endServerMs > 0){
-      // ★ 종료 후 "경과"도 HTML과 동일한 종료시각을 Native에 전달합니다.
-      const localEpochEnded = localEpochFromServerMs(endServerMs);
-      const key = `stop:${localEpochFromServerMs(startServerMs)}:${localEpochEnded}:${label}`;
-      if(key !== lastAndroidTimerKey){
-        if(typeof window.AndroidTimer.stopTimerAt === 'function'){
-          window.AndroidTimer.stopTimerAt('sleep', localEpochEnded, label);
-        }else{
-          // 기존 stopTimer 브리지를 쓰는 구버전 앱도 정확한 종료시각을 전달할 수 있도록
-          // 화면에 보이지 않는 marker로 종료 epoch을 함께 전달합니다.
-          const legacyLabel = `${label}\u0001ENDMS=${localEpochEnded}`;
-          window.AndroidTimer.stopTimer('sleep', Math.floor(timerElapsedMs(p)), legacyLabel);
-        }
-        lastAndroidTimerKey = key;
+    }else{
+      // 종료 타이머: 화면 "종료 후" 타이머(wasteTimer)와 같은 기준시각(종료시각)
+      const w = wasteTimerForCurrentDay();
+      if(w && Number.isFinite(w.startedAt) && w.startedAt > 0){
+        const label = `${w.idx+1}회 수면`;
+        const ms = Math.round(w.startedAt - off);
+        send('stop', label, ms, () => {
+          if(typeof T.stopTimerAt === 'function'){
+            T.stopTimerAt('sleep', ms, label);
+          }else{
+            T.stopTimer('sleep', Math.floor(timerElapsedMs(w.p)), `${label}\u0001ENDMS=${ms}`);
+          }
+        });
       }
     }
   }catch(e){
     console.warn('Android 타이머 브리지 실패:', e);
   }
 }
+setInterval(()=>{ try{ syncAndroidTimer(); }catch(e){} }, 1000);
 
 function localEpochFromServerMs(serverMs){
   return Math.round(
