@@ -883,7 +883,16 @@ function mergePeriods(localP, remoteP){
     out.endTime = String(r.endTime || '');
     const remoteEndPage = String(r.endPage ?? '').trim();
     const startPage = String(r.startPage ?? l.startPage ?? '').trim();
-    out.endPage = remoteEndPage || startPage;
+    const localEndPageTs = Number(l._fieldUpdatedAt?.endPage || 0);
+    const remoteEndPageTs = Math.max(
+      Number(r._fieldUpdatedAt?.endPage || 0),
+      Number(r._updatedAt || 0),
+      remoteEnded
+    );
+    const localEndPage = String(l.endPage ?? '').trim();
+    out.endPage = localEndPageTs > remoteEndPageTs
+      ? localEndPage
+      : (remoteEndPage || localEndPage || startPage);
 
     const endTs = Math.max(
       remoteEnded,
@@ -5007,6 +5016,29 @@ if ('serviceWorker' in navigator && window.parent === window) {
 })();
 </script>
 
+<script id="native-widget-sync">
+(()=>{
+  let last='';
+  const text=id=>document.getElementById(id)?.textContent?.trim()||'';
+  const seconds=value=>{const n=value.split(':').map(Number);return n.length===3?n[0]*3600+n[1]*60+n[2]:0};
+  function sync(){
+    const bridge=window.NativeWidget;
+    if(!bridge||typeof bridge.updateSummary!=='function')return;
+    const box=document.getElementById('studyTimer');
+    const running=!!box?.classList.contains('running');
+    const elapsed=seconds(text('studyTimerTime'));
+    const total=text('sumStudy')||'오늘 합계 없음';
+    const detail=[text('sumPages'),text('sumWaste')&&`휴식 ${text('sumWaste')}`].filter(Boolean).join(String.fromCharCode(10,10));
+    const label=running?text('studyTimerLabel').replace(/\s*[·•]\s*진행 중\s*$/,'')+' · 진행 중':'';
+    const key=[total,detail,label,elapsed,running].join('|');
+    if(key===last)return;
+    last=key;
+    bridge.updateSummary('study',total,detail,label,elapsed,running);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{sync();setInterval(sync,2000)});
+  else{sync();setInterval(sync,2000)}
+})();
+</script>
 <div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
 </body>
 </html>

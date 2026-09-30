@@ -5388,6 +5388,28 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
-
+<script id="native-widget-sync">
+(()=>{
+  let last='';
+  const text=id=>document.getElementById(id)?.textContent?.trim()||'';
+  const seconds=value=>{const n=value.split(':').map(Number);return n.length===3?n[0]*3600+n[1]*60+n[2]:0};
+  function sync(){
+    const bridge=window.NativeWidget;
+    if(!bridge||typeof bridge.updateSummary!=='function')return;
+    const box=document.getElementById('studyTimer');
+    const running=!!box?.classList.contains('running');
+    const elapsed=seconds(text('studyTimerTime'));
+    const total=text('sumStudy')||'오늘 합계 없음';
+    const detail=[text('sumLongest')&&`가장 긴 수면 ${text('sumLongest')}`,text('sumLatestWake')&&`최근 기상 ${text('sumLatestWake')}`].filter(Boolean).join(String.fromCharCode(10,10));
+    const label=running?text('studyTimerLabel').replace(/\s*[·•]\s*진행 중\s*$/,'')+' · 진행 중':'';
+    const key=[total,detail,label,elapsed,running].join('|');
+    if(key===last)return;
+    last=key;
+    bridge.updateSummary('sleep',total,detail,label,elapsed,running);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{sync();setInterval(sync,2000)});
+  else{sync();setInterval(sync,2000)}
+})();
+</script>
 </body>
 </html>
