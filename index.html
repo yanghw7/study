@@ -230,15 +230,6 @@
   const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
   let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
   let sharedSettingsLoaded=false;
-  let sharedSettingsUserId=null;
-  let sharedSettingsRowExists=false;
-
-  function resetSharedSettingsCache(userId=null){
-    sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
-    sharedSettingsLoaded=false;
-    sharedSettingsUserId=userId ? String(userId) : null;
-    sharedSettingsRowExists=false;
-  }
   window.getSupabaseClient = () => initSettingsClient();
   function initSettingsClient(){
     if(sbSettingsClient) return sbSettingsClient;
@@ -257,29 +248,19 @@
   }
   async function loadSharedSettingsFromCloud(){
     const sb=initSettingsClient();
-    if(!sb){
-      sharedSettingsLoaded=false;
-      return {...sharedSettingsCache};
-    }
+    if(!sb) return {...SHARED_SETTINGS_DEFAULT};
     const {data:{session}}=await sb.auth.getSession();
-    const user=session?.user;
-    if(!user){
-      resetSharedSettingsCache(null);
-      return {...sharedSettingsCache};
+    if(!session?.user){
+      sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
+      sharedSettingsLoaded=false;
+      return {...SHARED_SETTINGS_DEFAULT};
     }
-
-    const uid=String(user.id);
-    if(sharedSettingsUserId!==uid){
-      resetSharedSettingsCache(uid);
-    }
-
     const {data,error}=await sb.from('journal_settings')
       .select('day_start_hour,pending_day_start,week_start_day')
-      .eq('user_id',uid).maybeSingle();
+      .eq('user_id',session.user.id).maybeSingle();
     if(error){
-      sharedSettingsLoaded=false;
-      console.warn('설정 로드 실패, 기존 캐시 유지:',error);
-      return {...sharedSettingsCache};
+      console.warn('설정 로드 실패, 기본값 사용:',error);
+      return {...SHARED_SETTINGS_DEFAULT};
     }
     const norm={
       dayStartHour:Number.isInteger(data?.day_start_hour)&&data.day_start_hour>=0&&data.day_start_hour<=11?data.day_start_hour:SHARED_SETTINGS_DEFAULT.dayStartHour,
@@ -287,8 +268,6 @@
       pendingDayStart:data?.pending_day_start||null
     };
     sharedSettingsCache=norm;
-    sharedSettingsUserId=uid;
-    sharedSettingsRowExists=!!data;
     sharedSettingsLoaded=true;
     return norm;
   }
@@ -308,6 +287,7 @@
     try{
       if(!sharedSettingsLoaded){
         await loadSharedSettingsFromCloud();
+        sharedSettingsLoaded = true;
       }
       ev.source?.postMessage({
         type:'journal-shared-settings-changed',
@@ -320,49 +300,18 @@
     if(!sb) throw new Error('클라우드 연결 실패');
     const {data:{session}}=await sb.auth.getSession();
     if(!session?.user) throw new Error('로그인이 필요합니다. 설정은 클라우드에만 저장됩니다.');
-
-    const uid=String(session.user.id);
-    if(sharedSettingsUserId!==uid){
-      resetSharedSettingsCache(uid);
-    }
-    if(!sharedSettingsLoaded){
-      await loadSharedSettingsFromCloud();
-    }
-    if(!sharedSettingsLoaded || sharedSettingsUserId!==uid){
-      throw new Error('공통 설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
-    }
-
-    const current={...sharedSettingsCache};
+    const current=await readSharedSettings();
     const next={...current,...patch};
-    const changed={updated_at:new Date().toISOString()};
-    if(Object.prototype.hasOwnProperty.call(patch,'dayStartHour')) changed.day_start_hour=next.dayStartHour;
-    if(Object.prototype.hasOwnProperty.call(patch,'pendingDayStart')) changed.pending_day_start=next.pendingDayStart??null;
-    if(Object.prototype.hasOwnProperty.call(patch,'weekStartDay')) changed.week_start_day=next.weekStartDay;
-
-    let error=null;
-    if(sharedSettingsRowExists){
-      const updated=await sb.from('journal_settings')
-        .update(changed).eq('user_id',uid).select('user_id').maybeSingle();
-      error=updated.error;
-      if(!error && !updated.data){
-        sharedSettingsRowExists=false;
-      }
-    }
-    if(!sharedSettingsRowExists && !error){
-      const payload={
-        user_id:uid,
-        day_start_hour:next.dayStartHour,
-        pending_day_start:next.pendingDayStart??null,
-        week_start_day:next.weekStartDay,
-        updated_at:changed.updated_at
-      };
-      ({error}=await sb.from('journal_settings').upsert(payload,{onConflict:'user_id'}));
-    }
+    const payload={
+      user_id:session.user.id,
+      day_start_hour:next.dayStartHour,
+      pending_day_start:next.pendingDayStart??null,
+      week_start_day:next.weekStartDay,
+      updated_at:new Date().toISOString()
+    };
+    const {error}=await sb.from('journal_settings').upsert(payload,{onConflict:'user_id'});
     if(error) throw error;
     sharedSettingsCache=next;
-    sharedSettingsUserId=uid;
-    sharedSettingsRowExists=true;
-    sharedSettingsLoaded=true;
     notifySharedSettings(next);
     return next;
   }
@@ -486,8 +435,22 @@
       try{
         const h=Number(ev.data.hour);
         if(!Number.isInteger(h)||h<0||h>11) return;
-        await writeSharedSettingsToCloud({dayStartHour:h,pendingDayStart:null});
+        sharedSettingsCache.dayStartHour=h;
+        sharedSettingsCache.pendingDayStart=null;
+        const sb=initSettingsClient();
+        if(sb){
+          const {data:{session}}=await sb.auth.getSession();
+          if(session?.user){
+            await sb.from('journal_settings').upsert({
+              user_id:session.user.id,
+              day_start_hour:h,
+              pending_day_start:null,
+              updated_at:new Date().toISOString()
+            },{onConflict:'user_id'});
+          }
+        }
         await paint();
+        notifySharedSettings(sharedSettingsCache);
       }catch(e){ console.warn('[pending-activate] 반영 실패', e); }
     });
 
@@ -628,7 +591,8 @@
 
   loadSharedSettingsFromCloud()
     .then(()=>{
-      if(sharedSettingsLoaded) notifySharedSettings(sharedSettingsCache);
+      sharedSettingsLoaded = true;
+      notifySharedSettings(sharedSettingsCache);
     })
     .catch(e => console.warn('[FIX3] 초기 설정 브로드캐스트 실패', e));
 
@@ -666,15 +630,7 @@
     let ch = null;
     let chGeneration = 0;
     let realtimeRetryTimer = null;
-    let realtimeStableResetTimer = null;
-    let realtimeRecoveryTimer = null;
     let realtimeSubscribed = false;
-    let realtimeRetryDelayMs = 5000;
-    let lastSubscribeRecoveryAt = 0;
-
-    const REALTIME_RETRY_MAX_MS = 60 * 1000;
-    const REALTIME_STABLE_RESET_MS = 60 * 1000;
-    const SUBSCRIBE_RECOVERY_THROTTLE_MS = 60 * 1000;
 
     function updateSyncConnectionStatus(){
       const el = document.getElementById('syncConnectionStatus');
@@ -761,12 +717,10 @@
         try{
           const {data:{session}}=await sb.auth.getSession();
           if(!session?.user) return centralServerClockOffsetMs;
-          const uid=String(session.user.id);
           const t0=Date.now();
           const {data,error}=await sb.rpc('server_now');
           const t1=Date.now();
           if(error) throw error;
-          if(centralUserId && String(centralUserId) !== uid) return centralServerClockOffsetMs;
           const serverMs=Date.parse(data);
           if(!Number.isFinite(serverMs)) throw new Error('서버 시간을 읽지 못했습니다.');
           centralServerClockOffsetMs=Math.round(serverMs-((t0+t1)/2));
@@ -845,53 +799,10 @@
       }
     }
 
-    function clearRealtimeStableReset(){
-      if(realtimeStableResetTimer){
-        clearTimeout(realtimeStableResetTimer);
-        realtimeStableResetTimer = null;
-      }
-    }
-
-    function clearRealtimeRecovery(){
-      if(realtimeRecoveryTimer){
-        clearTimeout(realtimeRecoveryTimer);
-        realtimeRecoveryTimer = null;
-      }
-    }
-
-    function runSubscribeRecovery(){
-      if(navigator.onLine === false || document.visibilityState === 'hidden') return;
-      lastSubscribeRecoveryAt = Date.now();
-      void fetchOnce(false, true);
-      void calibrateCentralServerClock(false);
-      void centralPoll(true);
-    }
-
-    function scheduleSubscribeRecovery(){
-      clearRealtimeRecovery();
-      const now = Date.now();
-      const wait = Math.max(0, SUBSCRIBE_RECOVERY_THROTTLE_MS - (now - lastSubscribeRecoveryAt));
-      if(wait === 0){
-        runSubscribeRecovery();
-        return;
-      }
-      // 재연결이 60초 안에 반복돼도 복구를 버리지 않고, 제한 시점에 1회만 실행한다.
-      realtimeRecoveryTimer = setTimeout(()=>{
-        realtimeRecoveryTimer = null;
-        runSubscribeRecovery();
-      }, wait);
-    }
-
-    function scheduleRealtimeRetry(){
+    function scheduleRealtimeRetry(delay=5000){
       clearRealtimeRetry();
-      if(navigator.onLine === false || document.visibilityState === 'hidden') return;
-
-      const delay = realtimeRetryDelayMs;
-      realtimeRetryDelayMs = Math.min(realtimeRetryDelayMs * 2, REALTIME_RETRY_MAX_MS);
-
       realtimeRetryTimer = setTimeout(()=>{
         realtimeRetryTimer = null;
-        if(navigator.onLine === false || document.visibilityState === 'hidden') return;
         startRealtime(0);
       }, delay);
     }
@@ -914,7 +825,7 @@
     }
 
     function resetCentralUser(userId){
-      const id = userId ? String(userId) : null;
+      const id = userId || null;
       if(centralUserId === id) return;
       centralUserId = id;
       centralLastMonthSyncAt = null;
@@ -1000,7 +911,6 @@
           .maybeSingle();
 
         if(error) throw error;
-        if(String(centralUserId || '') !== String(user.id)) return;
 
         handleActiveRow(row, {
           autoSwitch: autoSwitch === true,
@@ -1049,7 +959,6 @@
         }
 
         const monthRes = await monthQuery;
-        if(String(centralUserId || '') !== String(user.id)) return;
 
         if(monthRes.error){
           console.warn('[central] study_months 폴링 실패:', monthRes.error);
@@ -1067,12 +976,8 @@
       }
     }
 
-    async function stopRealtime(clearUserState=false){
+    async function stopRealtime(){
       clearRealtimeRetry();
-      clearRealtimeStableReset();
-      clearRealtimeRecovery();
-      realtimeRetryDelayMs = 5000;
-      lastSubscribeRecoveryAt = 0;
       stopCentralPollTimer();
       chGeneration++;
 
@@ -1091,18 +996,15 @@
         }
       }
 
-      if(clearUserState){
-        resetCentralUser(null);
-        exclusiveActive = null;
-        setExclusiveTabStatus(null);
-        broadcastActiveTimer(null, 'signed-out');
-      }
+      resetCentralUser(null);
+      exclusiveActive = null;
+      setExclusiveTabStatus(null);
+      broadcastActiveTimer(null, 'signed-out');
     }
 
     function startRealtime(retry=0){
       const sb = initSettingsClient();
       if(!sb || ch) return;
-      if(navigator.onLine === false || document.visibilityState === 'hidden') return;
 
       const generation = ++chGeneration;
 
@@ -1176,22 +1078,14 @@
           if(status === 'SUBSCRIBED'){
             realtimeSubscribed = true;
             updateSyncConnectionStatus();
-
-            clearRealtimeStableReset();
-            realtimeStableResetTimer = setTimeout(()=>{
-              realtimeStableResetTimer = null;
-              if(ch === next && realtimeSubscribed){
-                realtimeRetryDelayMs = 5000;
-              }
-            }, REALTIME_STABLE_RESET_MS);
-
-            scheduleSubscribeRecovery();
+            void fetchOnce(true, true);
+            void calibrateCentralServerClock(false);
+            void centralPoll(true);
             return;
           }
 
           if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
             realtimeSubscribed = false;
-            clearRealtimeStableReset();
             updateSyncConnectionStatus();
             ch = null;
 
@@ -1201,35 +1095,22 @@
               })
               .finally(()=>{
                 if(generation === chGeneration){
-                  scheduleRealtimeRetry();
+                  scheduleRealtimeRetry(5000);
                 }
               });
           }
         });
       }).catch(()=>{
         if(generation === chGeneration && !ch){
-          scheduleRealtimeRetry();
+          scheduleRealtimeRetry(5000);
         }
       });
     }
 
     window.refreshExclusiveServerState = fetchOnce;
-    window.stopExclusiveTabRealtime = ()=>{ void stopRealtime(true); };
+    window.stopExclusiveTabRealtime = ()=>{ void stopRealtime(); };
     window.restartExclusiveTabRealtime = ()=>{
-      void stopRealtime(false).finally(()=>startRealtime(0));
-    };
-    window.ensureExclusiveTabRealtimeForUser = (userId)=>{
-      const uid=userId ? String(userId) : null;
-      if(!uid) return;
-
-      if(centralUserId && centralUserId!==uid){
-        void stopRealtime(true).finally(()=>startRealtime(0));
-        return;
-      }
-
-      if(!ch && navigator.onLine!==false && document.visibilityState!=='hidden'){
-        startRealtime(0);
-      }
+      void stopRealtime().finally(()=>startRealtime(0));
     };
     window.runCentralJournalSync = ()=>centralPoll(true);
     window.getCentralActiveTimerSnapshot = ()=>{
@@ -1264,18 +1145,14 @@
     startRealtime();
 
     document.addEventListener('visibilitychange', ()=>{
-      if(document.visibilityState === 'hidden'){
-        clearRealtimeRetry();
-        return;
+      if(document.visibilityState === 'visible'){
+        void fetchOnce(false, false);
+        void calibrateCentralServerClock(false);
+        void centralPoll(false);
       }
-      if(navigator.onLine !== false && !ch) startRealtime(0);
-      void fetchOnce(false, false);
-      void calibrateCentralServerClock(false);
-      void centralPoll(false);
     });
 
     window.addEventListener('pageshow', ()=>{
-      if(navigator.onLine !== false && !ch && document.visibilityState !== 'hidden') startRealtime(0);
       void fetchOnce(false, false);
       void calibrateCentralServerClock(false);
       void centralPoll(false);
@@ -1284,15 +1161,11 @@
     // Network can recover while the app stays visible, so do not wait for
     // visibility/pageshow or the next periodic poll. Reconcile immediately.
     window.addEventListener('offline', ()=>{
-      clearRealtimeRetry();
-      clearRealtimeRecovery();
-      realtimeSubscribed = false;
       updateSyncConnectionStatus();
     });
 
     window.addEventListener('online', ()=>{
       updateSyncConnectionStatus();
-      if(document.visibilityState === 'hidden') return;
       if(!ch) startRealtime(0);
       void fetchOnce(false, true);
       void calibrateCentralServerClock(false);
@@ -1357,7 +1230,8 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=11.07', { scope: './' })
+      navigator.serviceWorker.register('./sw.js?v=11.06', { scope: './' })
+        .then(reg => reg.update())
         .catch(err => console.error('Service worker registration failed:', err));
     });
   }
@@ -1442,21 +1316,12 @@
         if(event === 'TOKEN_REFRESHED') return;
 
         if(event === 'SIGNED_OUT'){
-          resetSharedSettingsCache(null);
           window.stopExclusiveTabRealtime?.();
-          setTimeout(status, 500);
           return;
         }
 
         if(event === 'SIGNED_IN'){
-          const uid=session?.user?.id ? String(session.user.id) : null;
-          if(uid && sharedSettingsUserId!==uid){
-            resetSharedSettingsCache(uid);
-            void loadSharedSettingsFromCloud().then(()=>{
-              if(sharedSettingsLoaded) notifySharedSettings(sharedSettingsCache);
-            }).catch(e=>console.warn('[settings] 계정 전환 후 설정 로드 실패',e));
-          }
-          window.ensureExclusiveTabRealtimeForUser?.(uid);
+          window.restartExclusiveTabRealtime?.();
         }
 
         setTimeout(status, 500);
@@ -1534,12 +1399,13 @@
    async function play(loop=false){try{if(ring){ring.loop=loop;ring.currentTime=0;await ring.play();return true}}catch(e){}const u=await audioURL();if(u){try{ring=new Audio(u);preparedURL=u;ring.loop=loop;await ring.play();return true}catch(e){}}await beep();return false}
    function stopRing(){clearInterval(vibeTimer);vibeTimer=null;try{ring?.pause();if(ring){ring.currentTime=0;ring.loop=false;ring.volume=1;ring.src='';ring.load()}}catch(e){};ring=null;try{navigator.vibrate?.(0)}catch(e){};releaseWake();try{swReg&&swReg.getNotifications({tag:'gongbujang-alarm'}).then(ns=>ns.forEach(n=>n.close()))}catch(e){};const b=$('#alarmStop');if(b){b.classList.remove('show');b.hidden=true;b.style.display='none'}}
    function resetAlarm(){clearTimeout(timer);clearInterval(watch);timer=null;watch=null;stopRing();write({enabled:false,ringing:false,due:null});$('#alarmHours').value='0';$('#alarmMinutes').value='0';$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='';}
-   function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${d.getMonth()+1}월 ${d.getDate()}일 ${ap} ${h}시 ${pad(d.getMinutes())}분에 울립니다`}
-   function ui(a){if(!a?.ringing){const b=$('#alarmStop');b.classList.remove('show');b.hidden=true;b.style.display='none';}if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmt(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
+   function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${ap} ${h}시 ${pad(d.getMinutes())}분`}
+ function fmtSet(t){return `⏰️ ${fmt(t)} 알람이 울릴 예정입니다 !`}
+   function ui(a){if(!a?.ringing){const b=$('#alarmStop');b.classList.remove('show');b.hidden=true;b.style.display='none';}if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmtSet(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
    function alignedDue(ms){const n=new Date();n.setSeconds(0,0);return n.getTime()+ms}
    function clampAlarmInput(el,max){const raw=String(el?.value??'').trim();if(raw==='')return;const n=parseInt(raw,10);if(!Number.isFinite(n)){el.value='';return;}el.value=String(Math.max(0,Math.min(max,n)))}
    function updatePreview(){const h=Math.max(0,Math.min(24,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;$('#alarmStatus').textContent=ms>=60000?fmt(alignedDue(ms)):''}
-   async function fire(){const a=read();if(!a?.enabled)return;clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent=fmt(a.due);let sounded=false;try{if(!ring){const u=await audioURL();if(u)ring=new Audio(u)}if(ring){ring.loop=true;ring.volume=1;ring.currentTime=0;await ring.play();sounded=!ring.paused}}catch(e){sounded=false}if(!sounded){try{await beep();sounded=true}catch(e){}}try{const buzz=()=>{navigator.vibrate?.([900,250,900,250,1200,300]);notifyRing()};buzz();clearInterval(vibeTimer);vibeTimer=setInterval(buzz,4000)}catch(e){};notifyRing();write({...a,enabled:false,ringing:true});const b=$('#alarmStop');b.hidden=false;b.classList.add('show');b.style.display='inline-block';if(!sounded){$('#alarmStatus').textContent='🔔 알람 시간! (소리 재생이 막혀 진동/알림으로 대신 울리는 중)'}}
+   async function fire(){const a=read();if(!a?.enabled)return;clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent=fmtSet(a.due);let sounded=false;try{if(!ring){const u=await audioURL();if(u)ring=new Audio(u)}if(ring){ring.loop=true;ring.volume=1;ring.currentTime=0;await ring.play();sounded=!ring.paused}}catch(e){sounded=false}if(!sounded){try{await beep();sounded=true}catch(e){}}try{const buzz=()=>{navigator.vibrate?.([900,250,900,250,1200,300]);notifyRing()};buzz();clearInterval(vibeTimer);vibeTimer=setInterval(buzz,4000)}catch(e){};notifyRing();write({...a,enabled:false,ringing:true});const b=$('#alarmStop');b.hidden=false;b.classList.add('show');b.style.display='inline-block';if(!sounded){$('#alarmStatus').textContent='🔔 알람 시간! (소리 재생이 막혀 진동/알림으로 대신 울리는 중)'}}
    function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500)}
    function catchUp(){const x=read();if(!x)return;if(x.enabled&&Date.now()>=x.due){fire()}else if(x.enabled){arm(x)}}
    document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',e=>{clampAlarmInput(e.target,24);updatePreview()});$('#alarmMinutes').addEventListener('input',e=>{clampAlarmInput(e.target,59);updatePreview()});$('#alarmPreview').onclick=async()=>{await cacheSelected();const u=await audioURL();if(!u)return alert('알람음을 선택해주세요.');try{const preview=new Audio(u);preview.volume=1;await preview.play();setTimeout(()=>{try{preview.pause();preview.currentTime=0}catch(e){}},2500)}catch(e){alert('미리듣기를 재생할 수 없습니다.')}};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(24,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await ensureNotifyPermission();await cacheSelected();stopRing();try{const u=await audioURL();if(u){ring=new Audio(u);ring.loop=true;ring.volume=1;await ring.play();ring.pause();ring.currentTime=0}ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(e){}const a={enabled:true,ringing:false,due:alignedDue(ms),sound:$('#alarmSoundSelect').value};write(a);arm(a);try{if(window.NativeAlarm&&typeof window.NativeAlarm.scheduleAt==='function'){window.NativeAlarm.scheduleAt(a.due,'기록장 알람')}}catch(e){console.warn('[Alarm] 네이티브 예약 실패',e)}};$('#alarmCancel').onclick=()=>{if(!confirm('알람을 정말 해제하시겠습니까?'))return;resetAlarm();try{window.NativeAlarm?.cancel?.()}catch(e){}};$('#alarmStop').onclick=()=>{resetAlarm();try{window.NativeAlarm?.cancel?.()}catch(e){}};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp()}});window.addEventListener('pageshow',()=>{catchUp()});window.addEventListener('focus',()=>{catchUp()})});

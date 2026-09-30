@@ -644,9 +644,8 @@ body{background:#FCF6F7!important}
 .alarmline button.primary{background:#285f50;border-color:#285f50;color:#fff}
 .alarmline button.danger{display:none!important;background:#b42318;border-color:#b42318;color:#fff}
 .alarmline button.danger.show{display:inline-block!important}
-#alarmFileName{min-width:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#77827e}
 .alarmstatusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;min-height:30px}.alarmstatusline:has(#alarmStatus:empty){display:none}#alarmStatus{display:block;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}.alarmstatusline #alarmStop{display:none;height:27px;padding:0 8px;border:1px solid #b42318;border-radius:8px;background:#b42318;color:#fff;font-size:10.5px;font-weight:800;white-space:nowrap}.alarmstatusline #alarmStop.show{display:inline-block}
-@media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmFileName{max-width:70px}#alarmStatus{font-size:13px}}
+@media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmStatus{font-size:13px}}
 .record-fixed-top{position:sticky!important;top:0!important;z-index:50!important;background:var(--bg);padding-top:1px;padding-bottom:1px}
 </style>
 
@@ -676,8 +675,7 @@ body{background:#FCF6F7!important}
   border-color:var(--accent)!important;
   color:#fff!important;
 }
-.record-fixed-top #recordAlarmBar #alarmCancel,
-.record-fixed-top #recordAlarmBar #alarmPreview{
+.record-fixed-top #recordAlarmBar #alarmCancel{
   background:var(--card)!important;
   color:var(--ink)!important;
 }
@@ -728,11 +726,8 @@ body{background:#FCF6F7!important}
     width:30px!important;min-width:30px!important;height:28px!important;padding:0 2px!important;font-size:12px!important;flex:0 0 30px!important;
   }
   #recordAlarmBar .alarmline .unit{font-size:9px!important;margin-left:0!important;flex:0 0 auto!important;}
-  #recordAlarmBar #alarmSoundSelect{
-    width:64px!important;min-width:0!important;max-width:64px!important;height:28px!important;padding:0 2px!important;font-size:9px!important;flex:1 1 52px!important;
-  }
-  #recordAlarmBar #alarmPreview{
-    height:28px!important;min-width:56px!important;width:56px!important;padding:0 2px!important;font-size:9px!important;flex:0 0 56px!important;
+  #recordAlarmBar #alarmModeSelect{
+    width:76px!important;min-width:0!important;max-width:76px!important;height:28px!important;padding:0 2px!important;font-size:10px!important;flex:1 1 60px!important;
   }
   #recordAlarmBar #alarmStart,#recordAlarmBar #alarmCancel{
     height:28px!important;min-width:40px!important;width:40px!important;padding:0 2px!important;font-size:10px!important;flex:0 0 40px!important;
@@ -753,9 +748,7 @@ body{background:#FCF6F7!important}
       <input id="alarmHours" type="number" min="0" max="24" value="" placeholder="" aria-label="시간"><span class="unit">시간</span>
       <input id="alarmMinutes" type="number" min="0" max="59" value="" placeholder="" aria-label="분"><span class="unit">분</span>
       <span class="unit afterAlarm">후</span>
-      <select id="alarmSoundSelect" aria-label="알람음"><option value="">불러오는 중...</option></select>
-      <span id="alarmFileName" hidden></span>
-      <button id="alarmPreview" type="button">▶ 미리듣기</button>
+      <select id="alarmModeSelect" aria-label="알림 방식"><option value="vibrate">📳 진동</option><option value="silent">🔕 무음</option></select>
       <button id="alarmStart" class="primary" type="button">시작</button>
       <button id="alarmCancel" type="button">해제</button>
     </div>
@@ -1218,31 +1211,17 @@ async function loadMonth(ym){
 
 async function saveMonth(ym){
   if(!sbClient || !cloudUser){
-    dirtySaveMonths.add(String(ym));
     showToast('로그인 후에만 저장할 수 있어요');
-    return false;
-  }
-  if(navigator.onLine === false){
-    dirtySaveMonths.add(String(ym));
-    showToast('오프라인이라 저장을 보류했어요. 연결되면 다시 저장합니다.');
     return false;
   }
   try{
     await cloudSaveMonth(ym);
-    dirtySaveMonths.delete(String(ym));
     return true;
   }catch(e){
-    dirtySaveMonths.add(String(ym));
     console.error('클라우드 저장 실패:', e);
     showToast('클라우드 저장에 실패했어요. 인터넷 연결을 확인해주세요.');
     return false;
   }
-}
-
-async function requireSaveMonth(ym){
-  const ok=await saveMonth(ym);
-  if(ok !== true) throw new Error('월 기록을 서버에 저장하지 못했습니다: '+ym);
-  return true;
 }
 
 function getDayData(){
@@ -1257,37 +1236,6 @@ function getDayData(){
 
 const saveTimers = {};
 const saveWaiters = {};
-const dirtySaveMonths = new Set();
-let dirtySaveRetryBusy = false;
-let dirtySaveRetryAt = 0;
-
-async function retryDirtySavesOnce(force=false){
-  if(dirtySaveRetryBusy || !sbClient || !cloudUser || navigator.onLine === false) return false;
-  if(!dirtySaveMonths.size) return true;
-  const now=Date.now();
-  if(!force && now-dirtySaveRetryAt < 30000) return false;
-  dirtySaveRetryAt=now;
-  dirtySaveRetryBusy=true;
-  try{
-    for(const ym of [...dirtySaveMonths]){
-      if(saveTimers[ym]) continue;
-      const ok=await saveMonth(ym);
-      if(ok) dirtySaveMonths.delete(ym);
-    }
-    return dirtySaveMonths.size===0;
-  }finally{
-    dirtySaveRetryBusy=false;
-  }
-}
-
-window.addEventListener('online',()=>{
-  void retryDirtySavesOnce(true);
-  try{
-    if(cloudUser && cloudBootstrapDoneUserId !== String(cloudUser.id)){
-      void ensureCloudBootstrap().catch(e=>console.warn('온라인 복구 동기화 실패:', e));
-    }
-  }catch(_){}
-});
 
 function settleSaveWaiters(ym, error=null, value=false){
   const waiters = saveWaiters[ym] || [];
@@ -1317,7 +1265,6 @@ async function flushPendingSavesNow(){
       delete saveTimers[ym];
       try{
         const result = await saveMonth(ym);
-        if(result !== true) throw new Error('대기 중인 기록 저장 실패: '+ym);
         settleSaveWaiters(ym, null, result);
       }catch(e){
         settleSaveWaiters(ym, e, false);
@@ -1348,7 +1295,6 @@ function isPeriodInputEditing(){
 
 async function persistToday(){
   const ym = ymKey(cur);
-  dirtySaveMonths.add(String(ym));
   if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
 
   return new Promise((resolve,reject) => {
@@ -1369,13 +1315,11 @@ async function persistToday(){
 
 async function persistTodayImmediate(){
   const ym = ymKey(cur);
-  dirtySaveMonths.add(String(ym));
   if(saveTimers[ym]) clearTimeout(saveTimers[ym]);
   delete saveTimers[ym];
 
   try{
     const result = await saveMonth(ym);
-    if(result !== true) throw new Error('즉시 기록 저장 실패: '+ym);
     settleSaveWaiters(ym, null, result);
     return result;
   }catch(e){
@@ -1623,19 +1567,10 @@ function updateWasteTimer(){
   labelEl.textContent = `${info.idx+1}기록 후 · 기록 종료 후 시간`;
 }
 
-let legacyDisplayTimerTickId = null;
-function startLegacyDisplayTimerTick(){
-  if(legacyDisplayTimerTickId || __journalPaused || document.visibilityState === 'hidden') return;
+setInterval(()=>{
   updateStudyTimer();
   updateWasteTimer();
-  legacyDisplayTimerTickId=setInterval(()=>{
-    updateStudyTimer();
-    updateWasteTimer();
-  }, 1000);
-}
-function stopLegacyDisplayTimerTick(){
-  if(legacyDisplayTimerTickId){ clearInterval(legacyDisplayTimerTickId); legacyDisplayTimerTickId=null; }
-}
+}, 250);
 
 let studyDayRolloverBusy = false;
 
@@ -1934,7 +1869,6 @@ window.addEventListener('message', (ev)=>{
     startBackgroundSensitiveLoops();
 
     if(wasPaused){
-      void retryDirtySavesOnce(false);
       // No child polling/read here. Parent sends its current central snapshot.
       requestCentralSync(false);
       if(!(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing())
@@ -1984,8 +1918,6 @@ window.addEventListener('message', (ev)=>{
 function startBackgroundSensitiveLoops(){
   if(document.visibilityState === 'hidden') return;
 
-  startLegacyDisplayTimerTick();
-  startAndroidTimerSyncTick();
 
   if(!rolloverCheckId){
     rolloverCheckId = setInterval(()=>{
@@ -1999,8 +1931,6 @@ function startBackgroundSensitiveLoops(){
 }
 
 function stopBackgroundSensitiveLoops(){
-  stopLegacyDisplayTimerTick();
-  stopAndroidTimerSyncTick();
 
   if(clockCalibrateId){
     clearInterval(clockCalibrateId);
@@ -2016,10 +1946,6 @@ function stopBackgroundSensitiveLoops(){
 async function recoverFromBackground(){
   try{
     if(cloudUser){
-      if(cloudBootstrapDoneUserId !== String(cloudUser.id)){
-        await ensureCloudBootstrap();
-      }
-      await retryDirtySavesOnce(false);
       if(window.parent !== window){
         requestCentralSync(true);
         await calibrateServerClock(false);
@@ -2113,16 +2039,7 @@ function syncAndroidTimer(){
     console.warn('Android 타이머 브리지 실패:', e);
   }
 }
-let androidTimerSyncTickId = null;
-function startAndroidTimerSyncTick(){
-  if(androidTimerSyncTickId || __journalPaused || document.visibilityState === 'hidden') return;
-  syncAndroidTimer();
-  androidTimerSyncTickId=setInterval(syncAndroidTimer, 5000);
-}
-function stopAndroidTimerSyncTick(){
-  if(androidTimerSyncTickId){ clearInterval(androidTimerSyncTickId); androidTimerSyncTickId=null; }
-}
-
+setInterval(syncAndroidTimer, 1000);
 
 function cutoffForDate(date = cur){
   const ym = ymKey(date), dk = dKey(date);
@@ -2686,7 +2603,7 @@ $('#periodList').addEventListener('input', async (e) => {
             const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
             const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
             p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            void calibrateServerClock(false);
+            void calibrateServerClock(true);
           }else{
             p.timerStartedAt = Math.round(serverNowMs());
           }
@@ -2695,7 +2612,7 @@ $('#periodList').addEventListener('input', async (e) => {
             const row = await cloudStopActiveTimer();
             const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
             p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-            void calibrateServerClock(false);
+            void calibrateServerClock(true);
           }else{
             p.timerEndedAt = Math.round(serverNowMs());
           }
@@ -2831,7 +2748,7 @@ $('#periodList').addEventListener('click', async (e) => {
         const row = await cloudStartActiveTimer(ymKey(cur), dKey(cur), p, idx);
         const ts = row?.started_at ? Date.parse(row.started_at) : NaN;
         p.timerStartedAt = Number.isFinite(ts) ? ts : Math.round(now.getTime());
-        void calibrateServerClock(false);
+        void calibrateServerClock(true);
       }catch(_){
         p.timerStartedAt = Math.round(now.getTime());
       }
@@ -2850,7 +2767,7 @@ $('#periodList').addEventListener('click', async (e) => {
         const row = await cloudStopActiveTimer(ymKey(cur), dKey(cur), p._id);
         const ts = row?.stopped_at ? Date.parse(row.stopped_at) : NaN;
         p.timerEndedAt = Number.isFinite(ts) ? ts : Math.round(serverNowMs());
-        void calibrateServerClock(false);
+        void calibrateServerClock(true);
       }catch(_){
         p.timerEndedAt = Math.round(serverNowMs());
       }
@@ -2880,7 +2797,7 @@ $('#periodList').addEventListener('click', async (e) => {
     if(Number(p.timerStartedAt) > 0 && cloudUser){
       try{
         await cloudResumeActiveTimer(ymKey(cur), dKey(cur), p, idx);
-        void calibrateServerClock(false);
+        void calibrateServerClock(true);
       }catch(_){}
     }
     if(window.parent!==window){
@@ -3598,7 +3515,6 @@ $('#settingsSave').onclick = async () => {
 };
 
 setInterval(async ()=>{
-  if(__journalPaused || document.visibilityState === 'hidden') return;
   const before = appSettings.dayStartHour;
   if(maybeActivatePending()){
     const latest = logicalToday();
@@ -3612,18 +3528,13 @@ let sbClient = null;
 let cloudUser = null;
 let cloudDataOwnerId = null;
 let cloudSessionEpoch = 0;
-let cloudBootstrapDoneUserId = null;
-let cloudBootstrapPromise = null;
-let cloudBootstrapPromiseUserId = null;
 
 function resetCloudAccountState(){
   cloudSessionEpoch++;
   cancelPendingSaves();
   monthCache = {};
   lastMonthSyncAt = null;
-  dirtySaveMonths.clear();
   periodRenderPending = false;
-  cloudBootstrapDoneUserId = null;
   try{ stopActiveTimerRealtime(); }catch(_){}
 }
 
@@ -3638,41 +3549,6 @@ function setCloudUser(nextUser){
 
   cloudUser = next;
   return cloudUser;
-}
-
-async function ensureCloudBootstrap(){
-  if(!cloudUser) return false;
-  const uid=String(cloudUser.id);
-  if(cloudBootstrapDoneUserId === uid) return true;
-  if(cloudBootstrapPromise && cloudBootstrapPromiseUserId === uid) return cloudBootstrapPromise;
-
-  const sessionEpoch=cloudSessionEpoch;
-  const promise=(async()=>{
-    await calibrateServerClock(false);
-    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
-    await autoSyncFromCloud();
-    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
-    enforceStudyDayLimit();
-    await renderCurrentView();
-    startActiveTimerRealtime();
-    await syncActiveTimerFromCloud(true);
-    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
-    await checkStudyDayBoundaryRollover();
-    if(sessionEpoch !== cloudSessionEpoch || String(cloudUser?.id||'') !== uid) return false;
-    cloudBootstrapDoneUserId=uid;
-    return true;
-  })();
-
-  cloudBootstrapPromise=promise;
-  cloudBootstrapPromiseUserId=uid;
-  try{
-    return await promise;
-  }finally{
-    if(cloudBootstrapPromise === promise){
-      cloudBootstrapPromise=null;
-      cloudBootstrapPromiseUserId=null;
-    }
-  }
 }
 
 function advanceLastMonthSyncAtFromRows(rows){
@@ -3947,7 +3823,7 @@ $('#cloudLogin').onclick = async () => {
   if(error){ alert('로그인 실패: '+error.message); return; }
   setCloudUser(data.user);
   await refreshCloudStatus();
-  await ensureCloudBootstrap();
+  await autoSyncFromCloud();
   showToast('클라우드에 로그인했어요');
 };
 $('#cloudGoogle').onclick = async () => {
@@ -3995,7 +3871,10 @@ window.yangStudyHandleOAuthCallback = async function(callbackUrl){
     await refreshCloudStatus();
 
     if(cloudUser){
-      await ensureCloudBootstrap();
+      void calibrateServerClock(true);
+      await autoSyncFromCloud();
+      startActiveTimerRealtime();
+      await syncActiveTimerFromCloud(true);
     }
     enforceStudyDayLimit();
     await renderCurrentView();
@@ -4037,6 +3916,7 @@ initSupabase();
 if(sbClient){
   let __authBusy = false;
   sbClient.auth.onAuthStateChange((event, session) => {
+    if(__authBusy) return;
     __authBusy = true;
     setTimeout(async () => {
       try {
@@ -4054,7 +3934,14 @@ if(sbClient){
 
     if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')){
       try{
-        await ensureCloudBootstrap();
+        void calibrateServerClock(true);
+        await autoSyncFromCloud();
+        enforceStudyDayLimit();
+        await renderCurrentView();
+        startActiveTimerRealtime();
+        await syncActiveTimerFromCloud(true);
+
+        await checkStudyDayBoundaryRollover();
       }catch(e){
         console.error('세션 자동 동기화 실패:', e);
         enforceStudyDayLimit();
@@ -4075,7 +3962,12 @@ if(sbClient){
 (async () => {
   await refreshCloudStatus();
   if(cloudUser){
-    await ensureCloudBootstrap();
+    void calibrateServerClock(true);
+    await autoSyncFromCloud();
+    startActiveTimerRealtime();
+    await syncActiveTimerFromCloud(true);
+
+    await checkStudyDayBoundaryRollover();
   }
   enforceStudyDayLimit();
   await renderCurrentView();
@@ -4143,8 +4035,7 @@ async function applyRealtimeMonthRow(payload){
     const ym = recordLocalYm(ymRaw);
     if(!ym) return;
     if(row.deleted_at){
-      const appliedDelete = await applyRemoteDeletedMonth(ym, row.deleted_at);
-      if(appliedDelete) advanceLastMonthSyncAtFromRows([row]);
+      await applyRemoteDeletedMonth(ym, row.deleted_at);
       __scheduleRtRender();
       return;
     }
@@ -4157,7 +4048,6 @@ async function applyRealtimeMonthRow(payload){
     const remote = ensureMonthSync(deepClone(row.data || {}), ym);
     const existing = monthCache[ym];
     monthCache[ym] = existing ? mergeMonths(existing, remote, ym) : remote;
-    advanceLastMonthSyncAtFromRows([row]);
     __scheduleRtRender();
   }catch(e){
     console.warn('[7단계] Realtime 병합 실패, 폴백:', e);
@@ -4281,9 +4171,9 @@ setTimeout(()=>renderDay(), 0);
 </script>
 
 <script>
-if ('serviceWorker' in navigator && window.parent === window) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=11.07', {scope:'./'}).catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=11.06', {scope:'./'}).catch(err => {
       console.error('Service worker registration failed:', err);
     });
   });
@@ -4472,39 +4362,49 @@ document.addEventListener('visibilitychange',()=>{
 
 <script id="record-independent-index-alarm">
 (()=>{
- const KEY='recordAlarm:v1', LIST_KEY='githubAlarmSounds:v1', SELECT_KEY='recordGithubAlarmSelected:v1';
- const API='https://api.github.com/repos/yanghw7/study/contents/sounds';
- const CACHE='alarm-sounds-v1';
- const $=q=>document.querySelector(q); let timer=null,watch=null,ring=null,ctx=null,gain=null,preparedURL=null,vibeTimer=null,wakeLock=null,swReg=null;
+ /* 알람: 소리 없이 '진동' 또는 '무음(화면 알림만)'으로 알립니다. */
+ const KEY='recordAlarm:v1', MODE_KEY='recordAlarmMode:v1';
+ const $=q=>document.querySelector(q); let timer=null,watch=null,vibeTimer=null,wakeLock=null,swReg=null;
  if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(r=>swReg=r).catch(()=>{})}
+ const native=()=>{try{return window.NativeAlarm||(window.parent&&window.parent.NativeAlarm)||null}catch(e){return null}};
+ const getMode=()=>($('#alarmModeSelect')?.value==='silent'?'silent':'vibrate');
  async function ensureNotifyPermission(){try{if(!('Notification' in window))return false;if(Notification.permission==='granted')return true;if(Notification.permission==='denied')return false;const p=await Notification.requestPermission();return p==='granted'}catch(e){return false}}
- async function notifyRing(){try{const reg=swReg||(navigator.serviceWorker&&await navigator.serviceWorker.ready);if(!reg)return;await reg.showNotification('⏰ 알람이 울리고 있어요',{body:'설정한 알람 시간이 되었습니다. 앱을 열어 확인해주세요.',tag:'record-journal-alarm',renotify:true,requireInteraction:true,vibrate:[900,250,900,250,1200,300],icon:'./icon-192.png',badge:'./icon-192.png',silent:false})}catch(e){}}
+ async function notifyRing(mode){try{const reg=swReg||(navigator.serviceWorker&&await navigator.serviceWorker.ready);if(!reg)return;const opt={body:'설정한 알람 시간이 되었습니다. 앱을 열어 확인해주세요.',tag:'record-journal-alarm',renotify:true,requireInteraction:true,icon:'./icon-192.png',badge:'./icon-192.png'};if(mode==='silent')opt.silent=true;else opt.vibrate=[900,250,900,250,1200,300];await reg.showNotification('⏰ 알람이 울리고 있어요',opt)}catch(e){}}
  async function requestWake(){try{if('wakeLock' in navigator && document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){wakeLock=null}}
  function releaseWake(){try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null}
  const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
  const write=v=>localStorage.setItem(KEY,JSON.stringify(v)); const pad=n=>String(n).padStart(2,'0');
- const audioExt=/\.(mp3|m4a|aac|wav|ogg|flac)$/i;
- function title(name){return decodeURIComponent(name).replace(audioExt,'')}
- function savedList(){try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]')}catch(e){return []}}
- function render(list){const sel=$('#alarmSoundSelect');if(!list.length){sel.innerHTML='<option value="">알람음 없음</option>';return}sel.innerHTML=list.map(x=>`<option value="${x.url.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${title(x.name)}</option>`).join('');const old=localStorage.getItem(SELECT_KEY);if(old&&list.some(x=>x.url===old))sel.value=old;else{sel.value=list[0].url;localStorage.setItem(SELECT_KEY,sel.value)}}
- async function refreshSounds(){let list=[];try{const r=await fetch(API,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});if(!r.ok)throw new Error('GitHub '+r.status);const j=await r.json();list=j.filter(x=>x.type==='file'&&audioExt.test(x.name)).map(x=>({name:x.name,url:x.download_url}));localStorage.setItem(LIST_KEY,JSON.stringify(list))}catch(e){list=savedList()}render(list)}
- async function cacheSelected(){const u=$('#alarmSoundSelect').value;if(!u)return false;localStorage.setItem(SELECT_KEY,u);try{const c=await caches.open(CACHE);let r=await c.match(u);if(!r){r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error();await c.put(u,r.clone())}return true}catch(e){return false}}
- async function audioURL(){const u=$('#alarmSoundSelect').value||localStorage.getItem(SELECT_KEY);if(!u)return null;try{const c=await caches.open(CACHE);const r=await c.match(u);if(r){const b=await r.blob();return URL.createObjectURL(b)}}catch(e){}return u}
- async function beep(){ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const o=ctx.createOscillator();gain=ctx.createGain();o.frequency.value=880;gain.gain.value=.18;o.connect(gain);gain.connect(ctx.destination);o.start();o.stop(ctx.currentTime+1.2)}
- async function play(loop=false){try{if(ring){ring.loop=loop;ring.currentTime=0;await ring.play();return true}}catch(e){}const u=await audioURL();if(u){try{ring=new Audio(u);preparedURL=u;ring.loop=loop;await ring.play();return true}catch(e){}}await beep();return false}
- function stopRing(){clearInterval(vibeTimer);vibeTimer=null;try{ring?.pause();if(ring){ring.currentTime=0;ring.loop=false;ring.volume=1;ring.src='';ring.load()}}catch(e){};ring=null;try{navigator.vibrate?.(0)}catch(e){};releaseWake();try{swReg&&swReg.getNotifications({tag:'record-journal-alarm'}).then(ns=>ns.forEach(n=>n.close()))}catch(e){};const b=$('#alarmStop');if(b){b.classList.remove('show');b.hidden=true;b.style.display='none'}}
- function resetAlarm(){clearTimeout(timer);clearInterval(watch);timer=null;watch=null;stopRing();write({enabled:false,ringing:false,due:null});$('#alarmHours').value='0';$('#alarmMinutes').value='0';$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='';}
- function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${d.getMonth()+1}월 ${d.getDate()}일 ${ap} ${h}시 ${pad(d.getMinutes())}분에 울립니다`}
- function ui(a){if(!a?.ringing){const b=$('#alarmStop');b.classList.remove('show');b.hidden=true;b.style.display='none';}if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmt(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
+ function stopRing(){clearInterval(vibeTimer);vibeTimer=null;try{navigator.vibrate?.(0)}catch(e){};releaseWake();try{swReg&&swReg.getNotifications({tag:'record-journal-alarm'}).then(ns=>ns.forEach(n=>n.close()))}catch(e){};const b=$('#alarmStop');if(b){b.classList.remove('show');b.hidden=true;b.style.display='none'}}
+ function resetAlarm(){clearTimeout(timer);clearInterval(watch);timer=null;watch=null;stopRing();write({enabled:false,ringing:false,due:null});try{native()?.cancelQuiet?.()}catch(e){};$('#alarmHours').value='0';$('#alarmMinutes').value='0';$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='';}
+ function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${ap} ${h}시 ${pad(d.getMinutes())}분`}
+ function fmtSet(t){return `⏰️ ${fmt(t)} 알람이 울릴 예정입니다 !`}
+ function ui(a){if(!a?.ringing){const b=$('#alarmStop');b.classList.remove('show');b.hidden=true;b.style.display='none';}if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmtSet(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
  function alignedDue(ms){const n=new Date();n.setSeconds(0,0);return n.getTime()+ms}
  function clampAlarmInput(el,max){const raw=String(el?.value??'').trim();if(raw==='')return;const n=parseInt(raw,10);if(!Number.isFinite(n)){el.value='';return;}el.value=String(Math.max(0,Math.min(max,n)))}
  function updatePreview(){const h=Math.max(0,Math.min(24,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;$('#alarmStatus').textContent=ms>=60000?fmt(alignedDue(ms)):''}
- async function fire(){const a=read();if(!a?.enabled)return;clearTimeout(timer);clearInterval(watch);$('#alarmStatus').textContent=fmt(a.due);let sounded=false;try{if(!ring){const u=await audioURL();if(u)ring=new Audio(u)}if(ring){ring.loop=true;ring.volume=1;ring.currentTime=0;await ring.play();sounded=!ring.paused}}catch(e){sounded=false}if(!sounded){try{await beep();sounded=true}catch(e){}}try{const buzz=()=>{navigator.vibrate?.([900,250,900,250,1200,300]);notifyRing()};buzz();clearInterval(vibeTimer);vibeTimer=setInterval(buzz,4000)}catch(e){};notifyRing();write({...a,enabled:false,ringing:true});const b=$('#alarmStop');b.hidden=false;b.classList.add('show');b.style.display='inline-block';if(!sounded){$('#alarmStatus').textContent='🔔 알람 시간! (소리 재생이 막혀 진동/알림으로 대신 울리는 중)'}}
+ async function fire(){const a=read();if(!a?.enabled)return;clearTimeout(timer);clearInterval(watch);const mode=a.mode==='silent'?'silent':'vibrate';
+  /* 앱(안드로이드)에서는 네이티브 서비스가 진동/화면 알림을 처리하므로 웹은 화면 표시만 합니다. 브라우저에서만 웹 진동/알림을 사용합니다. */
+  if(!native()){if(mode==='vibrate'){const buzz=()=>{try{navigator.vibrate?.([900,250,900,250,1200,300])}catch(e){}notifyRing(mode)};buzz();clearInterval(vibeTimer);vibeTimer=setInterval(buzz,4000)}else{notifyRing(mode)}}
+  write({...a,enabled:false,ringing:true});
+  $('#alarmStatus').textContent=mode==='silent'?'🔔 알람 시간! (무음 · 화면 알림)':'🔔 알람 시간! (진동)';
+  const b=$('#alarmStop');b.hidden=false;b.classList.add('show');b.style.display='inline-block'}
  function arm(a){clearTimeout(timer);clearInterval(watch);ui(a);const left=a.due-Date.now();if(left<=0)return fire();timer=setTimeout(fire,left);watch=setInterval(()=>{const x=read();if(x?.enabled&&Date.now()>=x.due)fire()},500)}
  function catchUp(){const x=read();if(!x)return;if(x.enabled&&Date.now()>=x.due){fire()}else if(x.enabled){arm(x)}}
- document.addEventListener('DOMContentLoaded',async()=>{await refreshSounds();$('#alarmSoundSelect').onchange=async()=>{localStorage.setItem(SELECT_KEY,$('#alarmSoundSelect').value);await cacheSelected()};$('#alarmHours').addEventListener('input',e=>{clampAlarmInput(e.target,24);updatePreview()});$('#alarmMinutes').addEventListener('input',e=>{clampAlarmInput(e.target,59);updatePreview()});$('#alarmPreview').onclick=async()=>{await cacheSelected();const u=await audioURL();if(!u)return alert('알람음을 선택해주세요.');try{const preview=new Audio(u);preview.volume=1;await preview.play();setTimeout(()=>{try{preview.pause();preview.currentTime=0}catch(e){}},2500)}catch(e){alert('미리듣기를 재생할 수 없습니다.')}};$('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(24,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');if(!$('#alarmSoundSelect').value)return alert('알람음을 선택해주세요.');await ensureNotifyPermission();await cacheSelected();stopRing();try{const u=await audioURL();if(u){ring=new Audio(u);ring.loop=true;ring.volume=1;await ring.play();ring.pause();ring.currentTime=0}ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();await ctx.resume()}catch(e){}const a={enabled:true,ringing:false,due:alignedDue(ms),sound:$('#alarmSoundSelect').value};write(a);arm(a)};$('#alarmCancel').onclick=async()=>{if(!(await askConfirm('알람을 정말 해제하시겠습니까?', true)))return;resetAlarm()};$('#alarmStop').onclick=()=>{resetAlarm()};const a=read();if(a?.sound&&[...$('#alarmSoundSelect').options].some(o=>o.value===a.sound))$('#alarmSoundSelect').value=a.sound;if(a?.enabled)arm(a);else ui(null);window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp()}});window.addEventListener('pageshow',()=>{catchUp()});window.addEventListener('focus',()=>{catchUp()})});
+ document.addEventListener('DOMContentLoaded',()=>{
+  const sel=$('#alarmModeSelect');const a0=read();const savedMode=(a0?.mode)||localStorage.getItem(MODE_KEY)||'vibrate';sel.value=savedMode==='silent'?'silent':'vibrate';
+  sel.onchange=()=>{localStorage.setItem(MODE_KEY,getMode())};
+  $('#alarmHours').addEventListener('input',e=>{clampAlarmInput(e.target,24);updatePreview()});
+  $('#alarmMinutes').addEventListener('input',e=>{clampAlarmInput(e.target,59);updatePreview()});
+  $('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(24,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');await ensureNotifyPermission();stopRing();const mode=getMode();localStorage.setItem(MODE_KEY,mode);const a={enabled:true,ringing:false,due:alignedDue(ms),mode};write(a);arm(a);try{const n=native();if(n&&typeof n.scheduleAtWithMode==='function')n.scheduleAtWithMode(a.due,'기록장 알람',mode)}catch(e){}};
+  $('#alarmCancel').onclick=async()=>{if(!(await askConfirm('알람을 정말 해제하시겠습니까?', true)))return;resetAlarm()};
+  $('#alarmStop').onclick=()=>{resetAlarm()};
+  if(a0?.enabled)arm(a0);else ui(null);
+  window.addEventListener('storage',e=>{if(e.key===KEY){const x=read();if(x?.enabled)arm(x);else ui(null)}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){catchUp()}});
+  window.addEventListener('pageshow',()=>{catchUp()});
+  window.addEventListener('focus',()=>{catchUp()})
+ });
 })();
-
 </script>
 
 <style id="record-native-datetime-picker-style">

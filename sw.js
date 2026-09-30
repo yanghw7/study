@@ -1,4 +1,4 @@
-const CACHE='study-pwa-v11.07';
+const CACHE='study-pwa-v11.06';
 const CORE=['./','./index.html','./study.html','./lecture.html','./sleep.html','./record.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',e=>e.waitUntil(
@@ -22,20 +22,20 @@ self.addEventListener('notificationclick',e=>{
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET') return;
 
-  let url;
-  try{ url = new URL(e.request.url); }catch(_){ return; }
-
-  // API/외부 리소스는 SW 캐시에 넣지 않는다. Supabase, GitHub, CDN, 폰트 등의
-  // 불필요한 CacheStorage 증가와 오래된 외부 응답 재사용을 막는다.
-  if(url.origin !== self.location.origin || url.hostname.includes('supabase.co')) return;
+  // ★ Supabase API 요청은 Service Worker가 건드리지 않고 그대로 통과
+  //    (캐시 시도/복제/로그 오버헤드 제거)
+  try{
+    const url = new URL(e.request.url);
+    if(url.hostname.includes('supabase.co')){
+      return;
+    }
+  }catch(_){}
 
   e.respondWith(
     fetch(e.request)
       .then(r=>{
-        if(r && r.ok){
-          const copy=r.clone();
-          caches.open(CACHE).then(c=>c.put(e.request,copy)).catch(()=>{});
-        }
+        const copy=r.clone();
+        caches.open(CACHE).then(c=>c.put(e.request,copy)).catch(()=>{});
         return r;
       })
       .catch(()=>caches.match(e.request).then(r=>r||new Response('',{status:504,statusText:'Offline'})))
