@@ -1546,9 +1546,14 @@ function recordedEndMsFromFields(p){
 // 시작/종료 입력 필드를 타이머의 1차 기준으로 사용합니다.
 // timerStartedAt/timerEndedAt가 stale해도 사용자가 수정한 완료 기록이 다시 진행 상태로 바뀌지 않습니다.
 function effectiveTimerStartedAt(p){
+  // 기준시점에서 자동 분리된 이어지는 카드만 기존 타이머 시작시각을 유지합니다.
+  // 일반 카드는 기존대로 화면의 시작 날짜/시간을 타이머 기준으로 사용합니다.
+  const storedStart = Number(p?.timerStartedAt);
+  if(p?._autoSplit === 'start' && Number.isFinite(storedStart) && storedStart > 0){
+    return storedStart;
+  }
   const fieldStart = recordedStartMsFromFields(p);
   if(fieldStart > 0) return fieldStart;
-  const storedStart = Number(p?.timerStartedAt);
   return Number.isFinite(storedStart) && storedStart > 0 ? storedStart : 0;
 }
 
@@ -1574,14 +1579,21 @@ function syncTimerAnchorsToFields(p, hadTimerStart = hasRecordedStart(p)){
     p.timerEndedAt = null;
     return;
   }
-  p.timerStartedAt = startMs > 0 ? startMs : null;
-  p.timerEndedAt = endMs > 0 && startMs > 0 && endMs >= startMs ? endMs : null;
+  // 기준시점 자동 분리 카드만 기존 timerStartedAt을 보존합니다.
+  // 그 외 카드는 기존처럼 입력된 시작/종료 시간과 동기화합니다.
+  if(p?._autoSplit === 'start' && Number(p.timerStartedAt) > 0){
+    p.timerStartedAt = Number(p.timerStartedAt);
+    p.timerEndedAt = endMs > 0 && Number(p.timerStartedAt) > 0 && endMs >= Number(p.timerStartedAt) ? endMs : null;
+  }else{
+    p.timerStartedAt = startMs > 0 ? startMs : null;
+    p.timerEndedAt = endMs > 0 && startMs > 0 && endMs >= startMs ? endMs : null;
+  }
 }
 
 function timerElapsedMs(p, nowMs = serverNowMs()){
-  const start = recordedStartMsFromFields(p) || effectiveTimerStartedAt(p);
+  const start = effectiveTimerStartedAt(p);
   if(start <= 0) return 0;
-  const end = recordedEndMsFromFields(p);
+  const end = effectiveTimerEndedAt(p);
   const until = end > 0 ? end : nowMs;
   return Math.max(0, until - start);
 }
