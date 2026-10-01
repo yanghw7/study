@@ -1309,7 +1309,7 @@ function requestParentServerClock(timeoutMs=1000, force=false){
 
 async function calibrateServerClock(force=false){
   if(serverClockCalibrationBusy || !sbClient || !cloudUser) return serverClockOffsetMs;
-  if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 300000){
+  if(!force && serverClockCalibrated && Date.now() - serverClockLastCalibratedAt < 1800000){
     return serverClockOffsetMs;
   }
 
@@ -3790,6 +3790,8 @@ let sbClient = null;
 let cloudUser = null;
 let cloudDataOwnerId = null;
 let cloudSessionEpoch = 0;
+// 내가 마지막으로 서버에 쓴 행의 updated_at (userId|ym -> updated_at). 저장 시 사전 읽기를 생략하는 용도
+const savedStampByYm = new Map();
 let cloudBootstrapDoneUserId = null;
 let cloudBootstrapPromise = null;
 let cloudBootstrapPromiseUserId = null;
@@ -3798,6 +3800,7 @@ function resetCloudAccountState(){
   cloudSessionEpoch++;
   cancelPendingSaves();
   monthCache = {};
+  try{ savedStampByYm.clear(); }catch(_){}
   lastMonthSyncAt = null;
   dirtySaveMonths.clear();
   periodRenderPending = false;
@@ -3925,6 +3928,27 @@ async function cloudSaveMonth(ym){
   let lastSaveErr = null;
   for(let attempt=0; attempt<4; attempt++){
     if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
+    const stampKey = userId + '|' + ym;
+    if(attempt === 0){
+      // 빠른 경로: 서버 행이 내가 마지막으로 쓴 상태 그대로(updated_at 일치, 삭제 안 됨)라면
+      // 읽기·병합 없이 바로 갱신한다. 다른 기기가 먼저 바꿨다면 0행이 되어 아래 기존 경로(읽기→병합)로 진행.
+      const knownStamp = savedStampByYm.get(stampKey);
+      if(knownStamp){
+        const nowIsoF = new Date(serverNowMs()).toISOString();
+        const {data:wf,error:wfErr} = await sbClient.from('study_months')
+          .update({data:local, updated_at:nowIsoF})
+          .eq('user_id',userId).eq('ym',ym).eq('updated_at',knownStamp).is('deleted_at',null)
+          .select('updated_at');
+        if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
+        if(!wfErr && wf && wf.length){
+          savedStampByYm.set(stampKey, wf[0].updated_at);
+          const currentF = ensureMonthSync(monthCache[ym] || {}, ym);
+          monthCache[ym] = mergeMonths(local, currentF, ym);
+          return;
+        }
+        savedStampByYm.delete(stampKey);
+      }
+    }
     const {data:rows,error:readErr} = await sbClient.from('study_months')
       .select('data,updated_at,deleted_at').eq('user_id',userId).eq('ym',ym).limit(1);
     if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
@@ -3946,6 +3970,7 @@ async function cloudSaveMonth(ym){
       if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
       const {data:w2,error:wErr2} = await q2.select('updated_at');
       if(!wErr2 && w2 && w2.length){
+        savedStampByYm.set(stampKey, w2[0].updated_at);
         if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
         monthCache[ym] = local;
         return;
@@ -3962,7 +3987,7 @@ async function cloudSaveMonth(ym){
         .eq('user_id',userId).eq('ym',ym);
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
-      if(!wErr && w && w.length){ writeOk=true; }
+      if(!wErr && w && w.length){ writeOk=true; savedStampByYm.set(stampKey, w[0].updated_at); }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{

@@ -682,7 +682,8 @@
     let centralServerClockPromise = null;
 
     const CENTRAL_POLL_MS = 15 * 60 * 1000;
-    const CENTRAL_CLOCK_MAX_AGE_MS = 5 * 60 * 1000;
+    const CENTRAL_CLOCK_MAX_AGE_MS = 30 * 60 * 1000;
+    const CENTRAL_POLL_REALTIME_MS = 55 * 60 * 1000;   // Realtime 연결 중 안전망 폴링 간격(타이머 15분 틱 기준 실제 약 60분)
 
     function postToFrame(target, msg){
       if(!target) return;
@@ -830,8 +831,11 @@
       if(centralPollTimer) return;
       centralPollTimer = setInterval(()=>{
         if(document.visibilityState === 'hidden') return;
+        const rtOk = !!ch && realtimeSubscribed;
         // active_timer is polled only when Realtime is unavailable.
         if(!ch) void fetchOnce(false, false);
+        // Realtime이 연결돼 있으면 안전망 폴링을 약 60분 간격으로 줄이고, 끊기면 기존 15분을 유지
+        if(rtOk && Date.now() - centralLastPollAt < CENTRAL_POLL_REALTIME_MS) return;
         void centralPoll(false);
       }, CENTRAL_POLL_MS);
     }
