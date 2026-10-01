@@ -627,6 +627,8 @@
       return null;
     }
 
+    // 푸시로 깨어난 숨은 WebView(?bg=1)는 실시간 연결·주기 폴링 없이 1회 조회만 하고 종료
+    const BG_SYNC_MODE = new URLSearchParams(location.search).get('bg') === '1';
     let ch = null;
     let chGeneration = 0;
     let realtimeRetryTimer = null;
@@ -1003,6 +1005,7 @@
     }
 
     function startRealtime(retry=0){
+      if(BG_SYNC_MODE) return;
       const sb = initSettingsClient();
       if(!sb || ch) return;
 
@@ -1753,6 +1756,7 @@ else window.addEventListener('load',()=>setTimeout(__preloadFrames,300));
 <script id="fcm-token-register">
 // 이 기기의 푸시 주소(토큰)를 로그인한 계정으로 Supabase(device_tokens)에 등록
 (()=>{
+  if(new URLSearchParams(location.search).get('bg')==='1')return; // 백그라운드 동기화 중에는 토큰 재등록(쓰기) 생략
   let lastSent='';
   async function register(){
     try{
