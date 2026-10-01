@@ -5030,7 +5030,7 @@ if ('serviceWorker' in navigator && window.parent === window) {
     const running=!!box?.classList.contains('running');
     const elapsed=seconds(text('studyTimerTime'));
     const total=text('sumStudy')||'오늘 합계 없음';
-    const detail=[text('sumPages'),text('sumWaste')&&`휴식 ${text('sumWaste')}`].filter(Boolean).join(String.fromCharCode(10));
+    const detail=[text('sumPages'),text('sumWaste')&&`휴식 ${text('sumWaste')}`].filter(Boolean).join(String.fromCharCode(10,10));
     const label=running?text('studyTimerLabel').replace(/\s*[·•]\s*진행 중\s*$/,'')+' · 진행 중':'';
     const key=[total,detail,label,elapsed,running].join('|');
     if(key!==last){
