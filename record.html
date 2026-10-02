@@ -647,6 +647,10 @@ body{background:#FCF6F7!important}
 .alarmstatusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;min-height:30px}.alarmstatusline:has(#alarmStatus:empty){display:none}#alarmStatus{display:block;text-align:center;white-space:nowrap;font-size:14px;font-weight:800;color:#b23a48}.alarmstatusline #alarmStop{display:none;height:27px;padding:0 8px;border:1px solid #b42318;border-radius:8px;background:#b42318;color:#fff;font-size:10.5px;font-weight:800;white-space:nowrap}.alarmstatusline #alarmStop.show{display:inline-block}
 @media(max-width:560px){.alarmbar{padding:5px 4px}.alarmline{gap:3px}.alarmline strong{font-size:11px}.alarmline button{padding:0 6px;font-size:10px}#alarmStatus{font-size:13px}}
 .record-fixed-top{position:sticky!important;top:0!important;z-index:50!important;background:var(--bg);padding-top:1px;padding-bottom:1px}
+  .record-alarm-quick{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:2px;margin:3px 0 4px;width:100%;}
+  .record-alarm-quick button{min-width:0;height:26px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);padding:0 2px;font-size:9px;font-weight:800;white-space:nowrap;overflow:hidden;}
+  .record-alarm-quick button:active{background:var(--accent-soft);transform:scale(.97);}
+
 </style>
 
 <style id="record-alarm-summary-harmony">
@@ -753,6 +757,18 @@ body{background:#FCF6F7!important}
       <button id="alarmCancel" type="button">해제</button>
     </div>
     <div class="alarmstatusline"><div id="alarmStatus"></div><button id="alarmStop" class="danger" type="button" hidden style="display:none">🔕 끄기</button></div>
+  </div>
+  <div class="record-alarm-quick" id="recordAlarmQuick" aria-label="알람시간 빠른 설정">
+    <button type="button" data-minutes="10">10분</button>
+    <button type="button" data-minutes="15">15분</button>
+    <button type="button" data-minutes="20">20분</button>
+    <button type="button" data-minutes="25">25분</button>
+    <button type="button" data-minutes="30">30분</button>
+    <button type="button" data-minutes="50">50분</button>
+    <button type="button" data-minutes="60">60분</button>
+    <button type="button" data-minutes="100">100분</button>
+    <button type="button" data-minutes="120">120분</button>
+    <button type="button" data-minutes="150">150분</button>
   </div>
 
 <div class="summary-card">
@@ -4436,6 +4452,15 @@ document.addEventListener('visibilitychange',()=>{
   sel.onchange=()=>{localStorage.setItem(MODE_KEY,getMode())};
   $('#alarmHours').addEventListener('input',e=>{clampAlarmInput(e.target,24);updatePreview()});
   $('#alarmMinutes').addEventListener('input',e=>{clampAlarmInput(e.target,59);updatePreview()});
+  document.querySelectorAll('#recordAlarmQuick button[data-minutes]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const total=Number(btn.dataset.minutes)||0;
+      const h=Math.floor(total/60),m=total%60;
+      $('#alarmHours').value=String(h);
+      $('#alarmMinutes').value=String(m);
+      updatePreview();
+    });
+  });
   $('#alarmStart').onclick=async()=>{const h=Math.max(0,Math.min(24,parseInt($('#alarmHours').value)||0)),m=Math.max(0,Math.min(59,parseInt($('#alarmMinutes').value)||0)),ms=(h*60+m)*60000;if(ms<60000)return alert('알람 시간을 1분 이상 설정해주세요.');await ensureNotifyPermission();stopRing();const mode=getMode();localStorage.setItem(MODE_KEY,mode);const a={enabled:true,ringing:false,due:alignedDue(ms),mode};write(a);arm(a);try{const n=native();if(n&&typeof n.scheduleAtWithMode==='function')n.scheduleAtWithMode(a.due,'기록장 알람',mode)}catch(e){}};
   $('#alarmCancel').onclick=async()=>{if(!(await askConfirm('알람을 정말 해제하시겠습니까?', true)))return;resetAlarm()};
   $('#alarmStop').onclick=()=>{resetAlarm()};
