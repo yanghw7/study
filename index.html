@@ -300,14 +300,7 @@
     }catch(e){ return null; }
     finally{ __sbCreating = false; }
   }
-  // 로그 절감: 동시에 여러 번 호출돼도 진행 중인 요청 하나를 공유 (화면 4개 + 초기 로드가 각자 조회하던 것 방지)
-  let __sharedSettingsInflight=null;
-  function loadSharedSettingsFromCloud(){
-    if(__sharedSettingsInflight) return __sharedSettingsInflight;
-    __sharedSettingsInflight=__loadSharedSettingsFromCloudImpl().finally(()=>{ __sharedSettingsInflight=null; });
-    return __sharedSettingsInflight;
-  }
-  async function __loadSharedSettingsFromCloudImpl(){
+  async function loadSharedSettingsFromCloud(){
     const sb=initSettingsClient();
     if(!sb) return {...SHARED_SETTINGS_DEFAULT};
     const {data:{session}}=await sb.auth.getSession();
@@ -725,7 +718,6 @@
     let centralLastActiveFetchAt = 0;
     let centralActiveFetchBusy = false;
     let centralActiveFetchPendingAutoSwitch = false;
-    let centralActiveLoaded = false;   // active_timer 를 한 번이라도 서버에서 받아 반영했는지(빈 값 포함)
     const centralMonthBroadcastSig = new Map();
 
     let centralServerClockOffsetMs = 0;
@@ -775,22 +767,6 @@
       }
       if(centralServerClockPromise) return centralServerClockPromise;
 
-      // 로그 절감: 숨은 동기화처럼 WebView 가 매번 새로 만들어져도 30분 안의 보정값은 저장해 둔 값을 재사용
-      if(!force){
-        try{
-          const saved=JSON.parse(localStorage.getItem('journal_central_clock_v1')||'null');
-          const now=Date.now();
-          if(saved && Number.isFinite(saved.offset) && Number.isFinite(saved.at)
-             && saved.at<=now && now-saved.at<CENTRAL_CLOCK_MAX_AGE_MS){
-            centralServerClockOffsetMs=saved.offset;
-            centralServerClockCalibrated=true;
-            centralServerClockLastCalibratedAt=saved.at;
-            sendCentralServerClock();
-            return centralServerClockOffsetMs;
-          }
-        }catch(_){}
-      }
-
       const sb=initSettingsClient();
       if(!sb) return centralServerClockOffsetMs;
 
@@ -807,7 +783,6 @@
           centralServerClockOffsetMs=Math.round(serverMs-((t0+t1)/2));
           centralServerClockCalibrated=true;
           centralServerClockLastCalibratedAt=Date.now();
-          try{ localStorage.setItem('journal_central_clock_v1', JSON.stringify({offset:centralServerClockOffsetMs, at:centralServerClockLastCalibratedAt})); }catch(_){}
           sendCentralServerClock();
         }catch(e){
           console.warn('[central] 서버 시계 보정 실패:', e);
@@ -917,7 +892,6 @@
       centralActiveTimerRow = null;
       centralLastPollAt = 0;
       centralLastActiveFetchAt = 0;
-      centralActiveLoaded = false;
       centralMonthBroadcastSig.clear();
     }
 
@@ -964,7 +938,6 @@
     function handleActiveRow(row, opts={}){
       const normalized = row && Object.keys(row).length ? row : null;
       centralActiveTimerRow = normalized;
-      centralActiveLoaded = true;
       applyFromRow(normalized, opts);
       broadcastActiveTimer(normalized, opts.source || 'realtime');
     }
@@ -1215,13 +1188,6 @@
       setTimeout(()=>{try{window.NativeWidget?.markSynced?.()}catch(_){}}, 2500);
       setTimeout(()=>window.NativeWidget?.finishBackgroundSync?.(), 6500);
     };
-    // 화면(iframe)이 active_timer 를 다시 조회하지 않아도 되는지: 부모 값이 최신일 때만 true
-    //  - Realtime 연결 중이거나, 최근 60초 안에 서버에서 직접 받은 경우
-    window.isCentralActiveTimerFresh = ()=>{
-      if(!centralActiveLoaded) return false;
-      if(!!ch && realtimeSubscribed) return true;
-      return Date.now() - centralLastActiveFetchAt < 60000;
-    };
     window.getCentralActiveTimerSnapshot = ()=>{
       return centralActiveTimerRow ? {...centralActiveTimerRow} : null;
     };
@@ -1253,26 +1219,18 @@
 
     startRealtime();
 
-    // 화면 복귀 시 동기화. (1.08 로그 절감)
-    //  - 숨은 동기화(?bg=1): runWidgetSync 가 곧바로 centralPoll(true)를 한 번 실행하므로 여기서 중복 조회하지 않음
-    //  - 일반 화면: Realtime 이 연결돼 있고 최근 5분 안에 동기화했다면 study_months 폴링 생략
-    //    (active_timer 는 항상 확인하므로 타이머 동기화는 그대로)
-    const RESUME_POLL_SKIP_MS = 5 * 60 * 1000;
-    function resumeSync(){
-      void fetchOnce(false, false);
-      void calibrateCentralServerClock(false);
-      if(BG_SYNC_MODE) return;
-      const rtOk = !!ch && realtimeSubscribed;
-      if(rtOk && Date.now() - centralLastPollAt < RESUME_POLL_SKIP_MS) return;
-      void centralPoll(false);
-    }
-
     document.addEventListener('visibilitychange', ()=>{
-      if(document.visibilityState === 'visible') resumeSync();
+      if(document.visibilityState === 'visible'){
+        void fetchOnce(false, false);
+        void calibrateCentralServerClock(false);
+        void centralPoll(false);
+      }
     });
 
     window.addEventListener('pageshow', ()=>{
-      resumeSync();
+      void fetchOnce(false, false);
+      void calibrateCentralServerClock(false);
+      void centralPoll(false);
     });
 
     // Network can recover while the app stays visible, so do not wait for
@@ -1876,45 +1834,28 @@ else window.addEventListener('load',()=>setTimeout(__preloadFrames,300));
 // 이 기기의 푸시 주소(토큰)를 로그인한 계정으로 Supabase(device_tokens)에 등록
 (()=>{
   if(new URLSearchParams(location.search).get('bg')==='1')return; // 백그라운드 동기화 중에는 토큰 재등록(쓰기) 생략
-  // 1.08 로그 절감: 등록 성공한 (계정|토큰)은 localStorage 에 기억 → 앱을 켤 때마다 upsert 하지 않음.
-  //  주기 재시도(30초)는 제거하고, 토큰/로그인 상태가 늦게 준비되는 경우를 위해 짧은 간격으로 몇 번만 확인한 뒤
-  //  실패하면 지수 백오프(최대 10분)로 재시도, 이후에는 화면 복귀 시에만 확인.
-  const LS_KEY='fcm_registered_key';
   let lastSent='';
-  try{lastSent=localStorage.getItem(LS_KEY)||'';}catch(e){}
-  let busy=false, fails=0, timer=null;
-  function later(ms){clearTimeout(timer);timer=setTimeout(register,ms);}
   async function register(){
-    if(busy)return;
-    busy=true;
     try{
       const nw=window.NativeWidget;
       if(!nw||typeof nw.getFcmToken!=='function')return;
       const token=nw.getFcmToken();
-      if(!token){ if(fails++<6)later(Math.min(5000*Math.pow(2,fails),600000)); return; }
+      if(!token)return;
       const sb=window.getSupabaseClient&&window.getSupabaseClient();
-      if(!sb){ if(fails++<6)later(Math.min(5000*Math.pow(2,fails),600000)); return; }
+      if(!sb)return;
       const {data}=await sb.auth.getSession();
       const uid=data&&data.session&&data.session.user&&data.session.user.id;
-      if(!uid)return; // 로그인 전: 로그인 후 화면 복귀/다음 실행 때 등록
-      const key=uid+'|'+token+'|'+(nw.getDeviceId()||'');
-      if(key===lastSent){fails=0;return;}
+      if(!uid)return;
+      const key=uid+'|'+token;
+      if(key===lastSent)return;
       const {error}=await sb.from('device_tokens').upsert(
         {user_id:uid,device_id:nw.getDeviceId(),token:token,updated_at:new Date().toISOString()},
         {onConflict:'user_id,device_id'});
-      if(!error){
-        lastSent=key;fails=0;
-        try{localStorage.setItem(LS_KEY,key);}catch(e){}
-      }else if(fails++<6){
-        later(Math.min(5000*Math.pow(2,fails),600000));
-      }
-    }catch(e){
-      if(fails++<6)later(Math.min(5000*Math.pow(2,fails),600000));
-    }finally{busy=false;}
+      if(!error)lastSent=key;
+    }catch(e){}
   }
   setTimeout(register,4000);
-  // 로그인 직후나 오래 켜 둔 뒤에도 놓치지 않도록, 화면에 돌아올 때 한 번만 확인(이미 등록됐으면 네트워크 요청 없음)
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&fails<=6)later(1500);});
+  setInterval(register,30000);
 })();
 </script>
 </body>

@@ -1830,9 +1830,6 @@ async function getRunningPeriodForBoundary(){
       // Use the parent's Realtime snapshot first. Read active_timer only as a fallback.
       if(snapshot?.status === 'running' && String(snapshot.ym || '').startsWith('S:')){
         data = snapshot;
-      }else if(isParentActiveTimerFresh()){
-        // 로그 절감: 부모(index)가 최신 active_timer 를 이미 갖고 있으면(없음 포함) 다시 조회하지 않음
-        data = snapshot || null;
       }else{
         const {data:remote,error} = await sbClient
           .from('active_timer')
@@ -5083,14 +5080,6 @@ async function syncActiveTimerFromCloud(force=false){
 }
 
 let centralActiveTimerSnapshot = null;
-
-function isParentActiveTimerFresh(){
-  try{
-    return window.parent !== window
-      && typeof window.parent.isCentralActiveTimerFresh === 'function'
-      && window.parent.isCentralActiveTimerFresh() === true;
-  }catch(_){ return false; }
-}
 
 function currentCentralActiveTimerSnapshot(){
   try{

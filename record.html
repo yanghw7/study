@@ -1633,25 +1633,11 @@ function isBoundaryEligiblePeriod(p, boundaryMs=null){
 async function getRunningPeriodForBoundary(){
   if(cloudUser && sbClient){
     try{
-      let data = null, error = null;
-      // 로그 절감: 부모(index)가 최신 active_timer 를 이미 갖고 있으면(없음 포함) 다시 조회하지 않음
-      let __parentFresh = false, __snap = null;
-      try{
-        if(window.parent !== window && typeof window.parent.isCentralActiveTimerFresh === 'function' && window.parent.isCentralActiveTimerFresh() === true){
-          __snap = window.parent.getCentralActiveTimerSnapshot?.() || null;
-          if(!(__snap?.user_id && String(__snap.user_id) !== String(cloudUser.id))) __parentFresh = true;
-        }
-      }catch(_){}
-      if(__parentFresh){
-        data = __snap;
-      }else{
-        const __r = await sbClient
-          .from('active_timer')
-          .select('*')
-          .eq('user_id', cloudUser.id)
-          .maybeSingle();
-        data = __r.data; error = __r.error;
-      }
+      const {data,error} = await sbClient
+        .from('active_timer')
+        .select('*')
+        .eq('user_id', cloudUser.id)
+        .maybeSingle();
 
       if(!error && data?.status === 'running'){
         const ym = String(data.ym || '');
