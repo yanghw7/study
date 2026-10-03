@@ -5085,5 +5085,52 @@ if ('serviceWorker' in navigator && window.parent === window) {
 })();
 </script>
 <div style="display:none" aria-hidden="true"><button id="backupData" type="button"></button><button id="restoreData" type="button"></button><input type="file" id="restoreFile" accept="application/json,.json"></div>
+<script id="remote-change-refresh">
+// 다른 기기에서 기록이 바뀌어 이 화면 데이터가 실제로 달라지면, 화면을 완전히 새로고침해서 최신 상태로 보여줍니다.
+// 입력 중이거나 방금 직접 조작했거나 저장이 끝나지 않았으면 기다렸다가 새로고침합니다.
+(()=>{
+  if(typeof applyRealtimeMonthRow!=='function')return;
+  let lastUserAt=0,pendingTimer=null,tries=0;
+  ['pointerdown','keydown','touchstart','input','wheel'].forEach(t=>
+    document.addEventListener(t,()=>{lastUserAt=Date.now()},{capture:true,passive:true}));
+  const isBg=()=>{try{return /[?&]bg=1/.test((window.parent!==window?window.parent:window).location.search)}catch(e){return false}};
+  const editing=()=>{const a=document.activeElement;return !!a&&(/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)||a.isContentEditable)};
+  const lastReload=()=>{try{return Number(sessionStorage.getItem('rcr_last')||0)}catch(e){return 0}};
+  function savesPending(){
+    try{
+      if(typeof saveTimers==='object'&&saveTimers&&Object.keys(saveTimers).some(k=>saveTimers[k]))return true;
+      if(typeof dirtySaveMonths!=='undefined'&&dirtySaveMonths&&dirtySaveMonths.size>0)return true;
+    }catch(e){}
+    return false;
+  }
+  function tryReload(){
+    pendingTimer=null;
+    if(document.visibilityState==='hidden')return;
+    try{if(typeof __journalPaused!=='undefined'&&__journalPaused)return}catch(e){}
+    const busy=editing()||(Date.now()-lastUserAt<8000)||savesPending()
+      ||(typeof userActionCount==='number'&&userActionCount>0);
+    if(busy){if(++tries<=10)pendingTimer=setTimeout(tryReload,2000);return}
+    if(Date.now()-lastReload()<15000)return;
+    try{sessionStorage.setItem('rcr_last',String(Date.now()))}catch(e){}
+    location.reload();
+  }
+  const orig=applyRealtimeMonthRow;
+  applyRealtimeMonthRow=async function(payload){
+    const ym=String(payload&&payload.new&&payload.new.ym||'');
+    let before='';
+    try{before=JSON.stringify(monthCache[ym]||null)}catch(e){}
+    const r=await orig.apply(this,arguments);
+    try{
+      if(!isBg()){
+        const after=JSON.stringify(monthCache[ym]||null);
+        if(before!==after&&Date.now()-lastUserAt>=8000){
+          tries=0;clearTimeout(pendingTimer);pendingTimer=setTimeout(tryReload,1200);
+        }
+      }
+    }catch(e){}
+    return r;
+  };
+})();
+</script>
 </body>
 </html>
