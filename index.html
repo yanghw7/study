@@ -300,7 +300,14 @@
     }catch(e){ return null; }
     finally{ __sbCreating = false; }
   }
-  async function loadSharedSettingsFromCloud(){
+  // 로그 절감: 동시에 여러 번 호출돼도 진행 중인 요청 하나를 공유 (화면 4개 + 초기 로드가 각자 조회하던 것 방지)
+  let __sharedSettingsInflight=null;
+  function loadSharedSettingsFromCloud(){
+    if(__sharedSettingsInflight) return __sharedSettingsInflight;
+    __sharedSettingsInflight=__loadSharedSettingsFromCloudImpl().finally(()=>{ __sharedSettingsInflight=null; });
+    return __sharedSettingsInflight;
+  }
+  async function __loadSharedSettingsFromCloudImpl(){
     const sb=initSettingsClient();
     if(!sb) return {...SHARED_SETTINGS_DEFAULT};
     const {data:{session}}=await sb.auth.getSession();
@@ -718,6 +725,7 @@
     let centralLastActiveFetchAt = 0;
     let centralActiveFetchBusy = false;
     let centralActiveFetchPendingAutoSwitch = false;
+    let centralActiveLoaded = false;   // active_timer 를 한 번이라도 서버에서 받아 반영했는지(빈 값 포함)
     const centralMonthBroadcastSig = new Map();
 
     let centralServerClockOffsetMs = 0;
@@ -767,6 +775,22 @@
       }
       if(centralServerClockPromise) return centralServerClockPromise;
 
+      // 로그 절감: 숨은 동기화처럼 WebView 가 매번 새로 만들어져도 30분 안의 보정값은 저장해 둔 값을 재사용
+      if(!force){
+        try{
+          const saved=JSON.parse(localStorage.getItem('journal_central_clock_v1')||'null');
+          const now=Date.now();
+          if(saved && Number.isFinite(saved.offset) && Number.isFinite(saved.at)
+             && saved.at<=now && now-saved.at<CENTRAL_CLOCK_MAX_AGE_MS){
+            centralServerClockOffsetMs=saved.offset;
+            centralServerClockCalibrated=true;
+            centralServerClockLastCalibratedAt=saved.at;
+            sendCentralServerClock();
+            return centralServerClockOffsetMs;
+          }
+        }catch(_){}
+      }
+
       const sb=initSettingsClient();
       if(!sb) return centralServerClockOffsetMs;
 
@@ -783,6 +807,7 @@
           centralServerClockOffsetMs=Math.round(serverMs-((t0+t1)/2));
           centralServerClockCalibrated=true;
           centralServerClockLastCalibratedAt=Date.now();
+          try{ localStorage.setItem('journal_central_clock_v1', JSON.stringify({offset:centralServerClockOffsetMs, at:centralServerClockLastCalibratedAt})); }catch(_){}
           sendCentralServerClock();
         }catch(e){
           console.warn('[central] 서버 시계 보정 실패:', e);
@@ -892,6 +917,7 @@
       centralActiveTimerRow = null;
       centralLastPollAt = 0;
       centralLastActiveFetchAt = 0;
+      centralActiveLoaded = false;
       centralMonthBroadcastSig.clear();
     }
 
@@ -938,6 +964,7 @@
     function handleActiveRow(row, opts={}){
       const normalized = row && Object.keys(row).length ? row : null;
       centralActiveTimerRow = normalized;
+      centralActiveLoaded = true;
       applyFromRow(normalized, opts);
       broadcastActiveTimer(normalized, opts.source || 'realtime');
     }
@@ -1187,6 +1214,13 @@
       // 데이터를 모두 읽은 뒤에만 알림바 갱신을 허용(읽는 도중의 '타이머 없음'이 알림바를 지우지 않게)
       setTimeout(()=>{try{window.NativeWidget?.markSynced?.()}catch(_){}}, 2500);
       setTimeout(()=>window.NativeWidget?.finishBackgroundSync?.(), 6500);
+    };
+    // 화면(iframe)이 active_timer 를 다시 조회하지 않아도 되는지: 부모 값이 최신일 때만 true
+    //  - Realtime 연결 중이거나, 최근 60초 안에 서버에서 직접 받은 경우
+    window.isCentralActiveTimerFresh = ()=>{
+      if(!centralActiveLoaded) return false;
+      if(!!ch && realtimeSubscribed) return true;
+      return Date.now() - centralLastActiveFetchAt < 60000;
     };
     window.getCentralActiveTimerSnapshot = ()=>{
       return centralActiveTimerRow ? {...centralActiveTimerRow} : null;
