@@ -889,6 +889,7 @@
     let centralActiveFetchBusy = false;
     let centralActiveFetchPendingAutoSwitch = false;
     const centralMonthBroadcastSig = new Map();
+    const centralMonthLatestUpdatedAtMs = new Map();
 
     let centralServerClockOffsetMs = 0;
     let centralServerClockCalibrated = false;
@@ -991,14 +992,25 @@
 
     function broadcastMonthRow(row, source='realtime'){
       if(!row || !row.ym) return;
-      noteKnownStamp(row.user_id || centralUserId, String(row.ym), row.updated_at, row.deleted_at);
+      const ymKey = String(row.ym);
+      const updatedMs = Date.parse(row.updated_at || '');
+      const latestMs = Number(centralMonthLatestUpdatedAtMs.get(ymKey) || 0);
+      // Realtime can occasionally deliver an older queued UPDATE after a newer
+      // soft-delete/new-record UPDATE. Never broadcast an older row back to a
+      // child iframe, otherwise a deleted lecture month can be resurrected.
+      if(Number.isFinite(updatedMs) && latestMs > 0 && updatedMs < latestMs) return;
+      if(Number.isFinite(updatedMs) && updatedMs > latestMs){
+        centralMonthLatestUpdatedAtMs.set(ymKey, updatedMs);
+      }
+
+      noteKnownStamp(row.user_id || centralUserId, ymKey, row.updated_at, row.deleted_at);
       const kind = kindFromMonthYm(row.ym);
       const item = kind ? tabs[kind] : null;
       if(!item) return;
 
       const sig=`${row.updated_at||''}|${row.deleted_at||''}`;
-      if(centralMonthBroadcastSig.get(String(row.ym)) === sig) return;
-      centralMonthBroadcastSig.set(String(row.ym), sig);
+      if(centralMonthBroadcastSig.get(ymKey) === sig) return;
+      centralMonthBroadcastSig.set(ymKey, sig);
 
       postToFrame(item.frame, {
         type:'journal-central-month-row',
@@ -1078,6 +1090,7 @@
       centralLastPollAt = 0;
       centralLastActiveFetchAt = 0;
       centralMonthBroadcastSig.clear();
+      centralMonthLatestUpdatedAtMs.clear();
     }
 
     function advanceCentralMonthCursor(rows){
