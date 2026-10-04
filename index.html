@@ -243,6 +243,61 @@
   const SUPABASE_URL = 'https://nvpvxtwebzefhgulswsv.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
 
+  // ── 접속 환경별 로그인 유지 정책 ─────────────────────────────
+  //  - 안드로이드 앱(WebView) / 설치한 PWA : 기존과 동일하게 항상 로그인 유지
+  //  - 일반 브라우저(주소 입력 접속)       : 마지막 사용 후 30분이 지나면 이 브라우저에서만 로그아웃
+  const ENV_APP = location.hostname === 'appassets.androidplatform.net';
+  const ENV_PWA = (()=>{
+    try{
+      if(window.matchMedia){
+        for(const m of ['standalone','fullscreen','minimal-ui','window-controls-overlay']){
+          if(window.matchMedia('(display-mode: '+m+')').matches) return true;
+        }
+      }
+      if(navigator.standalone === true) return true;
+      if(String(document.referrer||'').startsWith('android-app://')) return true;
+    }catch(_){}
+    return false;
+  })();
+  const ENV_BROWSER = !ENV_APP && !ENV_PWA;
+  const BROWSER_IDLE_MS = 30 * 60 * 1000;
+  const BROWSER_ACTIVE_KEY = 'journal:browser-last-active';
+  // 브라우저는 로그인 정보를 별도 키에 저장한다. 같은 기기의 PWA와 저장소를 공유하더라도
+  // 브라우저의 30분 로그아웃이 PWA/앱의 로그인 상태를 지우지 못하게 하기 위함.
+  const BROWSER_AUTH_KEY = 'sb-journal-browser-auth';
+  let browserIdleGuardStarted = false;
+
+  function startBrowserIdleGuard(sb){
+    if(!ENV_BROWSER || browserIdleGuardStarted) return;
+    browserIdleGuardStarted = true;
+    let lastWrite = 0;
+    const readLast = ()=>{ try{ return Number(localStorage.getItem(BROWSER_ACTIVE_KEY)||0); }catch(_){ return 0; } };
+    const writeNow = ()=>{ lastWrite = Date.now(); try{ localStorage.setItem(BROWSER_ACTIVE_KEY, String(lastWrite)); }catch(_){} };
+    async function expireIfIdle(){
+      const last = readLast();
+      if(!last || Date.now() - last < BROWSER_IDLE_MS) return false;
+      try{
+        const {data:{session}} = await sb.auth.getSession();
+        // scope:'local' → 서버의 다른 기기/앱 세션은 건드리지 않고 이 브라우저의 로그인만 해제
+        if(session) await sb.auth.signOut({scope:'local'});
+      }catch(_){}
+      writeNow();
+      return true;
+    }
+    async function onActivity(){
+      if(Date.now() - lastWrite < 5000) return;      // 입력이 잦아도 기록은 5초에 한 번만
+      if(await expireIfIdle()) return;
+      writeNow();
+    }
+    ['pointerdown','keydown','touchstart','wheel'].forEach(ev=>
+      window.addEventListener(ev, ()=>{ void onActivity(); }, {passive:true, capture:true}));
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') void onActivity(); });
+    window.addEventListener('focus', ()=>{ void onActivity(); });
+    setInterval(()=>{ void expireIfIdle(); }, 60 * 1000);
+    // 시작 시: 마지막 사용 후 30분이 지났으면 로그아웃, 기록이 없으면 지금부터 측정 시작
+    void (async()=>{ await expireIfIdle(); if(!readLast()) writeNow(); })();
+  }
+
   let sbSettingsClient = null;
   let __sbCreating = false;
 
@@ -268,10 +323,12 @@
         item.frame.contentWindow?.postMessage({
           type: active ? 'journal-resume' : 'journal-pause'
         }, location.origin);
+        if(active){
+          setTimeout(()=>{ try{ window.loadVisibleMonthForActiveTab?.(key); }catch(_){} }, 120);
+        }
       }catch(e){}
     });
     try{ localStorage.setItem(LAST_TAB_LOCAL_KEY, which); }catch(_){}
-    if(!skipSave) scheduleLastTabCloudSave(which);
   }
   Object.entries(tabs).forEach(([key,item])=>item.button.onclick=()=>openTab(key));
   let first='study';
@@ -284,7 +341,11 @@
   const SHARED_SETTINGS_DEFAULT={dayStartHour:11,weekStartDay:6};
   let sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
   let sharedSettingsLoaded=false;
+  let sharedSettingsLoadPromise=null;
+  let sharedSettingsLoadOk=false;
+  let sharedSettingsUserId=null;
   window.getSupabaseClient = () => initSettingsClient();
+  window.markLocalCloudChange = ()=>{ try{ localStorage.setItem('journal_last_local_change_at', String(Date.now())); }catch(_){} };
   function initSettingsClient(){
     if(sbSettingsClient) return sbSettingsClient;
     if(__sbCreating) return null;
@@ -294,36 +355,95 @@
       sbSettingsClient = window.supabase.createClient(
         SUPABASE_URL,
         SUPABASE_KEY,
-        { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:!isAndroidApp }, realtime: { logLevel: 'error' } }
+        { auth: Object.assign(
+            { persistSession:true, autoRefreshToken:true, detectSessionInUrl:!isAndroidApp },
+            ENV_BROWSER ? { storageKey: BROWSER_AUTH_KEY } : {}
+          ), realtime: { logLevel: 'error' } }
       );
+      startBrowserIdleGuard(sbSettingsClient);
       return sbSettingsClient;
     }catch(e){ return null; }
     finally{ __sbCreating = false; }
   }
+  // 숨은 동기화(bg=1)는 매번 새 화면이 떠서 journal_settings 를 다시 읽던 것을 30분 캐시로 대체
+  const IS_BG_PAGE=new URLSearchParams(location.search).get('bg')==='1';
+  const SETTINGS_CACHE_KEY='journal:settings-cache:';
+  const SETTINGS_CACHE_MS=30*60*1000;
+  function readSettingsCache(uid){
+    try{
+      const c=JSON.parse(localStorage.getItem(SETTINGS_CACHE_KEY+uid)||'null');
+      if(c && c.v && Date.now()-Number(c.at)<SETTINGS_CACHE_MS) return c.v;
+    }catch(_){}
+    return null;
+  }
+  function writeSettingsCache(uid,v){
+    try{ localStorage.setItem(SETTINGS_CACHE_KEY+uid, JSON.stringify({at:Date.now(),v})); }catch(_){}
+  }
   async function loadSharedSettingsFromCloud(){
-    const sb=initSettingsClient();
-    if(!sb) return {...SHARED_SETTINGS_DEFAULT};
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session?.user){
-      sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
+    if(sharedSettingsLoadPromise) return sharedSettingsLoadPromise;
+    if(sharedSettingsLoaded){
+      try{
+        const sb=initSettingsClient();
+        const {data:{session}}=await sb.auth.getSession();
+        const uid=String(session?.user?.id||'');
+        if(uid && uid===sharedSettingsUserId) return {...sharedSettingsCache};
+      }catch(_){}
       sharedSettingsLoaded=false;
-      return {...SHARED_SETTINGS_DEFAULT};
+      sharedSettingsLoadOk=false;
+      sharedSettingsUserId=null;
     }
-    const {data,error}=await sb.from('journal_settings')
-      .select('day_start_hour,pending_day_start,week_start_day')
-      .eq('user_id',session.user.id).maybeSingle();
-    if(error){
-      console.warn('설정 로드 실패, 기본값 사용:',error);
-      return {...SHARED_SETTINGS_DEFAULT};
+
+    sharedSettingsLoadPromise=(async()=>{
+      const sb=initSettingsClient();
+      if(!sb){
+        sharedSettingsLoadOk=false;
+        return {...SHARED_SETTINGS_DEFAULT};
+      }
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session?.user){
+        sharedSettingsCache={...SHARED_SETTINGS_DEFAULT};
+        sharedSettingsLoaded=false;
+        sharedSettingsLoadOk=false;
+        sharedSettingsUserId=null;
+        return {...SHARED_SETTINGS_DEFAULT};
+      }
+      const currentUserId=String(session.user.id||'');
+      if(IS_BG_PAGE){
+        const cached=readSettingsCache(currentUserId);
+        if(cached){
+          sharedSettingsCache=cached;
+          sharedSettingsUserId=currentUserId;
+          sharedSettingsLoaded=true;
+          sharedSettingsLoadOk=true;
+          return cached;
+        }
+      }
+      const {data,error}=await sb.from('journal_settings')
+        .select('day_start_hour,pending_day_start,week_start_day')
+        .eq('user_id',session.user.id).maybeSingle();
+      if(error){
+        console.warn('설정 로드 실패, 기본값 사용:',error);
+        sharedSettingsLoadOk=false;
+        return {...SHARED_SETTINGS_DEFAULT};
+      }
+      const norm={
+        dayStartHour:Number.isInteger(data?.day_start_hour)&&data.day_start_hour>=0&&data.day_start_hour<=11?data.day_start_hour:SHARED_SETTINGS_DEFAULT.dayStartHour,
+        weekStartDay:Number.isInteger(data?.week_start_day)&&data.week_start_day>=0&&data.week_start_day<=6?data.week_start_day:SHARED_SETTINGS_DEFAULT.weekStartDay,
+        pendingDayStart:data?.pending_day_start||null
+      };
+      sharedSettingsCache=norm;
+      sharedSettingsUserId=currentUserId;
+      sharedSettingsLoaded=true;
+      sharedSettingsLoadOk=true;
+      writeSettingsCache(currentUserId,norm);
+      return norm;
+    })();
+
+    try{
+      return await sharedSettingsLoadPromise;
+    }finally{
+      sharedSettingsLoadPromise=null;
     }
-    const norm={
-      dayStartHour:Number.isInteger(data?.day_start_hour)&&data.day_start_hour>=0&&data.day_start_hour<=11?data.day_start_hour:SHARED_SETTINGS_DEFAULT.dayStartHour,
-      weekStartDay:Number.isInteger(data?.week_start_day)&&data.week_start_day>=0&&data.week_start_day<=6?data.week_start_day:SHARED_SETTINGS_DEFAULT.weekStartDay,
-      pendingDayStart:data?.pending_day_start||null
-    };
-    sharedSettingsCache=norm;
-    sharedSettingsLoaded=true;
-    return norm;
   }
   async function readSharedSettings(){
     if(!sharedSettingsLoaded) await loadSharedSettingsFromCloud();
@@ -366,43 +486,9 @@
     const {error}=await sb.from('journal_settings').upsert(payload,{onConflict:'user_id'});
     if(error) throw error;
     sharedSettingsCache=next;
+    writeSettingsCache(String(session.user.id),next);
     notifySharedSettings(next);
     return next;
-  }
-  let lastTabCloudSaveTimer=null;
-  let pendingLastTabCloud=null;
-  let lastTabCloudSavedValue=null;
-  function scheduleLastTabCloudSave(tab){
-    pendingLastTabCloud=tab;
-    if(lastTabCloudSaveTimer) clearTimeout(lastTabCloudSaveTimer);
-    lastTabCloudSaveTimer=setTimeout(()=>{
-      lastTabCloudSaveTimer=null;
-      const next=pendingLastTabCloud;
-      pendingLastTabCloud=null;
-      if(!next || next===lastTabCloudSavedValue) return;
-      void saveLastTabToCloud(next);
-    },3000);
-  }
-  async function saveLastTabToCloud(tab){
-    const sb=initSettingsClient();
-    if(!sb) return;
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session?.user) return;
-    const {error}=await sb.from('journal_settings').upsert({
-      user_id:session.user.id,
-      last_tab:tab,
-      updated_at:new Date().toISOString()
-    },{onConflict:'user_id'});
-    if(!error) lastTabCloudSavedValue=tab;
-  }
-  async function restoreLastTabFromCloud(){
-    const sb=initSettingsClient();
-    if(!sb) return null;
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session?.user) return null;
-    const {data}=await sb.from('journal_settings')
-      .select('last_tab').eq('user_id',session.user.id).maybeSingle();
-    return data?.last_tab||null;
   }
   function initSharedSettingsUI(){
     const btn=document.getElementById('sharedSettingsBtn');
@@ -683,6 +769,17 @@
 
     // 푸시로 깨어난 숨은 WebView(?bg=1)는 실시간 연결·주기 폴링 없이 1회 조회만 하고 종료
     const BG_SYNC_MODE = new URLSearchParams(location.search).get('bg') === '1';
+    const BG_PUSH_PARAMS = new URLSearchParams(location.search);
+    const BG_PUSH_TYPE = BG_PUSH_PARAMS.get('push_type') || '';
+    const BG_PUSH_YM = BG_PUSH_PARAMS.get('push_ym') || '';
+    const BG_PUSH_UPDATED_AT = BG_PUSH_PARAMS.get('push_updated_at') || '';
+    const BG_PUSH_DELETED_AT = BG_PUSH_PARAMS.get('push_deleted_at') || '';
+    const BG_PUSH_TIMER_STATUS = BG_PUSH_PARAMS.get('push_timer_status') || '';
+    const BG_PUSH_TIMER_STARTED_AT = BG_PUSH_PARAMS.get('push_timer_started_at') || '';
+    const BG_PUSH_TIMER_STOPPED_AT = BG_PUSH_PARAMS.get('push_timer_stopped_at') || '';
+    const BG_PUSH_TIMER_DAY_KEY = BG_PUSH_PARAMS.get('push_timer_day_key') || '';
+    const BG_PUSH_TIMER_PERIOD_ID = BG_PUSH_PARAMS.get('push_timer_period_id') || '';
+    const BG_PUSH_TIMER_YM = BG_PUSH_PARAMS.get('push_timer_ym') || '';
     let ch = null;
     let chGeneration = 0;
     let realtimeRetryTimer = null;
@@ -697,14 +794,57 @@
       if(navigator.onLine === false){
         el.classList.add('offline');
         textEl.textContent = '오프라인';
+        applyChildTimerLock();
         return;
       }
       if(realtimeSubscribed){
         el.classList.add('online');
         textEl.textContent = '온라인';
+        applyChildTimerLock();
         return;
       }
       textEl.textContent = '서버 연결 중';
+      applyChildTimerLock();
+    }
+
+    // 온라인일 때만 자식 화면(공부/강의/수면/기록)의 시작·종료 버튼 사용 가능.
+    // 서버 연결 중이거나 오프라인이면 비활성화. 상태는 위 표시(updateSyncConnectionStatus)와 동일한 기준이며
+    // Supabase 조회·로그는 쓰지 않는다.
+    function isIndexOnline(){
+      // 숨은 화면(?bg=1: 위젯 동기화·위젯 시작/종료)은 실시간 연결을 쓰지 않으므로 기기 네트워크 상태만 기준으로 삼는다.
+      if(BG_SYNC_MODE) return navigator.onLine !== false;
+      return navigator.onLine !== false && realtimeSubscribed === true;
+    }
+
+    function applyChildTimerLock(){
+      const locked = !isIndexOnline();
+      Object.values(tabs).forEach(item=>{
+        try{
+          const doc = item.frame && item.frame.contentDocument;
+          if(!doc || !doc.documentElement) return;
+          if(!doc.getElementById('indexOnlineLockStyle') && doc.head){
+            const st = doc.createElement('style');
+            st.id = 'indexOnlineLockStyle';
+            st.textContent = 'html.index-offline-lock button[data-study-action],html.index-offline-lock button[data-lecture-action]{opacity:.4!important;filter:grayscale(.7);pointer-events:none!important;cursor:not-allowed}';
+            doc.head.appendChild(st);
+          }
+          if(!doc.__indexOnlineLockBound){
+            doc.__indexOnlineLockBound = true;
+            const block = (e)=>{
+              if(!doc.documentElement.classList.contains('index-offline-lock')) return;
+              const t = e.target;
+              const btn = t && t.closest ? t.closest('button[data-study-action],button[data-lecture-action]') : null;
+              if(!btn) return;
+              e.preventDefault();
+              e.stopImmediatePropagation();
+            };
+            // 캡처 단계에서 먼저 막아 자식 화면의 기존 클릭 처리기가 실행되지 않게 함 (카드가 다시 그려져도 유지)
+            doc.addEventListener('click', block, true);
+            doc.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' ') block(e); }, true);
+          }
+          doc.documentElement.classList.toggle('index-offline-lock', locked);
+        }catch(_){}
+      });
     }
 
     updateSyncConnectionStatus();
@@ -712,6 +852,36 @@
     let centralPollTimer = null;
     let centralPollBusy = false;
     let centralLastMonthSyncAt = null;
+    // knownStamp: 이미 받아 둔 월 행의 (updated_at|deleted_at) 표식. Realtime 수신·내 저장·poll 에서 갱신하고
+    // localStorage 에 저장해 숨은 동기화 화면과 공유한다. (자식 화면도 같은 키·형식으로 기록)
+    const KNOWN_STAMP_KEY='journal:known-stamp:';
+    function stampSig(updatedAt, deletedAt){
+      const u=Date.parse(updatedAt||''); const d=deletedAt?Date.parse(deletedAt):NaN;
+      return (Number.isFinite(u)?u:'')+'|'+(Number.isFinite(d)?d:'');
+    }
+    function readKnownStamps(uid){
+      try{ return JSON.parse(localStorage.getItem(KNOWN_STAMP_KEY+String(uid))||'{}')||{}; }catch(_){ return {}; }
+    }
+    function noteKnownStamp(uid, ym, updatedAt, deletedAt){
+      if(!uid || !ym || !updatedAt) return;
+      try{
+        const m=readKnownStamps(uid);
+        const sig=stampSig(updatedAt, deletedAt);
+        if(m[ym]===sig) return;
+        m[ym]=sig;
+        localStorage.setItem(KNOWN_STAMP_KEY+String(uid), JSON.stringify(m));
+      }catch(_){}
+    }
+    function isKnownStamp(uid, ym, updatedAt, deletedAt){
+      if(!uid || !ym || !updatedAt) return false;
+      return readKnownStamps(uid)[ym]===stampSig(updatedAt, deletedAt);
+    }
+    function loadPersistedMonthCursor(userId){
+      try{ const v=localStorage.getItem('journal_month_cursor:'+String(userId)); return v||null; }catch(_){ return null; }
+    }
+    function persistMonthCursor(userId, value){
+      try{ if(userId && value) localStorage.setItem('journal_month_cursor:'+String(userId), value); }catch(_){}
+    }
     let centralUserId = null;
     let centralActiveTimerRow = null;
     let centralLastPollAt = 0;
@@ -726,8 +896,8 @@
     let centralServerClockPromise = null;
 
     const CENTRAL_POLL_MS = 15 * 60 * 1000;
-    const CENTRAL_CLOCK_MAX_AGE_MS = 30 * 60 * 1000;
-    const CENTRAL_POLL_REALTIME_MS = 14 * 60 * 1000;   // Realtime 연결 중 안전망 폴링 간격(타이머 15분 틱 기준 실제 약 60분)
+    const CENTRAL_CLOCK_MAX_AGE_MS = 10 * 60 * 1000;
+    const CENTRAL_POLL_REALTIME_MS = 60 * 60 * 1000;   // Realtime 연결 중 안전망 폴링 간격 60분
 
     function postToFrame(target, msg){
       if(!target) return;
@@ -767,6 +937,18 @@
       }
       if(centralServerClockPromise) return centralServerClockPromise;
 
+      if(!force && BG_SYNC_MODE){
+        try{
+          const c=JSON.parse(localStorage.getItem('journal:server-clock')||'null');
+          if(c && Number.isFinite(c.offset) && Date.now()-Number(c.at) < 30*60*1000){
+            centralServerClockOffsetMs=c.offset;
+            centralServerClockCalibrated=true;
+            centralServerClockLastCalibratedAt=Number(c.at);
+            return centralServerClockOffsetMs;
+          }
+        }catch(_){}
+      }
+
       const sb=initSettingsClient();
       if(!sb) return centralServerClockOffsetMs;
 
@@ -783,6 +965,7 @@
           centralServerClockOffsetMs=Math.round(serverMs-((t0+t1)/2));
           centralServerClockCalibrated=true;
           centralServerClockLastCalibratedAt=Date.now();
+          try{ localStorage.setItem('journal:server-clock', JSON.stringify({offset:centralServerClockOffsetMs, at:centralServerClockLastCalibratedAt})); }catch(_){}
           sendCentralServerClock();
         }catch(e){
           console.warn('[central] 서버 시계 보정 실패:', e);
@@ -808,6 +991,7 @@
 
     function broadcastMonthRow(row, source='realtime'){
       if(!row || !row.ym) return;
+      noteKnownStamp(row.user_id || centralUserId, String(row.ym), row.updated_at, row.deleted_at);
       const kind = kindFromMonthYm(row.ym);
       const item = kind ? tabs[kind] : null;
       if(!item) return;
@@ -845,7 +1029,8 @@
 
     Object.values(tabs).forEach(item=>{
       item.frame.addEventListener('load', ()=>{
-        setTimeout(()=>pushCentralStateToFrame(item.frame), 0);
+        applyChildTimerLock();
+        setTimeout(()=>{ applyChildTimerLock(); pushCentralStateToFrame(item.frame); }, 0);
       });
     });
 
@@ -888,7 +1073,7 @@
       const id = userId || null;
       if(centralUserId === id) return;
       centralUserId = id;
-      centralLastMonthSyncAt = null;
+      centralLastMonthSyncAt = id ? loadPersistedMonthCursor(id) : null;
       centralActiveTimerRow = null;
       centralLastPollAt = 0;
       centralLastActiveFetchAt = 0;
@@ -907,6 +1092,7 @@
 
       if(Number.isFinite(maxMs)){
         centralLastMonthSyncAt = new Date(maxMs).toISOString();
+        persistMonthCursor(centralUserId, centralLastMonthSyncAt);
       }
     }
 
@@ -942,6 +1128,45 @@
       broadcastActiveTimer(normalized, opts.source || 'realtime');
     }
 
+    function getBackgroundPushActiveRow(){
+      if(!BG_SYNC_MODE || !BG_PUSH_TYPE || !BG_PUSH_TIMER_STATUS) return null;
+      const status=BG_PUSH_TIMER_STATUS==='running'?'running':'stopped';
+      return {
+        status,
+        ym: BG_PUSH_TIMER_YM || null,
+        day_key: BG_PUSH_TIMER_DAY_KEY || null,
+        period_id: BG_PUSH_TIMER_PERIOD_ID || null,
+        started_at: BG_PUSH_TIMER_STARTED_AT || null,
+        stopped_at: BG_PUSH_TIMER_STOPPED_AT || null,
+        updated_at: BG_PUSH_UPDATED_AT || null
+      };
+    }
+    let bgPushTimerApplied=false;
+    function applyBackgroundPushTimer(){
+      if(bgPushTimerApplied) return !!centralActiveTimerRow;
+      const row=getBackgroundPushActiveRow();
+      if(!row) return false;
+      bgPushTimerApplied=true;
+      handleActiveRow(row,{autoSwitch:true,source:'push'});
+      return true;
+    }
+
+    window.shouldIgnoreSelfPush = (type, ym, updatedAt, deletedAt)=>{
+      try{
+        // 푸시에 실린 (ym, updated_at)이 이미 반영된 상태와 같으면 읽을 필요가 없다.
+        if(type==='month' && ym && updatedAt && centralUserId &&
+           isKnownStamp(centralUserId, String(ym), updatedAt, deletedAt||null)) return true;
+        if(type==='timer' && updatedAt && centralActiveTimerRow?.updated_at){
+          const a=Date.parse(centralActiveTimerRow.updated_at), b=Date.parse(updatedAt);
+          if(Number.isFinite(a) && a===b) return true;
+        }
+      }catch(_){}
+      try{
+        const t=Number(localStorage.getItem('journal_last_local_change_at')||0);
+        return realtimeSubscribed && t>0 && Date.now()-t < 5000;
+      }catch(_){ return false; }
+    };
+
     async function fetchOnce(autoSwitch, force=false){
       const sb = initSettingsClient();
       if(!sb) return;
@@ -953,6 +1178,11 @@
         if(autoSwitch === true){
           applyFromRow(centralActiveTimerRow, {autoSwitch:true});
         }
+        return;
+      }
+
+      if(BG_SYNC_MODE && applyBackgroundPushTimer()){
+        centralLastActiveFetchAt=Date.now();
         return;
       }
 
@@ -1006,10 +1236,16 @@
 
         resetCentralUser(user.id);
 
+        // 1단계: 가벼운 표식(ym, updated_at, deleted_at)만 조회
         let monthQuery = sb.from('study_months')
-          .select('ym,data,updated_at,deleted_at,user_id')
+          .select('ym,updated_at,deleted_at,user_id')
           .eq('user_id', user.id)
           .order('updated_at', {ascending:true});
+
+        // 숨은 푸시 동기화에서는 푸시가 알려준 월만 읽는다.
+        if(BG_SYNC_MODE && BG_PUSH_YM){
+          monthQuery = monthQuery.eq('ym', BG_PUSH_YM);
+        }
 
         // Cursor is advanced only from rows actually received.
         // gte intentionally re-reads the latest timestamp as a tiny overlap,
@@ -1018,14 +1254,46 @@
           monthQuery = monthQuery.gte('updated_at', centralLastMonthSyncAt);
         }
 
-        const monthRes = await monthQuery;
+        const stampRes = await monthQuery;
 
-        if(monthRes.error){
-          console.warn('[central] study_months 폴링 실패:', monthRes.error);
+        if(stampRes.error){
+          console.warn('[central] study_months 폴링 실패:', stampRes.error);
         }else{
-          const rows = monthRes.data || [];
-          for(const row of rows) broadcastMonthRow(row, 'poll');
-          advanceCentralMonthCursor(rows);
+          const stamps = stampRes.data || [];
+          // 2단계: 아직 못 받은 행만 전체 data 를 내려받는다 (Realtime 으로 이미 받은 행은 건너뜀)
+          const changedYms = stamps
+            .filter(r=>{
+              const ym=String(r.ym||'');
+              const sig=`${r.updated_at||''}|${r.deleted_at||''}`;
+              // Persistent localStorage stamps survive an Android/WebView process
+              // restart, but the new WebView has no in-memory month data yet.
+              // In background widget sync, only skip a row when this process has
+              // actually broadcast that exact row already.
+              const alreadyAppliedInThisProcess =
+                centralMonthBroadcastSig.get(ym) === sig;
+              return !alreadyAppliedInThisProcess;
+            })
+            .map(r=>r.ym);
+          let rows = [];
+          let fullOk = true;
+          if(changedYms.length){
+            const fullRes = await sb.from('study_months')
+              .select('ym,data,updated_at,deleted_at,user_id')
+              .eq('user_id', user.id)
+              .in('ym', changedYms)
+              .order('updated_at', {ascending:true});
+            if(fullRes.error){
+              fullOk = false;
+              console.warn('[central] study_months 본문 조회 실패:', fullRes.error);
+            }else{
+              rows = fullRes.data || [];
+            }
+          }
+          if(fullOk){
+            for(const row of rows) broadcastMonthRow(row, 'poll');
+            // 본문을 못 받은 경우에는 커서를 올리지 않아 다음 poll 에서 다시 시도한다.
+            advanceCentralMonthCursor(stamps.concat(rows));
+          }
         }
 
         centralLastPollAt = Date.now();
@@ -1139,9 +1407,7 @@
           if(status === 'SUBSCRIBED'){
             realtimeSubscribed = true;
             updateSyncConnectionStatus();
-            void fetchOnce(true, true);
-            void calibrateCentralServerClock(false);
-            void centralPoll(true);
+            void loadVisibleMonthForActiveTab();
             return;
           }
 
@@ -1168,14 +1434,81 @@
       });
     }
 
+    let centralInitialHydrationComplete=false;
+    let visibleMonthFetchBusy=false;
+    let visibleMonthFetchKey='';
+    const visibleMonthRows=new Map();
+    async function loadVisibleMonthForActiveTab(kindOverride=null, ymOverride=null, sourceWindow=null, requestId=null){
+      if(visibleMonthFetchBusy) return;
+      const kind=kindOverride || Object.keys(tabs).find(k=>tabs[k].frame.classList.contains('active')) || 'study';
+      const d=new Date();
+      const ym=ymOverride || `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const key=`${kind}:${ym}`;
+      if(visibleMonthRows.has(key)) {
+        const target=tabs[kind]?.frame?.contentWindow;
+        const cachedRow=visibleMonthRows.get(key);
+        try{ target?.postMessage({type:'journal-visible-month-response',kind,ym,row:cachedRow,requestId},location.origin); }catch(_){}
+        return;
+      }
+      if(!requestId && visibleMonthFetchKey===key) return;
+      const sb=initSettingsClient();
+      if(!sb) return;
+      visibleMonthFetchBusy=true;
+      visibleMonthFetchKey=key;
+      try{
+        const {data:{session}}=await sb.auth.getSession();
+        const user=session?.user;
+        if(!user) return;
+        const cloudYm = kind==='lecture' ? `L:${ym}` : kind==='sleep' ? `S:${ym}` : kind==='record' ? `R:${ym}` : ym;
+        const {data,error}=await sb.from('study_months')
+          .select('ym,data,updated_at,deleted_at,user_id')
+          .eq('user_id',user.id).eq('ym',cloudYm).maybeSingle();
+        if(error) throw error;
+        const row=data || {user_id:user.id,ym:cloudYm,data:{},deleted_at:null,updated_at:null};
+        visibleMonthRows.set(key,row);
+        const target=tabs[kind]?.frame?.contentWindow;
+        if(sourceWindow && sourceWindow!==target) return;
+        try{ target?.postMessage({type:'journal-visible-month-response',kind,ym,row,requestId},location.origin); }catch(_){}
+        // Also broadcast the exact row to the active frame so its cache becomes the source for rendering.
+        try{ target?.postMessage({type:'journal-central-month-row',row},location.origin); }catch(_){}
+        centralInitialHydrationComplete=true;
+      }catch(e){
+        console.warn('[central] visible month read failed:',e);
+      }finally{
+        visibleMonthFetchBusy=false;
+      }
+    }
+
+    window.loadVisibleMonthForActiveTab=()=>loadVisibleMonthForActiveTab();
+
+    window.isCentralRealtimeHealthy = ()=>!!(ch && realtimeSubscribed);
     window.refreshExclusiveServerState = fetchOnce;
     window.stopExclusiveTabRealtime = ()=>{ void stopRealtime(); };
     window.restartExclusiveTabRealtime = ()=>{
       void stopRealtime().finally(()=>startRealtime(0));
     };
     window.runCentralJournalSync = ()=>centralPoll(true);
+    // 자식이 RPC 로 이미 받은 active_timer 행을 그대로 반영 (select 재조회 생략)
+    window.applyRpcActiveRow = (row)=>{
+      handleActiveRow(row, {source:'rpc'});
+      centralLastActiveFetchAt = Date.now();
+    };
+    // 푸시가 알려 준 월이 이미 최신으로 반영돼 있으면 네트워크 조회 없이 넘어간다.
+    async function bgPushAlreadyApplied(){
+      if(!BG_SYNC_MODE || BG_PUSH_TYPE!=='month' || !BG_PUSH_YM || !BG_PUSH_UPDATED_AT) return false;
+      if(new URLSearchParams(location.search).get('force')==='1') return false;
+      const sb=initSettingsClient();
+      if(!sb) return false;
+      const {data:{session}}=await sb.auth.getSession();
+      const uid=session?.user?.id;
+      if(!uid) return false;
+      return isKnownStamp(uid, BG_PUSH_YM, BG_PUSH_UPDATED_AT, BG_PUSH_DELETED_AT||null);
+    }
     window.runWidgetSync = async ()=>{
       while(centralPollBusy) await new Promise(resolve=>setTimeout(resolve,100));
+      // Always reconcile the server in widget/background mode.
+      // A persisted "known stamp" is not enough after a process/WebView restart:
+      // the stamp may survive while the in-memory month cache is empty.
       await centralPoll(true);
       // 강의·수면 화면이 모두 로드되고 자기 타이머를 위젯에 보낼 시간을 준 뒤에 종료
       try{
@@ -1205,6 +1538,17 @@
         return;
       }
 
+      if(ev.data?.type === 'journal-visible-month-request'){
+        const kind=String(ev.data?.kind||'');
+        const ym=String(ev.data?.ym||'');
+        const requestId=String(ev.data?.requestId||'');
+        const item=tabs[kind];
+        // Only the currently visible tab is allowed to trigger the startup/month read.
+        if(!item || !item.frame.classList.contains('active') || ev.source!==item.frame.contentWindow) return;
+        void loadVisibleMonthForActiveTab(kind,ym,ev.source,requestId);
+        return;
+      }
+
       if(ev.data?.type !== 'journal-central-sync-request') return;
 
       pushCentralStateToFrame(ev.source);
@@ -1220,6 +1564,7 @@
     startRealtime();
 
     document.addEventListener('visibilitychange', ()=>{
+      if(!centralInitialHydrationComplete) return;
       if(document.visibilityState === 'visible'){
         void fetchOnce(false, false);
         void calibrateCentralServerClock(false);
@@ -1228,6 +1573,7 @@
     });
 
     window.addEventListener('pageshow', ()=>{
+      if(!centralInitialHydrationComplete) return;
       void fetchOnce(false, false);
       void calibrateCentralServerClock(false);
       void centralPoll(false);
@@ -1240,6 +1586,7 @@
     });
 
     window.addEventListener('online', ()=>{
+      if(!centralInitialHydrationComplete) return;
       updateSyncConnectionStatus();
       if(!ch) startRealtime(0);
       void fetchOnce(false, true);
@@ -1286,12 +1633,16 @@
   window.addEventListener('message',ev=>{
     if(ev.origin!==location.origin)return;
     const type=ev.data?.type;
-    if(type==='exclusive-session-ended'){
-      window.refreshExclusiveServerState?.();
-      return;
-    }
-    if(type==='exclusive-session-cancel-start'){
-      window.refreshExclusiveServerState?.(false, true);
+    if(type==='exclusive-session-ended' || type==='exclusive-session-cancel-start'){
+      const row=ev.data?.row;
+      // 진행 중이 아닌 상태의 행을 받았을 때만 그대로 반영한다. 그 외에는 예전처럼 서버에서 확인한다.
+      if(row && typeof row==='object' && row.status && row.status!=='running' && window.applyRpcActiveRow){
+        window.applyRpcActiveRow(row);
+      }else if(type==='exclusive-session-ended'){
+        window.refreshExclusiveServerState?.();
+      }else{
+        window.refreshExclusiveServerState?.(false, true);
+      }
       return;
     }
     if(type!=='exclusive-session-start')return;
@@ -1335,7 +1686,12 @@
     if(__statusVerifiedUserId===uid && Date.now()-__statusVerifiedAt<300000){
       verified=__statusVerifiedOk;
     }else{
-      try{const {error}=await sb.from('journal_settings').select('user_id').limit(1);verified=!error}catch(_){verified=false}
+      try{
+        // 설정 조회 자체가 클라우드 연결/권한 확인 역할을 하므로,
+        // 별도의 journal_settings 검증 GET을 만들지 않고 공유 조회 결과를 재사용한다.
+        await loadSharedSettingsFromCloud();
+        verified=sharedSettingsLoadOk;
+      }catch(_){verified=false}
       __statusVerifiedUserId=uid;__statusVerifiedAt=Date.now();__statusVerifiedOk=verified;
     }
   }else{__statusVerifiedUserId=null;__statusVerifiedAt=0;__statusVerifiedOk=false}
@@ -1830,11 +2186,140 @@ function __preloadFrames(){
 if(document.readyState==='complete')setTimeout(__preloadFrames,300);
 else window.addEventListener('load',()=>setTimeout(__preloadFrames,300));
 </script>
+<script id="widget-action-runner">
+// 새 위젯(시작/종료 버튼)이 숨은 화면(?bg=1)에서 호출: 해당 기록장 화면의 시작/종료 버튼을 그대로 눌러 준다.
+// 결과는 NativeWidget.widgetActionDone 으로 전달: ok / already / need_input / login / offline / fail / error
+(()=>{
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const ATTR={study:'data-study-action',lecture:'data-lecture-action',sleep:'data-lecture-action'};
+  const FRAME={study:'studyFrame',lecture:'lectureFrame',sleep:'sleepFrame'};
+  const report=r=>{try{window.NativeWidget&&window.NativeWidget.widgetActionDone&&window.NativeWidget.widgetActionDone(String(r))}catch(_){}};
+  async function waitFor(fn,timeout,step=150){
+    const t0=Date.now();
+    for(;;){
+      let v=null;
+      try{v=fn()}catch(_){}
+      if(v) return v;
+      if(Date.now()-t0>timeout) return null;
+      await sleep(step);
+    }
+  }
+  function latest(doc,attr){
+    const list=Array.from(doc.querySelectorAll('#periodList button['+attr+']'));
+    if(!list.length) return {idx:-1,btns:{}};
+    const max=Math.max(...list.map(b=>Number(b.dataset.idx)));
+    const btns={};
+    list.filter(b=>Number(b.dataset.idx)===max).forEach(b=>{btns[b.getAttribute(attr)]=b});
+    return {idx:max,btns};
+  }
+  // 공부 화면: 위젯에서는 시작/종료 페이지를 1로 채워 제한 없이 시작·종료할 수 있게 한다.
+  // 앱에서 이미 입력한 값은 덮어쓰지 않고, 비어 있는 칸만 채운다. (앱의 입력 처리 경로를 그대로 사용)
+  async function settle(win){
+    await sleep(200);
+    await waitFor(()=>win.eval('userActionCount')===0,8000,100);
+    await sleep(300);
+  }
+  function pageInput(doc,idx,key){
+    return doc.querySelector('#periodList input[data-k="'+key+'"][data-idx="'+idx+'"]');
+  }
+  async function fillBlankPage(doc,win,idx,key,val){
+    const el=pageInput(doc,idx,key);
+    if(!el||el.disabled) return false;
+    if(String(el.value||'').trim()!=='') return true;
+    el.value=String(val);
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    await settle(win);
+    return true;
+  }
+  async function fillStartPage(doc,win,idx){
+    return fillBlankPage(doc,win,idx,'startPage',1);
+  }
+  async function fillEndPage(doc,win,idx){
+    // 시작 페이지가 1보다 크면(앱에서 직접 입력한 경우) 종료 < 시작 오류가 나지 않도록 시작 페이지와 같은 값으로 채움
+    const sp=pageInput(doc,idx,'startPage');
+    const n=sp?parseInt(String(sp.value||'').trim(),10):1;
+    return fillBlankPage(doc,win,idx,'endPage',Number.isFinite(n)&&n>1?n:1);
+  }
+  window.runWidgetAction=async(kind,action)=>{
+    try{
+      if(!FRAME[kind]||(action!=='start'&&action!=='end')){report('error');return}
+      if(navigator.onLine===false){report('offline');return}
+      await __loadFrameOnce(FRAME[kind]);
+      const frame=document.getElementById(FRAME[kind]);
+      const attr=ATTR[kind];
+      const doc=await waitFor(()=>{
+        const d=frame.contentDocument;
+        return d&&d.readyState==='complete'&&d.getElementById('periodList')?d:null;
+      },10000);
+      if(!doc){report('error');return}
+      const win=frame.contentWindow;
+      const loggedIn=await waitFor(()=>win.eval('typeof cloudUser!=="undefined" && !!cloudUser'),8000);
+      if(!loggedIn){report('login');return}
+      // 시작/종료 전에 최신 기록으로 맞춤 (기록 추가 버튼과 같은 순서)
+      try{await win.autoSyncFromCloud();await win.renderCurrentView()}catch(_){}
+      await sleep(300);
+
+      let st=latest(doc,attr);
+      if(kind==='study'&&st.idx>=0){
+        // 최신 카드의 빈 페이지 칸을 1로 채운 뒤 버튼 상태를 다시 읽음
+        if(action==='start'&&!st.btns['cancel-start']) await fillStartPage(doc,win,st.idx);
+        if(action==='end'&&st.btns['cancel-start']&&!st.btns['cancel-end']) await fillEndPage(doc,win,st.idx);
+        st=latest(doc,attr);
+      }
+      const running=!!st.btns['cancel-start']&&!st.btns['cancel-end'];
+      let target=null;
+      if(action==='start'){
+        if(running){report('already');return}
+        if(!st.btns.start){
+          // 카드가 없거나 마지막 카드가 이미 종료됨 → 새 카드를 만든 뒤 시작
+          if(kind==='study'&&st.idx>=0){
+            // 새 교시 추가는 앞 교시의 시작/끝 페이지가 모두 있어야 하므로 빈 칸만 1로 채움
+            await fillStartPage(doc,win,st.idx);
+            await fillEndPage(doc,win,st.idx);
+          }
+          const add=doc.getElementById('addPeriod');
+          if(!add){report('error');return}
+          add.click();
+          const next=await waitFor(()=>{const s2=latest(doc,attr);return s2.btns.start&&s2.idx>st.idx?s2:null},8000);
+          if(!next){report('fail');return}
+          st=next;
+          if(kind==='study'){
+            await fillStartPage(doc,win,st.idx);
+            st=latest(doc,attr);
+          }
+        }
+        if(!st.btns.start||st.btns.start.disabled){report(kind==='study'?'fail':'need_input');return}
+        target=st.btns.start;
+      }else{
+        if(!running){report('already');return}
+        if(!st.btns.end||st.btns.end.disabled){report('fail');return}
+        target=st.btns.end;
+      }
+
+      target.click();
+      await sleep(300);
+      await waitFor(()=>!Array.from(doc.querySelectorAll('button')).some(b=>b.textContent.trim()==='⏳'),12000,200);
+      await sleep(500);
+      const after=latest(doc,attr);
+      const ok=action==='start'?!!after.btns['cancel-start']&&!after.btns['cancel-end']:!!after.btns['cancel-end'];
+      if(!ok){report('fail');return}
+      report('ok');
+      // 알림바·위젯 반영을 위해 기존 위젯 동기화 절차로 마무리 (끝나면 숨은 화면 종료)
+      setTimeout(()=>{try{window.NativeWidget&&window.NativeWidget.finishBackgroundSync&&window.NativeWidget.finishBackgroundSync()}catch(_){}},15000);
+      if(window.runWidgetSync) await window.runWidgetSync();
+    }catch(e){
+      console.error('[widget-action]',e);
+      report('error');
+    }
+  };
+})();
+</script>
 <script id="fcm-token-register">
 // 이 기기의 푸시 주소(토큰)를 로그인한 계정으로 Supabase(device_tokens)에 등록
 (()=>{
   if(new URLSearchParams(location.search).get('bg')==='1')return; // 백그라운드 동기화 중에는 토큰 재등록(쓰기) 생략
   let lastSent='';
+  try{ lastSent=localStorage.getItem('journal_last_device_token_key')||''; }catch(_){}
   async function register(){
     try{
       const nw=window.NativeWidget;
@@ -1851,7 +2336,7 @@ else window.addEventListener('load',()=>setTimeout(__preloadFrames,300));
       const {error}=await sb.from('device_tokens').upsert(
         {user_id:uid,device_id:nw.getDeviceId(),token:token,updated_at:new Date().toISOString()},
         {onConflict:'user_id,device_id'});
-      if(!error)lastSent=key;
+      if(!error){ lastSent=key; try{localStorage.setItem('journal_last_device_token_key',key);}catch(_){} }
     }catch(e){}
   }
   setTimeout(register,4000);

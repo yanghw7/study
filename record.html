@@ -1207,6 +1207,16 @@ async function loadMonth(ym){
     monthCache[ym] = {};
     return monthCache[ym];
   }
+  // In the Android/web app, the parent owns the single visible-month read.
+  // This prevents every iframe from independently querying the same month at startup.
+  if(window.parent !== window){
+    try{
+      const loaded = await requestCentralVisibleMonth(ym);
+      if(loaded && monthCache[ym]) return monthCache[ym];
+    }catch(_){}
+    monthCache[ym] = monthCache[ym] || {};
+    return monthCache[ym];
+  }
   try{
     const {data, error} = await sbClient.from('study_months')
       .select('data,deleted_at').eq('user_id', cloudUser.id).eq('ym', recordCloudYm(ym)).maybeSingle();
@@ -1224,7 +1234,6 @@ async function loadMonth(ym){
   }
   return monthCache[ym];
 }
-
 async function saveMonth(ym){
   if(!sbClient || !cloudUser){
     showToast('로그인 후에만 저장할 수 있어요');
@@ -1469,7 +1478,7 @@ async function calibrateServerClock(force=false){
   }
 
   if(window.parent !== window){
-    const gotParentClock = await requestParentServerClock(force ? 1200 : 800, force);
+    const gotParentClock = await requestParentServerClock(3000, force);
     if(gotParentClock) return serverClockOffsetMs;
   }
 
@@ -1630,16 +1639,37 @@ function isBoundaryEligiblePeriod(p, boundaryMs=null){
   return true;
 }
 
+async function getCentralActiveTimerForRead(){
+  try{
+    if(window.parent !== window
+       && typeof window.parent.getCentralActiveTimerSnapshot === 'function'){
+      let row = window.parent.getCentralActiveTimerSnapshot();
+      if(row) return row;
+      if(typeof window.parent.refreshExclusiveServerState === 'function'){
+        await window.parent.refreshExclusiveServerState(false);
+        row = window.parent.getCentralActiveTimerSnapshot();
+        return row || null;
+      }
+      return null;
+    }
+  }catch(_){}
+  return null;
+}
+
 async function getRunningPeriodForBoundary(){
   if(cloudUser && sbClient){
     try{
-      const {data,error} = await sbClient
-        .from('active_timer')
-        .select('*')
-        .eq('user_id', cloudUser.id)
-        .maybeSingle();
+      let data = await getCentralActiveTimerForRead();
+      if(window.parent === window && data == null){
+        const remote = await sbClient
+          .from('active_timer')
+          .select('*')
+          .eq('user_id', cloudUser.id)
+          .maybeSingle();
+        if(!remote.error) data = remote.data || null;
+      }
 
-      if(!error && data?.status === 'running'){
+      if(data?.status === 'running'){
         const ym = String(data.ym || '');
         const dk = String(data.day_key || '');
 
@@ -1850,14 +1880,39 @@ async function checkStudyDayBoundaryRollover(){
   }
 }
 
-window.addEventListener('pageshow', ()=>{
-  setTimeout(()=>checkStudyDayBoundaryRollover(), 0);
-});
+// Initial boundary check is deferred; startup must not trigger an active_timer read.
 
 let clockCalibrateId = null;
 let rolloverCheckId = null;
 
 let __journalPaused = false;
+
+let __centralMonthRequestSeq = 0;
+const __centralMonthWaiters = new Map();
+function requestCentralVisibleMonth(ym){
+  if(window.parent === window) return Promise.resolve(false);
+  const key=String(ym||'');
+  if(!/^\d{4}-\d{2}$/.test(key)) return Promise.resolve(false);
+  const requestId=`record-month-${++__centralMonthRequestSeq}`;
+  return new Promise(resolve=>{
+    const timer=setTimeout(()=>{
+      __centralMonthWaiters.delete(requestId);
+      resolve(false);
+    },1200);
+    __centralMonthWaiters.set(requestId, ok=>{
+      clearTimeout(timer);
+      __centralMonthWaiters.delete(requestId);
+      resolve(ok===true);
+    });
+    try{
+      window.parent.postMessage({type:'journal-visible-month-request',kind:'record',ym:key,requestId},location.origin);
+    }catch(_){
+      clearTimeout(timer);
+      __centralMonthWaiters.delete(requestId);
+      resolve(false);
+    }
+  });
+}
 
 function requestCentralSync(full=false){
   if(window.parent === window) return;
@@ -1891,6 +1946,20 @@ window.addEventListener('message', (ev)=>{
          && !(typeof userActionCount === 'number' && userActionCount > 0)){
         Promise.resolve(renderCurrentView()).catch(()=>{});
       }
+    }
+    return;
+  }
+
+  if(ev.data?.type === 'journal-visible-month-response' && ev.data?.kind === 'record'){
+    const ym=String(ev.data?.ym||'');
+    const row=ev.data?.row;
+    if(row && /^\d{4}-\d{2}$/.test(ym)){
+      void applyRealtimeMonthRow({new:row});
+      const done=__centralMonthWaiters.get(String(ev.data?.requestId||''));
+      if(done) done(true);
+    }else{
+      const done=__centralMonthWaiters.get(String(ev.data?.requestId||''));
+      if(done) done(false);
     }
     return;
   }
@@ -1960,6 +2029,7 @@ function stopBackgroundSensitiveLoops(){
 }
 
 async function recoverFromBackground(){
+  if(window.__initialServerHydrationComplete !== true){ updateStudyTimer(); updateWasteTimer(); return; }
   try{
     if(cloudUser){
       if(window.parent !== window){
@@ -3562,6 +3632,19 @@ let cloudDataOwnerId = null;
 let cloudSessionEpoch = 0;
 // 내가 마지막으로 서버에 쓴 행의 updated_at (userId|ym -> updated_at). 저장 시 사전 읽기를 생략하는 용도
 const savedStampByYm = new Map();
+// 부모(index.html)의 knownStamp 와 같은 키·형식으로 기록: 내가 저장한 행을 푸시/poll 이 다시 내려받지 않게 함
+function noteKnownStampShared(uid, ym, updatedAt){
+  try{
+    const u = Date.parse(updatedAt || '');
+    if(!uid || !ym || !Number.isFinite(u)) return;
+    const key = 'journal:known-stamp:' + String(uid);
+    const m = JSON.parse(localStorage.getItem(key) || '{}') || {};
+    const sig = u + '|';
+    if(m[ym] === sig) return;
+    m[ym] = sig;
+    localStorage.setItem(key, JSON.stringify(m));
+  }catch(_){}
+}
 
 function resetCloudAccountState(){
   cloudSessionEpoch++;
@@ -3600,6 +3683,8 @@ function advanceLastMonthSyncAtFromRows(rows){
     lastMonthSyncAt = new Date(maxMs).toISOString();
   }
 }
+
+function markLocalCloudChange(){ try{ window.parent?.markLocalCloudChange?.(); }catch(_){} }
 
 function initSupabase(){
   if(sbClient) return true;
@@ -3650,7 +3735,8 @@ async function cloudSaveMonth(ym){
           .select('updated_at');
         if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
         if(!wfErr && wf && wf.length){
-          savedStampByYm.set(stampKey, wf[0].updated_at);
+          savedStampByYm.set(stampKey, wf[0].updated_at); noteKnownStampShared(userId, ym, wf[0].updated_at);
+          markLocalCloudChange();
           const currentF = ensureMonthSync(monthCache[ym] || {}, ym);
           monthCache[ym] = mergeMonths(local, currentF, ym);
           return;
@@ -3679,7 +3765,8 @@ async function cloudSaveMonth(ym){
       if(row.updated_at) q2 = q2.eq('updated_at', row.updated_at);
       const {data:w2,error:wErr2} = await q2.select('updated_at');
       if(!wErr2 && w2 && w2.length){
-        savedStampByYm.set(stampKey, w2[0].updated_at);
+        savedStampByYm.set(stampKey, w2[0].updated_at); noteKnownStampShared(userId, ym, w2[0].updated_at);
+        markLocalCloudChange();
         if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
         monthCache[ym]=local;
         return;
@@ -3696,7 +3783,7 @@ async function cloudSaveMonth(ym){
         .eq('user_id',userId).eq('ym',recordCloudYm(ym));
       if(row.updated_at) q = q.eq('updated_at', row.updated_at);
       const {data:w,error:wErr} = await q.select('updated_at');
-      if(!wErr && w && w.length){ writeOk=true; savedStampByYm.set(stampKey, w[0].updated_at); }
+      if(!wErr && w && w.length){ writeOk=true; savedStampByYm.set(stampKey, w[0].updated_at); noteKnownStampShared(userId, ym, w[0].updated_at); }
       else if(wErr){ lastSaveErr=wErr; console.warn('동기화 충돌 재시도:', wErr.message); }
       else { lastSaveErr = new Error('업데이트된 행이 0개입니다 (RLS SELECT 정책을 확인하세요)'); }
     }else{
@@ -3775,7 +3862,7 @@ async function autoSyncFromCloud(lockOwned=false){
   }
 
   try{
-    const {data,error} = await sbClient.from('study_months').select('ym,data,updated_at,deleted_at').eq('user_id',userId).like('ym','R:%').gt('updated_at', lastMonthSyncAt || '1970-01-01T00:00:00Z').order('ym');
+    const {data,error} = await sbClient.from('study_months').select('ym,data,updated_at,deleted_at').eq('user_id',userId).like('ym','R:%').gt('updated_at', lastMonthSyncAt || '2026-01-01T00:00:00Z').order('ym');
 
     if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;
 
@@ -3991,18 +4078,15 @@ if(sbClient){
 
     if(cloudUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')){
       try{
-        void calibrateServerClock(true);
-        await autoSyncFromCloud();
         enforceStudyDayLimit();
         await renderCurrentView();
         startActiveTimerRealtime();
-        await syncActiveTimerFromCloud(true);
-
-        await checkStudyDayBoundaryRollover();
+        window.__initialServerHydrationComplete = true;
       }catch(e){
-        console.error('세션 자동 동기화 실패:', e);
+        console.error('세션 초기 화면 준비 실패:', e);
         enforceStudyDayLimit();
         await renderCurrentView();
+        window.__initialServerHydrationComplete = true;
       }
 } else if(!cloudUser){
   stopActiveTimerRealtime();
