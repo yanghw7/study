@@ -243,9 +243,60 @@
   const SUPABASE_URL = 'https://nvpvxtwebzefhgulswsv.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
 
-  // ── 로그인 유지 정책 ─────────────────────────────────────────
-  // 로그인 상태는 사용자가 직접 로그아웃할 때까지 유지한다.
-  // Supabase 세션은 persistSession + autoRefreshToken으로 계속 갱신한다.
+  // ── 접속 환경별 로그인 유지 정책 ─────────────────────────────
+  //  - 안드로이드 앱(WebView) / 설치한 PWA : 기존과 동일하게 항상 로그인 유지
+  //  - 일반 브라우저(주소 입력 접속)       : 마지막 사용 후 30분이 지나면 이 브라우저에서만 로그아웃
+  const ENV_APP = location.hostname === 'appassets.androidplatform.net';
+  const ENV_PWA = (()=>{
+    try{
+      if(window.matchMedia){
+        for(const m of ['standalone','fullscreen','minimal-ui','window-controls-overlay']){
+          if(window.matchMedia('(display-mode: '+m+')').matches) return true;
+        }
+      }
+      if(navigator.standalone === true) return true;
+      if(String(document.referrer||'').startsWith('android-app://')) return true;
+    }catch(_){}
+    return false;
+  })();
+  const ENV_BROWSER = !ENV_APP && !ENV_PWA;
+  const BROWSER_IDLE_MS = 30 * 60 * 1000;
+  const BROWSER_ACTIVE_KEY = 'journal:browser-last-active';
+  // 브라우저는 로그인 정보를 별도 키에 저장한다. 같은 기기의 PWA와 저장소를 공유하더라도
+  // 브라우저의 30분 로그아웃이 PWA/앱의 로그인 상태를 지우지 못하게 하기 위함.
+  const BROWSER_AUTH_KEY = 'sb-journal-browser-auth';
+  let browserIdleGuardStarted = false;
+
+  function startBrowserIdleGuard(sb){
+    if(!ENV_BROWSER || browserIdleGuardStarted) return;
+    browserIdleGuardStarted = true;
+    let lastWrite = 0;
+    const readLast = ()=>{ try{ return Number(localStorage.getItem(BROWSER_ACTIVE_KEY)||0); }catch(_){ return 0; } };
+    const writeNow = ()=>{ lastWrite = Date.now(); try{ localStorage.setItem(BROWSER_ACTIVE_KEY, String(lastWrite)); }catch(_){} };
+    async function expireIfIdle(){
+      const last = readLast();
+      if(!last || Date.now() - last < BROWSER_IDLE_MS) return false;
+      try{
+        const {data:{session}} = await sb.auth.getSession();
+        // scope:'local' → 서버의 다른 기기/앱 세션은 건드리지 않고 이 브라우저의 로그인만 해제
+        if(session) await sb.auth.signOut({scope:'local'});
+      }catch(_){}
+      writeNow();
+      return true;
+    }
+    async function onActivity(){
+      if(Date.now() - lastWrite < 5000) return;      // 입력이 잦아도 기록은 5초에 한 번만
+      if(await expireIfIdle()) return;
+      writeNow();
+    }
+    ['pointerdown','keydown','touchstart','wheel'].forEach(ev=>
+      window.addEventListener(ev, ()=>{ void onActivity(); }, {passive:true, capture:true}));
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') void onActivity(); });
+    window.addEventListener('focus', ()=>{ void onActivity(); });
+    setInterval(()=>{ void expireIfIdle(); }, 60 * 1000);
+    // 시작 시: 마지막 사용 후 30분이 지났으면 로그아웃, 기록이 없으면 지금부터 측정 시작
+    void (async()=>{ await expireIfIdle(); if(!readLast()) writeNow(); })();
+  }
 
   let sbSettingsClient = null;
   let __sbCreating = false;
@@ -309,6 +360,7 @@
             ENV_BROWSER ? { storageKey: BROWSER_AUTH_KEY } : {}
           ), realtime: { logLevel: 'error' } }
       );
+      startBrowserIdleGuard(sbSettingsClient);
       return sbSettingsClient;
     }catch(e){ return null; }
     finally{ __sbCreating = false; }
@@ -837,6 +889,7 @@
     let centralActiveFetchBusy = false;
     let centralActiveFetchPendingAutoSwitch = false;
     const centralMonthBroadcastSig = new Map();
+    const centralMonthLatestUpdatedAtMs = new Map();
 
     let centralServerClockOffsetMs = 0;
     let centralServerClockCalibrated = false;
@@ -939,14 +992,25 @@
 
     function broadcastMonthRow(row, source='realtime'){
       if(!row || !row.ym) return;
-      noteKnownStamp(row.user_id || centralUserId, String(row.ym), row.updated_at, row.deleted_at);
+      const ymKey = String(row.ym);
+      const updatedMs = Date.parse(row.updated_at || '');
+      const latestMs = Number(centralMonthLatestUpdatedAtMs.get(ymKey) || 0);
+      // Realtime can occasionally deliver an older queued UPDATE after a newer
+      // soft-delete/new-record UPDATE. Never broadcast an older row back to a
+      // child iframe, otherwise a deleted lecture month can be resurrected.
+      if(Number.isFinite(updatedMs) && latestMs > 0 && updatedMs < latestMs) return;
+      if(Number.isFinite(updatedMs) && updatedMs > latestMs){
+        centralMonthLatestUpdatedAtMs.set(ymKey, updatedMs);
+      }
+
+      noteKnownStamp(row.user_id || centralUserId, ymKey, row.updated_at, row.deleted_at);
       const kind = kindFromMonthYm(row.ym);
       const item = kind ? tabs[kind] : null;
       if(!item) return;
 
       const sig=`${row.updated_at||''}|${row.deleted_at||''}`;
-      if(centralMonthBroadcastSig.get(String(row.ym)) === sig) return;
-      centralMonthBroadcastSig.set(String(row.ym), sig);
+      if(centralMonthBroadcastSig.get(ymKey) === sig) return;
+      centralMonthBroadcastSig.set(ymKey, sig);
 
       postToFrame(item.frame, {
         type:'journal-central-month-row',
@@ -955,14 +1019,15 @@
       });
     }
 
-    function broadcastMonthDeleted(ym){
+    function broadcastMonthDeleted(ym, deletedAt=null){
       const kind=kindFromMonthYm(ym);
       const item=kind ? tabs[kind] : null;
       if(!item) return;
       centralMonthBroadcastSig.delete(String(ym||''));
       postToFrame(item.frame, {
         type:'journal-central-month-deleted',
-        ym:String(ym||'')
+        ym:String(ym||''),
+        deleted_at: deletedAt || new Date().toISOString()
       });
     }
 
@@ -1026,6 +1091,7 @@
       centralLastPollAt = 0;
       centralLastActiveFetchAt = 0;
       centralMonthBroadcastSig.clear();
+      centralMonthLatestUpdatedAtMs.clear();
     }
 
     function advanceCentralMonthCursor(rows){
@@ -1337,7 +1403,7 @@
               // Parent already knows exactly which ym disappeared, so no child re-query is needed.
               const oldYm = payload?.old?.ym;
               if(oldYm){
-                broadcastMonthDeleted(oldYm);
+                broadcastMonthDeleted(oldYm, payload?.old?.updated_at || new Date().toISOString());
               }else{
                 for(const item of Object.values(tabs)){
                   postToFrame(item.frame, {type:'journal-central-force-sync'});

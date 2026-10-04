@@ -1931,6 +1931,12 @@ window.addEventListener('message', (ev)=>{
   if(ev.data?.type === 'journal-central-month-deleted'){
     const ym=String(ev.data?.ym||'');
     if(!/^\d{4}-\d{2}$/.test(ym)) return;
+    const fenceTs=Date.parse(ev.data?.deleted_at||'');
+    if(Number.isFinite(fenceTs)){
+      const key=String(ym);
+      remoteMonthDeleteFenceMs.set(key, fenceTs);
+      remoteMonthLatestUpdatedAtMs.set(key, Math.max(Number(remoteMonthLatestUpdatedAtMs.get(key)||0), fenceTs));
+    }
     delete monthCache[ym];
     if(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing()){
       periodRenderPending=true;
@@ -3850,6 +3856,10 @@ let cloudDataOwnerId = null;
 let cloudSessionEpoch = 0;
 // 내가 마지막으로 서버에 쓴 행의 updated_at (userId|ym -> updated_at). 저장 시 사전 읽기를 생략하는 용도
 const savedStampByYm = new Map();
+// Monotonic remote version fence: prevents older Realtime/poll rows from
+// resurrecting records after a full-delete tombstone.
+const remoteMonthLatestUpdatedAtMs = new Map();
+const remoteMonthDeleteFenceMs = new Map();
 // 부모(index.html)의 knownStamp 와 같은 키·형식으로 기록: 내가 저장한 행을 푸시/poll 이 다시 내려받지 않게 함
 function noteKnownStampShared(uid, ym, updatedAt){
   try{
@@ -3872,6 +3882,7 @@ function resetCloudAccountState(){
   cancelPendingSaves();
   monthCache = {};
   try{ savedStampByYm.clear(); }catch(_){}
+  try{ remoteMonthLatestUpdatedAtMs.clear(); remoteMonthDeleteFenceMs.clear(); }catch(_){}
   lastMonthSyncAt = null;
   dirtySaveMonths.clear();
   periodRenderPending = false;
@@ -4082,6 +4093,13 @@ async function cloudSaveMonth(ym){
 
 async function applyRemoteDeletedMonth(ym, deletedAt){
   const delTs = Date.parse(deletedAt || '');
+  const key = String(ym);
+  const prevFence = Number(remoteMonthDeleteFenceMs.get(key) || 0);
+  if(Number.isFinite(delTs) && delTs > prevFence){
+    remoteMonthDeleteFenceMs.set(key, delTs);
+    remoteMonthLatestUpdatedAtMs.set(key, delTs);
+  }
+
   const existing = monthCache[ym];
 
   if(!existing || !Number.isFinite(delTs)){
@@ -4099,6 +4117,10 @@ async function applyRemoteDeletedMonth(ym, deletedAt){
 
   try{
     await cloudSaveMonth(ym);
+    // A successful post-delete write is a genuinely newer live version.
+    const rowTs = Date.now();
+    remoteMonthLatestUpdatedAtMs.set(key, Math.max(Number(remoteMonthLatestUpdatedAtMs.get(key)||0), rowTs));
+    remoteMonthDeleteFenceMs.delete(key);
     return true;
   }catch(e){
     console.warn('삭제 이후 생성한 로컬 기록 보존 실패:', ym, e);
@@ -4888,11 +4910,21 @@ async function applyRealtimeMonthRow(payload){
   try{
     const row = payload?.new;
     if(!row){ autoSyncFromCloud(); return; }
-
     if(row.user_id && cloudUser?.id && String(row.user_id) !== String(cloudUser.id)) return;
-
     const ym = String(row.ym || '');
     if(!/^\d{4}-\d{2}$/.test(ym)) return;
+
+    const key = String(ym);
+    const rowUpdatedMs = Date.parse(row.updated_at || '');
+    const latestMs = Number(remoteMonthLatestUpdatedAtMs.get(key) || 0);
+    const deleteFenceMs = Number(remoteMonthDeleteFenceMs.get(key) || 0);
+
+    if(Number.isFinite(rowUpdatedMs)){
+      if(latestMs > 0 && rowUpdatedMs < latestMs) return;
+      if(deleteFenceMs > 0 && !row.deleted_at && rowUpdatedMs <= deleteFenceMs) return;
+      if(rowUpdatedMs > latestMs) remoteMonthLatestUpdatedAtMs.set(key, rowUpdatedMs);
+    }
+
     if(row.deleted_at){
       const appliedDelete = await applyRemoteDeletedMonth(ym, row.deleted_at);
       if(appliedDelete) advanceLastMonthSyncAtFromRows([row]);
@@ -4900,11 +4932,13 @@ async function applyRealtimeMonthRow(payload){
       return;
     }
 
+    if(deleteFenceMs > 0 && Number.isFinite(rowUpdatedMs) && rowUpdatedMs <= deleteFenceMs) return;
+    if(Number.isFinite(rowUpdatedMs) && rowUpdatedMs > deleteFenceMs) remoteMonthDeleteFenceMs.delete(key);
+
     if(!row.data || typeof row.data !== 'object' || Array.isArray(row.data)){
       autoSyncFromCloud();
       return;
     }
-
     const remote = ensureMonthSync(deepClone(row.data || {}), ym);
     const existing = monthCache[ym];
     monthCache[ym] = existing ? mergeMonths(existing, remote, ym) : remote;
