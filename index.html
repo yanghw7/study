@@ -727,7 +727,7 @@
 
     const CENTRAL_POLL_MS = 15 * 60 * 1000;
     const CENTRAL_CLOCK_MAX_AGE_MS = 30 * 60 * 1000;
-    const CENTRAL_POLL_REALTIME_MS = 55 * 60 * 1000;   // Realtime 연결 중 안전망 폴링 간격(타이머 15분 틱 기준 실제 약 60분)
+    const CENTRAL_POLL_REALTIME_MS = 14 * 60 * 1000;   // Realtime 연결 중 안전망 폴링 간격(타이머 15분 틱 기준 실제 약 60분)
 
     function postToFrame(target, msg){
       if(!target) return;
