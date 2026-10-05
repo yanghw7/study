@@ -3145,7 +3145,16 @@ async function renderWeekView(){
     el.innerHTML = `<div class="empty-state">${cur.getMonth()+1}월에는 아직 시작된 주차가 없어요.</div>`;
     return;
   }
+  const chartPointsBySlot = [0,1,2].map(slot => weekNums.map(w => ({
+    label:`${w}주`, count:weeks[w].counts[slot], number:weeks[w].numbers[slot]
+  })));
+  const completedWeeks = weekNums.map((w,idx) => ({...chartPointsBySlot[0][idx], end:weeks[w].end}));
+  const names = ['과라나 caf','Vita C','기록 3'];
+  const chartSections = names.map((name,slot) =>
+    chartsHtml(chartPointsBySlot[slot], chartPointsBySlot[slot].filter((p,idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.', name)
+  ).join('');
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${cur.getFullYear()}년 ${cur.getMonth()+1}월 · 주별 정리 (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>` +
+    chartSections +
     weekNums.map(w => `
       <div class="agg-row">
         <div>
@@ -3167,8 +3176,10 @@ async function renderMonthView(){
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div><div class="empty-state">불러오는 중…</div>`;
   let html = '';
   let any = false;
+  const chartPoints = [[],[],[]];
   for(let mo=1; mo<=12; mo++){
     const { monthCounts, monthNumbers } = await computeMonthAgg(`${year}-${pad(mo)}`);
+    for(let slot=0; slot<3; slot++) chartPoints[slot].push({label:`${mo}월`, count:monthCounts[slot], number:monthNumbers[slot]});
     const total = monthCounts.reduce((a,b)=>a+b,0) + monthNumbers.reduce((a,b)=>a+b,0);
     if(total===0) continue;
     any = true;
@@ -3182,7 +3193,18 @@ async function renderMonthView(){
         </div>
       </div>`;
   }
+  const currentStudyDay = logicalToday();
+  const averageIndices = chartPoints[0].map((p,idx) => {
+    if(year < currentStudyDay.getFullYear()) return true;
+    if(year > currentStudyDay.getFullYear()) return false;
+    return (idx + 1) < (currentStudyDay.getMonth() + 1);
+  });
+  const names = ['과라나 caf','Vita C','기록 3'];
+  const chartSections = names.map((name,slot) =>
+    chartsHtml(chartPoints[slot], chartPoints[slot].filter((p,idx) => averageIndices[idx]), '월 평균', '평균은 완료된 전월까지 계산합니다.', name)
+  ).join('');
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${year}년 · 월별 정리</div>` +
+    chartSections +
     (any ? html : `<div class="empty-state">${year}년에 기록된 데이터가 없어요.</div>`);
 }
 
@@ -3194,17 +3216,24 @@ async function renderYearView(){
   const sorted = [...years].filter(y=>y<=currentYear).sort((a,b)=>a-b);
   let rows = '';
   let any = false;
+  const chartPoints = [[],[],[]];
   for(const year of sorted){
     const counts=[0,0,0], numbers=[0,0,0];
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
       for(let i=0;i<3;i++){ counts[i] += a.monthCounts[i]; numbers[i] += a.monthNumbers[i]; }
     }
+    for(let slot=0; slot<3; slot++) chartPoints[slot].push({label:`${year}`, count:counts[slot], number:numbers[slot]});
     if(counts.every(v=>v===0) && numbers.every(v=>v===0)) continue;
     any = true;
     rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">과라나 caf <b>${counts[0]}회</b> · <b style="color:#B86F7D;">${numbers[0]}</b><br>Vita C <b>${counts[1]}회</b> · <b style="color:#B86F7D;">${numbers[1]}</b><br>기록3 <b>${counts[2]}회</b> · <b style="color:#B86F7D;">${numbers[2]}</b></div></div>` + rows;
   }
+  const names = ['과라나 caf','Vita C','기록 3'];
+  const chartSections = names.map((name,slot) =>
+    chartsHtml(chartPoints[slot], chartPoints[slot].filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.', name)
+  ).join('');
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
+    chartSections +
     (any ? rows : `<div class="empty-state">기록된 연도별 데이터가 없어요.</div>`);
 }
 
