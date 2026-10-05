@@ -1439,38 +1439,72 @@
     let visibleMonthFetchKey='';
     const visibleMonthRows=new Map();
     async function loadVisibleMonthForActiveTab(kindOverride=null, ymOverride=null, sourceWindow=null, requestId=null){
-      if(visibleMonthFetchBusy) return;
       const kind=kindOverride || Object.keys(tabs).find(k=>tabs[k].frame.classList.contains('active')) || 'study';
       const d=new Date();
       const ym=ymOverride || `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       const key=`${kind}:${ym}`;
+
+      // Hidden/preloaded frames also need the same startup data as the visible frame.
+      // If a row is already cached, answer immediately without another Supabase read.
       if(visibleMonthRows.has(key)) {
         const target=tabs[kind]?.frame?.contentWindow;
         const cachedRow=visibleMonthRows.get(key);
-        try{ target?.postMessage({type:'journal-visible-month-response',kind,ym,row:cachedRow,requestId},location.origin); }catch(_){}
+        if(!sourceWindow || sourceWindow===target){
+          try{ target?.postMessage({type:'journal-visible-month-response',kind,ym,row:cachedRow,requestId},location.origin); }catch(_){}
+          try{ target?.postMessage({type:'journal-central-month-row',row:cachedRow},location.origin); }catch(_){}
+        }
         return;
       }
-      if(!requestId && visibleMonthFetchKey===key) return;
+
+      // Only one startup read is needed for study/lecture/sleep. Fetch their three rows
+      // together and cache them, so opening another tab later does not require another
+      // server read and cannot leave that frame with an empty placeholder month.
+      const batchKinds = ['study','lecture','sleep'];
+      if(visibleMonthFetchBusy){
+        const started=Date.now();
+        while(visibleMonthFetchBusy && Date.now()-started<3000){
+          await new Promise(r=>setTimeout(r,50));
+        }
+        if(visibleMonthRows.has(key)) return loadVisibleMonthForActiveTab(kind,ym,sourceWindow,requestId);
+        if(visibleMonthFetchBusy) return;
+      }
+
       const sb=initSettingsClient();
       if(!sb) return;
       visibleMonthFetchBusy=true;
-      visibleMonthFetchKey=key;
+      visibleMonthFetchKey=`batch:${ym}`;
       try{
         const {data:{session}}=await sb.auth.getSession();
         const user=session?.user;
         if(!user) return;
-        const cloudYm = kind==='lecture' ? `L:${ym}` : kind==='sleep' ? `S:${ym}` : kind==='record' ? `R:${ym}` : ym;
+
+        const requestedCloudYm = kind==='lecture' ? `L:${ym}` : kind==='sleep' ? `S:${ym}` : kind==='record' ? `R:${ym}` : ym;
+        const cloudYms = batchKinds.includes(kind)
+          ? [ym, `L:${ym}`, `S:${ym}`]
+          : [requestedCloudYm];
         const {data,error}=await sb.from('study_months')
           .select('ym,data,updated_at,deleted_at,user_id')
-          .eq('user_id',user.id).eq('ym',cloudYm).maybeSingle();
+          .eq('user_id',user.id).in('ym',cloudYms);
         if(error) throw error;
-        const row=data || {user_id:user.id,ym:cloudYm,data:{},deleted_at:null,updated_at:null};
-        visibleMonthRows.set(key,row);
-        const target=tabs[kind]?.frame?.contentWindow;
-        if(sourceWindow && sourceWindow!==target) return;
-        try{ target?.postMessage({type:'journal-visible-month-response',kind,ym,row,requestId},location.origin); }catch(_){}
-        // Also broadcast the exact row to the active frame so its cache becomes the source for rendering.
-        try{ target?.postMessage({type:'journal-central-month-row',row},location.origin); }catch(_){}
+
+        const byYm=new Map((data||[]).map(row=>[String(row.ym),row]));
+        const rowsByKey = batchKinds.includes(kind)
+          ? {
+              [`study:${ym}`]: byYm.get(ym) || {user_id:user.id,ym,data:{},deleted_at:null,updated_at:null},
+              [`lecture:${ym}`]: byYm.get(`L:${ym}`) || {user_id:user.id,ym:`L:${ym}`,data:{},deleted_at:null,updated_at:null},
+              [`sleep:${ym}`]: byYm.get(`S:${ym}`) || {user_id:user.id,ym:`S:${ym}`,data:{},deleted_at:null,updated_at:null}
+            }
+          : {[key]: byYm.get(requestedCloudYm) || {user_id:user.id,ym:requestedCloudYm,data:{},deleted_at:null,updated_at:null}};
+
+        Object.entries(rowsByKey).forEach(([cacheKey,row])=>visibleMonthRows.set(cacheKey,row));
+
+        // Push the exact server rows to every already-loaded record frame.
+        Object.entries(rowsByKey).forEach(([cacheKey,row])=>{
+          const [targetKind,targetYm]=cacheKey.split(':');
+          const target=tabs[targetKind]?.frame?.contentWindow;
+          try{ target?.postMessage({type:'journal-visible-month-response',kind:targetKind,ym:targetYm,row,requestId:target===sourceWindow?requestId:null},location.origin); }catch(_){}
+          try{ target?.postMessage({type:'journal-central-month-row',row},location.origin); }catch(_){}
+        });
         centralInitialHydrationComplete=true;
       }catch(e){
         console.warn('[central] visible month read failed:',e);
@@ -1604,8 +1638,10 @@
         const ym=String(ev.data?.ym||'');
         const requestId=String(ev.data?.requestId||'');
         const item=tabs[kind];
-        // Only the currently visible tab is allowed to trigger the startup/month read.
-        if(!item || !item.frame.classList.contains('active') || ev.source!==item.frame.contentWindow) return;
+        // Preloaded hidden record frames are legitimate startup consumers too.
+        // They must receive the same server row as the visible frame; otherwise they
+        // remain at their placeholder 0분 state and can overwrite the widget.
+        if(!item || ev.source!==item.frame.contentWindow) return;
         void loadVisibleMonthForActiveTab(kind,ym,ev.source,requestId);
         return;
       }
