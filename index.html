@@ -1488,19 +1488,6 @@
       void stopRealtime().finally(()=>startRealtime(0));
     };
     window.runCentralJournalSync = ()=>centralPoll(true);
-    // 위젯 동기화 버튼 → 앱 화면 새로고침. 앱 안 "↻ 동기화" 버튼과 같이 저장 안 된 변경을 먼저 올린 뒤 다시 불러온다.
-    window.flushAppForWidget = async ()=>{
-      for(const k of ['study','lecture','sleep','record']){
-        try{
-          const w=tabs[k]&&tabs[k].frame&&tabs[k].frame.contentWindow;
-          if(w && typeof w.flushPendingSavesNow==='function') await w.flushPendingSavesNow();
-        }catch(e){ console.warn('[widget] flush failed:',k,e); }
-      }
-    };
-    window.reloadAppFromWidget = async ()=>{
-      try{ await window.flushAppForWidget(); }catch(_){}
-      location.reload();
-    };
     // 자식이 RPC 로 이미 받은 active_timer 행을 그대로 반영 (select 재조회 생략)
     window.applyRpcActiveRow = (row)=>{
       handleActiveRow(row, {source:'rpc'});
@@ -1517,35 +1504,73 @@
       if(!uid) return false;
       return isKnownStamp(uid, BG_PUSH_YM, BG_PUSH_UPDATED_AT, BG_PUSH_DELETED_AT||null);
     }
-    // 위젯 동기화 버튼(?reload=1): 앱 안 동기화 버튼처럼 공부·강의·수면 기록장을 먼저 새로 불러온 뒤 기록을 읽는다.
-    async function reloadRecordFramesForSync(){
+    // 숨은 동기화에서 세 기록장(공부/강의/수면) 화면이 모두 로드되고 첫 초기화를 마칠 때까지 대기 (최대 ~9초).
+    // 월 기록 행은 postMessage 로 화면에 전달되는데, 화면이 아직 없거나 준비 전이면 행이 조용히 버려진다.
+    async function bgWaitFramesReady(){
+      const ids=['studyFrame','lectureFrame','sleepFrame'];
       try{
         await Promise.race([
-          window.__preloadFramesPromise||Promise.resolve(),
+          Promise.all(ids.map(id=>__loadFrameOnce(id))),
           new Promise(r=>setTimeout(r,6000))
         ]);
       }catch(_){}
-      try{ visibleMonthRows.clear(); }catch(_){}   // 월 기록 캐시를 비워 서버에서 다시 읽게 함
-      const waits=['study','lecture','sleep'].map(k=>new Promise(resolve=>{
-        const f=tabs[k]&&tabs[k].frame;
-        if(!f||!f.getAttribute('src')) return resolve();
-        let finished=false;
-        const done=()=>{ if(finished) return; finished=true; try{f.removeEventListener('load',done)}catch(_){} resolve(); };
-        f.addEventListener('load',done);
-        setTimeout(done,8000);
-        try{ f.contentWindow.location.reload(); }catch(_){ try{ f.src=f.src; }catch(__){ done(); } }
-      }));
-      await Promise.all(waits);
+      const t0=Date.now();
+      while(Date.now()-t0<3000){
+        const ready=ids.every(id=>{
+          try{ return document.getElementById(id).contentWindow.__initialServerHydrationComplete===true; }catch(_){ return false; }
+        });
+        if(ready) break;
+        await new Promise(r=>setTimeout(r,200));
+      }
+    }
+    // 위젯 강제 동기화: 세 기록장의 "오늘" 월 기록을 한 번의 조회로 직접 읽어 각 화면에 전달.
+    // (poll 은 커서 이후 바뀐 행만 주므로, 다른 기록장의 최신 행은 다시 오지 않아 강의/수면 타이머가 누락되었음)
+    // 커서는 올리지 않는다: 기록(R:) 등 이 조회에 포함되지 않은 행을 건너뛰지 않기 위해.
+    async function bgReadTodayMonthsForWidget(){
+      const sb=initSettingsClient();
+      if(!sb) return false;
+      const {data:{session}}=await sb.auth.getSession();
+      const user=session?.user;
+      if(!user) return false;
+      resetCentralUser(user.id);
+      const ymSet=new Set();
+      // 하루 집계 기준시각(최대 11시) 때문에 달 경계 직후엔 전날(전달) 기록이 오늘일 수 있어 12시간 전의 달도 함께 읽음
+      [Date.now(), Date.now()-12*3600*1000].forEach(t=>{
+        const d=new Date(t);
+        ymSet.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+      });
+      const yms=[];
+      ymSet.forEach(m=>{ yms.push(m, `L:${m}`, `S:${m}`); });
+      const {data,error}=await sb.from('study_months')
+        .select('ym,data,updated_at,deleted_at,user_id')
+        .eq('user_id', user.id)
+        .in('ym', yms);
+      if(error){ console.warn('[widget] 오늘 월 기록 조회 실패:', error); return false; }
+      (data||[]).forEach(row=>{
+        centralMonthBroadcastSig.delete(String(row.ym));
+        broadcastMonthRow(row, 'widget-force');
+      });
+      centralLastPollAt = Date.now();
+      return true;
     }
     window.runWidgetSync = async ()=>{
       while(centralPollBusy) await new Promise(resolve=>setTimeout(resolve,100));
-      if(new URLSearchParams(location.search).get('reload')==='1'){
-        try{ await reloadRecordFramesForSync(); }catch(e){ console.warn('[widget] frame reload failed:',e); }
+      const qp=new URLSearchParams(location.search);
+      if(qp.get('widget_action')){
+        // 위젯 시작/종료 버튼용 숨은 화면: 대상 기록장 프레임 하나만 로드돼 있다.
+        // 여기서 poll 하면 나머지 기록장의 변경 행이 버려지는데 커서는 저장돼 앞서 가므로 하지 않는다.
+        // 세 기록장 반영은 이어서 실행되는 마무리 동기화(force)가 맡는다.
+      }else{
+        await bgWaitFramesReady();
+        let direct=false;
+        if(qp.get('force')==='1'){
+          try{ direct=await bgReadTodayMonthsForWidget(); }catch(e){ console.warn('[widget] 직접 조회 오류:', e); }
+        }
+        // Always reconcile the server in widget/background mode.
+        // A persisted "known stamp" is not enough after a process/WebView restart:
+        // the stamp may survive while the in-memory month cache is empty.
+        if(!direct) await centralPoll(true);
       }
-      // Always reconcile the server in widget/background mode.
-      // A persisted "known stamp" is not enough after a process/WebView restart:
-      // the stamp may survive while the in-memory month cache is empty.
-      await centralPoll(true);
       // 강의·수면 화면이 모두 로드되고 자기 타이머를 위젯에 보낼 시간을 준 뒤에 종료
       try{
         await Promise.race([
@@ -1692,7 +1717,7 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=11.06', { scope: './' })
+      navigator.serviceWorker.register('./sw.js?v=11.09', { scope: './' })
         .then(reg => reg.update())
         .catch(err => console.error('Service worker registration failed:', err));
     });
@@ -1864,7 +1889,7 @@
    function soundName(){return $('#alarmSoundSelect').dataset.name||''}
    function setSoundValue(url,name){const b=$('#alarmSoundSelect');b.dataset.value=url||'';b.dataset.name=name||'';b.textContent=name||'알람음 없음'}
    function closeSoundList(){const w=$('#alarmSoundWrap');if(w){w.classList.remove('open');$('#alarmSoundSelect').setAttribute('aria-expanded','false')}}
-   function render(list){const sel=$('#alarmSoundSelect'),box=$('#alarmSoundList');if(!list.length){box.innerHTML='<div style="padding:10px 8px;font-size:12px;font-weight:700">알람음 없음</div>';setSoundValue('','알람음 없음');return}box.innerHTML=list.map((x,i)=>`<button type="button" class="alarm-sound-option" role="option" data-url="${x.url.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" data-name="${title(x.name).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${title(x.name)}</button>`).join('');const old=localStorage.getItem(SELECT_KEY);const chosen=old&&list.some(x=>x.url===old)?list.find(x=>x.url===old):list[0];setSoundValue(chosen.url,title(chosen.name));localStorage.setItem(SELECT_KEY,chosen.url)}
+   function render(list){const sel=$('#alarmSoundSelect'),box=$('#alarmSoundList');if(!list.length){box.innerHTML='<div style="padding:10px 8px;font-size:12px;font-weight:700">알람음 없음</div>';setSoundValue('','알람음 없음');return}box.innerHTML=list.map((x,i)=>`<button type="button" class="alarm-sound-option" role="option" data-url="${x.url.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" data-name="${title(x.name).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${title(x.name)}</button>`).join('');const old=localStorage.getItem(SELECT_KEY);const chosen=old&&list.some(x=>x.url===old)?list.find(x=>x.url===old):list[0];setSoundValue(chosen.url,title(chosen.name));localStorage.setItem(SELECT_KEY,chosen.url);try{if(new URLSearchParams(location.search).get('bg')!=='1')window.NativeAlarm?.setAlarmSound?.(chosen.url)}catch(e){}}
    async function refreshSounds(){let list=[],why='';try{const r=await fetch(API,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});if(!r.ok)throw new Error('GitHub '+r.status);const j=await r.json();list=j.filter(x=>x.type==='file'&&audioExt.test(x.name)).map(x=>({name:x.name,url:x.download_url}));localStorage.setItem(LIST_KEY,JSON.stringify(list))}catch(e){why=String(e&&e.message||e);list=savedList()}render(list);if(!list.length){setTimeout(()=>{try{if(!soundValue())$('#alarmStatus').textContent='⚠ 알람음 목록 불러오기 실패: '+(why||'목록 비어 있음')}catch(_){}},600)}}
    async function cacheSelected(){const u=soundValue();if(!u)return false;localStorage.setItem(SELECT_KEY,u);try{const c=await caches.open(CACHE);let r=await c.match(u);if(!r){r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error();await c.put(u,r.clone())}return true}catch(e){return false}}
    async function audioURL(){const u=soundValue()||localStorage.getItem(SELECT_KEY);if(!u)return null;try{const c=await caches.open(CACHE);const r=await c.match(u);if(r){const b=await r.blob();return URL.createObjectURL(b)}}catch(e){}return u}

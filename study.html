@@ -2659,7 +2659,11 @@ $('#periodList').addEventListener('click', async (e) => {
     if(!(await askConfirm(`${idx+1}교시를 정말 삭제하시겠습니까?`, true))) return;
     const deletedPeriod = day.periods[idx];
     if(cloudUser && deletedPeriod && Number(deletedPeriod.timerStartedAt) > 0){
-      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), deletedPeriod._id); }catch(_){}
+      let __delRow=null, __wasRunning=false;
+      try{ const __s=recordedStartMsFromFields(deletedPeriod), __e=recordedEndMsFromFields(deletedPeriod); __wasRunning=__s>0&&!(__e>0&&__e>=__s); }catch(_){}
+      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), deletedPeriod._id); __delRow=takeTimerRpcRow(); }catch(_){}
+      // 진행 중이던 카드를 지웠으면 부모(인덱스)에게 알려 탭의 빨간 표시를 바로 끈다 (새로고침 없이)
+      if(window.parent!==window && (__delRow||__wasRunning)){ try{ window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'study',row:__delRow},location.origin); }catch(_){} }
     }
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
@@ -3995,7 +3999,35 @@ async function refreshCloudStatus(){
   $('#cloudLogout').style.display = cloudUser ? '' : 'none';
 }
 
-async function cloudSaveMonth(ym){
+// ── 같은 월(ym)의 클라우드 저장을 한 번에 하나씩 순서대로 실행 ─────────────────────────
+// 저장이 겹쳐 실행되면 서로의 updated_at 조건에 걸려 0행 → 읽기·병합 재시도가 반복되고 푸시도 중복된다.
+//  · 아직 시작 전인 대기 저장은 하나로 합친다. 저장은 "시작하는 순간"의 monthCache 최신본을 읽으므로
+//    그 사이의 변경분이 모두 담기고, 호출자는 자기 호출 이후에 시작한 저장이 끝났을 때 완료 처리된다.
+//  · 저장 한 번이 20초 안에 끝나지 않아도(네트워크 멈춤) 뒤의 저장이 영영 막히지 않도록 순서를 풀어 준다.
+//  · 다른 기기와의 충돌 병합은 기존 저장 함수(__cloudSaveMonthImpl)가 그대로 담당한다.
+function cloudSaveMonth(ym){
+  const chains = (globalThis.__journalSaveChains = globalThis.__journalSaveChains || new Map());
+  const key = String(cloudUser?.id || '') + '|' + String(ym);
+  let st = chains.get(key);
+  if(!st){ st = { tail: Promise.resolve(), pending: null }; chains.set(key, st); }
+  if(st.pending) return st.pending;
+  let outerResolve, outerReject;
+  const outer = new Promise((res, rej)=>{ outerResolve = res; outerReject = rej; });
+  st.pending = outer;
+  st.tail = st.tail.then(()=> new Promise(release=>{
+    st.pending = null; // 이 저장이 시작됨 → 이후 호출은 다음 저장으로 대기
+    const timer = setTimeout(release, 20000);
+    let run;
+    try{ run = __cloudSaveMonthImpl(ym); }catch(e){ run = Promise.reject(e); }
+    run.then(
+      v=>{ clearTimeout(timer); release(); outerResolve(v); },
+      e=>{ clearTimeout(timer); release(); outerReject(e); }
+    );
+  }));
+  return outer;
+}
+
+async function __cloudSaveMonthImpl(ym){
   if(!sbClient || !cloudUser || !monthCache[ym]) return;
   const userId = cloudUser.id;
   const sessionEpoch = cloudSessionEpoch;
@@ -4500,6 +4532,27 @@ async function cloudStopActiveTimer(ym, dayKey, periodId){
     return null;
   }
   markLocalCloudChange();
+  // 종료를 요청한 교시와 서버 행의 교시가 달라 서버 행이 계속 running 이면(예: 기준시점 자동 분할 직후)
+  // 같은 기록장의 실제 실행 행을 그 식별자로 다시 종료한다.
+  try{
+    const kindPrefix = v => (String(v||'').match(/^[A-Za-z]:/)||[''])[0];
+    let live = (data && data.status === 'running') ? data : null;
+    if(!data){
+      const {data:chk} = await sbClient.from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
+      if(chk && chk.status === 'running') live = chk;
+    }
+    if(live && kindPrefix(live.ym) === kindPrefix(targetYm || live.ym)){
+      const r2 = await sbClient.rpc('stop_active_timer',{
+        p_ym: String(live.ym||''),
+        p_day_key: String(live.day_key||''),
+        p_period_id: String(live.period_id||'')
+      });
+      if(!r2.error && r2.data){
+        rememberTimerRpcRow(r2.data);
+        return r2.data;
+      }
+    }
+  }catch(e2){ console.warn('서버 타이머 종료 재확인 실패:', e2); }
   rememberTimerRpcRow(data || null);
   return data || null;
 }
@@ -5158,6 +5211,7 @@ if ('serviceWorker' in navigator && window.parent === window) {
 <script id="native-widget-sync">
 (()=>{
   const __widgetFrameBorn=Date.now();
+  const __widgetBg=()=>{try{return new URLSearchParams(window.parent.location.search).get("bg")==="1"}catch(e){return false}};
   let last='';
   let lastWasteKey='';
   const text=id=>document.getElementById(id)?.textContent?.trim()||'';
@@ -5172,13 +5226,7 @@ if ('serviceWorker' in navigator && window.parent === window) {
     // 실제 기록이 도착하면 월 데이터 객체가 바뀌므로 그때부터 정상 보고.
     try{
       const um=window.__unsureMonthObj;
-      if(um && typeof monthCache!=='undefined' && typeof ymKey==='function' && monthCache[ymKey(cur)]===um && (Date.now()-__widgetFrameBorn)<20000) return;
-    }catch(e){}
-    // 위젯은 "오늘" 기준 표시입니다. 사용자가 지난 날짜·주간/월간 화면을 보고 있으면 그 화면의
-    // 통계가 위젯으로 올라가 오늘 값을 덮어쓰거나 지워 버리므로 그때는 보고하지 않습니다.
-    try{
-      if(typeof currentView!=='undefined' && currentView!=='day') return;
-      if(typeof ymd==='function' && typeof logicalToday==='function' && ymd(cur)!==ymd(logicalToday())) return;
+      if(um && typeof monthCache!=='undefined' && typeof ymKey==='function' && monthCache[ymKey(cur)]===um && (__widgetBg()||(Date.now()-__widgetFrameBorn)<20000)){ if(__widgetBg()&&Date.now()-__widgetFrameBorn>=12000){try{window.NativeWidget&&window.NativeWidget.noteKind&&window.NativeWidget.noteKind('study')}catch(e){}} return; }
     }catch(e){}
     const bridge=window.NativeWidget;
     if(!bridge||typeof bridge.updateSummary!=='function')return;
