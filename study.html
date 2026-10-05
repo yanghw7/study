@@ -956,6 +956,7 @@ async function loadMonth(ym){
   if(monthCache[ym]) return monthCache[ym];
   if(!sbClient || !cloudUser){
     monthCache[ym] = {};
+    window.__unsureMonthObj = monthCache[ym]; // 아직 읽지 못한 빈 달 (위젯에 보고하지 않음)
     return monthCache[ym];
   }
   // In the Android/web app, the parent owns the single visible-month read.
@@ -965,7 +966,7 @@ async function loadMonth(ym){
       const loaded = await requestCentralVisibleMonth(ym);
       if(loaded && monthCache[ym]) return monthCache[ym];
     }catch(_){}
-    monthCache[ym] = monthCache[ym] || {};
+    if(!monthCache[ym]){ monthCache[ym] = {}; window.__unsureMonthObj = monthCache[ym]; } // 읽기 실패한 빈 달
     return monthCache[ym];
   }
   try{
@@ -1757,12 +1758,16 @@ async function splitRunningPeriodAtBoundary(running){
 
   if(cloudUser){
     try{
-      await cloudResumeActiveTimer(
-        next.ym,
-        next.dk,
-        nextP,
-        newIdx
-      );
+      // 서버 active_timer 행을 새 교시(이어지는 카드)로 옮김. 실패하면 옛 행을 종료한 뒤 다시 재개.
+      // (옮기지 못하면 서버 행이 옛 교시에 남아, 이후 종료 버튼이 서버에 반영되지 않음)
+      void (async ()=>{
+        let moved = await cloudResumeActiveTimer(next.ym, next.dk, nextP, newIdx);
+        if(!moved){
+          try{ await cloudStopActiveTimer(running.ym, running.dk, oldP._id); }catch(_){}
+          moved = await cloudResumeActiveTimer(next.ym, next.dk, nextP, newIdx);
+        }
+        if(!moved) console.warn('기준시점 이후 서버 타이머 이어붙이기 실패');
+      })();
     }catch(e){
       console.warn('기준시점 이후 서버 타이머 재개 실패:', e);
     }
@@ -4495,9 +4500,32 @@ async function cloudStopActiveTimer(ym, dayKey, periodId){
     return null;
   }
   markLocalCloudChange();
+  // 종료를 요청한 교시와 서버 행의 교시가 달라 서버 행이 계속 running 이면(예: 기준시점 자동 분할 직후)
+  // 같은 기록장의 실제 실행 행을 그 식별자로 다시 종료한다.
+  try{
+    const kindPrefix = v => (String(v||'').match(/^[A-Za-z]:/)||[''])[0];
+    let live = (data && data.status === 'running') ? data : null;
+    if(!data){
+      const {data:chk} = await sbClient.from('active_timer').select('*').eq('user_id',cloudUser.id).maybeSingle();
+      if(chk && chk.status === 'running') live = chk;
+    }
+    if(live && kindPrefix(live.ym) === kindPrefix(targetYm || live.ym)){
+      const r2 = await sbClient.rpc('stop_active_timer',{
+        p_ym: String(live.ym||''),
+        p_day_key: String(live.day_key||''),
+        p_period_id: String(live.period_id||'')
+      });
+      if(!r2.error && r2.data){
+        rememberTimerRpcRow(r2.data);
+        return r2.data;
+      }
+    }
+  }catch(e2){ console.warn('서버 타이머 종료 재확인 실패:', e2); }
   rememberTimerRpcRow(data || null);
   return data || null;
 }
+
+
 
 async function cloudResumeActiveTimer(ym, dayKey, p, idx, throwOnError=false){
   if(!sbClient || !cloudUser || !Number(p.timerStartedAt)) return null;
@@ -4509,7 +4537,9 @@ async function cloudResumeActiveTimer(ym, dayKey, p, idx, throwOnError=false){
   // 종료 취소는 다른 타이머가 실행 중이면 서버 규칙상 허용되지 않는다.
   // 부모의 중앙 active_timer 상태로 먼저 확인하여 불필요한 400 RPC를 막는다.
   const active = currentCentralActiveTimerSnapshot();
-  if(active?.status === 'running'
+  // 기준시점 자동 분할: 서버 행은 아직 옛 교시를 가리키지만 같은 타이머(시작시각 동일)의 이어짐이므로 충돌이 아님
+  const __sameChain = !!(active && Math.abs(Date.parse(active.started_at) - Number(p.timerStartedAt)) < 1000);
+  if(active?.status === 'running' && !__sameChain
      && !isSameActiveTimerTarget(active, targetYm, targetDayKey, targetPeriodId)){
     const conflict = activeTimerConflictError();
     if(throwOnError) throw conflict;
@@ -5148,6 +5178,7 @@ if ('serviceWorker' in navigator && window.parent === window) {
 
 <script id="native-widget-sync">
 (()=>{
+  const __widgetFrameBorn=Date.now();
   let last='';
   let lastWasteKey='';
   const text=id=>document.getElementById(id)?.textContent?.trim()||'';
@@ -5158,13 +5189,19 @@ if ('serviceWorker' in navigator && window.parent === window) {
     // WebViews can load all frames at once; an unhydrated frame would otherwise
     // overwrite another kind's elapsed-timer state with false/empty values.
     if(window.__initialServerHydrationComplete !== true) return;
+    // 이번 달 기록을 아직 못 읽어 빈 채로 그려진 상태(처음 20초)에는 위젯에 보고하지 않음.
+    // 실제 기록이 도착하면 월 데이터 객체가 바뀌므로 그때부터 정상 보고.
+    try{
+      const um=window.__unsureMonthObj;
+      if(um && typeof monthCache!=='undefined' && typeof ymKey==='function' && monthCache[ymKey(cur)]===um && (Date.now()-__widgetFrameBorn)<20000) return;
+    }catch(e){}
     const bridge=window.NativeWidget;
     if(!bridge||typeof bridge.updateSummary!=='function')return;
     if(typeof bridge.updateDayStartHour==='function')bridge.updateDayStartHour(appSettings.dayStartHour);
     const box=document.getElementById('studyTimer');
     const running=!!box?.classList.contains('running');
     const info=timerPeriodForCurrentDay();
-    const epochMs=info&&Number(info.started)>0?Number(info.started):0;
+    const epochMs=(()=>{try{const eff=info&&typeof effectiveTimerStartedAt==='function'?Number(effectiveTimerStartedAt(info.p)):0;if(eff>0)return eff}catch(e){}return info&&Number(info.started)>0?Number(info.started):0})();
     const total=text('sumStudy')||'오늘 합계 없음';
     const detail=[text('sumPages'),text('sumWaste')&&`휴식 ${text('sumWaste')}`].filter(Boolean).join(String.fromCharCode(10,10));
     const label=running?text('studyTimerLabel').replace(/\s*[·•]\s*진행 중\s*$/,'')+' · 진행 중':'';
