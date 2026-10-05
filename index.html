@@ -889,7 +889,6 @@
     let centralActiveFetchBusy = false;
     let centralActiveFetchPendingAutoSwitch = false;
     const centralMonthBroadcastSig = new Map();
-    const centralMonthLatestUpdatedAtMs = new Map();
 
     let centralServerClockOffsetMs = 0;
     let centralServerClockCalibrated = false;
@@ -992,25 +991,14 @@
 
     function broadcastMonthRow(row, source='realtime'){
       if(!row || !row.ym) return;
-      const ymKey = String(row.ym);
-      const updatedMs = Date.parse(row.updated_at || '');
-      const latestMs = Number(centralMonthLatestUpdatedAtMs.get(ymKey) || 0);
-      // Realtime can occasionally deliver an older queued UPDATE after a newer
-      // soft-delete/new-record UPDATE. Never broadcast an older row back to a
-      // child iframe, otherwise a deleted lecture month can be resurrected.
-      if(Number.isFinite(updatedMs) && latestMs > 0 && updatedMs < latestMs) return;
-      if(Number.isFinite(updatedMs) && updatedMs > latestMs){
-        centralMonthLatestUpdatedAtMs.set(ymKey, updatedMs);
-      }
-
-      noteKnownStamp(row.user_id || centralUserId, ymKey, row.updated_at, row.deleted_at);
+      noteKnownStamp(row.user_id || centralUserId, String(row.ym), row.updated_at, row.deleted_at);
       const kind = kindFromMonthYm(row.ym);
       const item = kind ? tabs[kind] : null;
       if(!item) return;
 
       const sig=`${row.updated_at||''}|${row.deleted_at||''}`;
-      if(centralMonthBroadcastSig.get(ymKey) === sig) return;
-      centralMonthBroadcastSig.set(ymKey, sig);
+      if(centralMonthBroadcastSig.get(String(row.ym)) === sig) return;
+      centralMonthBroadcastSig.set(String(row.ym), sig);
 
       postToFrame(item.frame, {
         type:'journal-central-month-row',
@@ -1019,15 +1007,14 @@
       });
     }
 
-    function broadcastMonthDeleted(ym, deletedAt=null){
+    function broadcastMonthDeleted(ym){
       const kind=kindFromMonthYm(ym);
       const item=kind ? tabs[kind] : null;
       if(!item) return;
       centralMonthBroadcastSig.delete(String(ym||''));
       postToFrame(item.frame, {
         type:'journal-central-month-deleted',
-        ym:String(ym||''),
-        deleted_at: deletedAt || new Date().toISOString()
+        ym:String(ym||'')
       });
     }
 
@@ -1091,7 +1078,6 @@
       centralLastPollAt = 0;
       centralLastActiveFetchAt = 0;
       centralMonthBroadcastSig.clear();
-      centralMonthLatestUpdatedAtMs.clear();
     }
 
     function advanceCentralMonthCursor(rows){
@@ -1403,7 +1389,7 @@
               // Parent already knows exactly which ym disappeared, so no child re-query is needed.
               const oldYm = payload?.old?.ym;
               if(oldYm){
-                broadcastMonthDeleted(oldYm, payload?.old?.updated_at || new Date().toISOString());
+                broadcastMonthDeleted(oldYm);
               }else{
                 for(const item of Object.values(tabs)){
                   postToFrame(item.frame, {type:'journal-central-force-sync'});
@@ -2194,6 +2180,18 @@ function __loadFrameOnce(id){
   });
 }
 function __preloadFrames(){
+  // 위젯의 시작/종료 액션에서는 대상 기록장만 로드합니다.
+  // 다른 두 프레임까지 미리 로드하면 각 화면의 초기 동기화가 서로의
+  // 경과 타이머 상태를 빈 값으로 덮어쓰는 경쟁 조건이 생길 수 있습니다.
+  const qp=new URLSearchParams(location.search);
+  const actionKind=qp.get('widget_kind') || '';
+  if(qp.get('widget_action') && actionKind){
+    const targetId = actionKind==='lecture' ? 'lectureFrame'
+      : actionKind==='sleep' ? 'sleepFrame'
+      : 'studyFrame';
+    __loadFrameOnce(targetId).then(()=>__resolvePreload());
+    return;
+  }
   Promise.all([__loadFrameOnce('lectureFrame'),__loadFrameOnce('sleepFrame')]).then(()=>__resolvePreload());
 }
 // 이미 로드가 끝난 뒤(load 이벤트 이후)에 실행돼도 동작하도록 처리

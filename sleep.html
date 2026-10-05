@@ -2193,12 +2193,6 @@ window.addEventListener('message', (ev)=>{
     const raw=String(ev.data?.ym||'');
     if(!raw.startsWith('S:')) return;
     const ym=raw.slice(2);
-    const fenceTs=Date.parse(ev.data?.deleted_at||'');
-    if(Number.isFinite(fenceTs)){
-      const key=String(ym);
-      remoteMonthDeleteFenceMs.set(key, fenceTs);
-      remoteMonthLatestUpdatedAtMs.set(key, Math.max(Number(remoteMonthLatestUpdatedAtMs.get(key)||0), fenceTs));
-    }
     delete monthCache[ym];
     if(typeof isPeriodInputEditing === 'function' && isPeriodInputEditing()){
       periodRenderPending=true;
@@ -4254,10 +4248,6 @@ let cloudDataOwnerId = null;
 let cloudSessionEpoch = 0;
 // 내가 마지막으로 서버에 쓴 행의 updated_at (userId|ym -> updated_at). 저장 시 사전 읽기를 생략하는 용도
 const savedStampByYm = new Map();
-// Monotonic remote version fence: prevents older Realtime/poll rows from
-// resurrecting records after a full-delete tombstone.
-const remoteMonthLatestUpdatedAtMs = new Map();
-const remoteMonthDeleteFenceMs = new Map();
 // 부모(index.html)의 knownStamp 와 같은 키·형식으로 기록: 내가 저장한 행을 푸시/poll 이 다시 내려받지 않게 함
 function noteKnownStampShared(uid, ym, updatedAt){
   try{
@@ -4280,7 +4270,6 @@ function resetCloudAccountState(){
   cancelPendingSaves();
   monthCache = {};
   try{ savedStampByYm.clear(); }catch(_){}
-  try{ remoteMonthLatestUpdatedAtMs.clear(); remoteMonthDeleteFenceMs.clear(); }catch(_){}
   lastMonthSyncAt = null;
   dirtySaveMonths.clear();
   periodRenderPending = false;
@@ -4471,13 +4460,6 @@ async function cloudSaveMonth(ym){
 
 async function applyRemoteDeletedMonth(ym, deletedAt){
   const delTs = Date.parse(deletedAt || '');
-  const key = String(ym);
-  const prevFence = Number(remoteMonthDeleteFenceMs.get(key) || 0);
-  if(Number.isFinite(delTs) && delTs > prevFence){
-    remoteMonthDeleteFenceMs.set(key, delTs);
-    remoteMonthLatestUpdatedAtMs.set(key, delTs);
-  }
-
   const existing = monthCache[ym];
 
   if(!existing || !Number.isFinite(delTs)){
@@ -4495,10 +4477,6 @@ async function applyRemoteDeletedMonth(ym, deletedAt){
 
   try{
     await cloudSaveMonth(ym);
-    // A successful post-delete write is a genuinely newer live version.
-    const rowTs = Date.now();
-    remoteMonthLatestUpdatedAtMs.set(key, Math.max(Number(remoteMonthLatestUpdatedAtMs.get(key)||0), rowTs));
-    remoteMonthDeleteFenceMs.delete(key);
     return true;
   }catch(e){
     console.warn('삭제 이후 생성한 로컬 기록 보존 실패:', ym, e);
@@ -5298,28 +5276,12 @@ async function applyRealtimeMonthRow(payload){
     if(!ymRaw.startsWith('S:')) return;
     const ym = sleepLocalYm(ymRaw);
     if(!ym) return;
-
-    const key = String(ym);
-    const rowUpdatedMs = Date.parse(row.updated_at || '');
-    const latestMs = Number(remoteMonthLatestUpdatedAtMs.get(key) || 0);
-    const deleteFenceMs = Number(remoteMonthDeleteFenceMs.get(key) || 0);
-
-    // Ignore stale queued/polled rows. This is the critical guard against an
-    // old live row arriving after the full-delete tombstone.
-    if(Number.isFinite(rowUpdatedMs)){
-      if(latestMs > 0 && rowUpdatedMs < latestMs) return;
-      if(deleteFenceMs > 0 && !row.deleted_at && rowUpdatedMs <= deleteFenceMs) return;
-      if(rowUpdatedMs > latestMs) remoteMonthLatestUpdatedAtMs.set(key, rowUpdatedMs);
-    }
     if(row.deleted_at){
       const appliedDelete = await applyRemoteDeletedMonth(ym, row.deleted_at);
       if(appliedDelete) advanceLastMonthSyncAtFromRows([row]);
       __scheduleRtRender();
       return;
     }
-
-    if(deleteFenceMs > 0 && Number.isFinite(rowUpdatedMs) && rowUpdatedMs <= deleteFenceMs) return;
-    if(Number.isFinite(rowUpdatedMs) && rowUpdatedMs > deleteFenceMs) remoteMonthDeleteFenceMs.delete(key);
 
     if(!row.data || typeof row.data !== 'object' || Array.isArray(row.data)){
       autoSyncFromCloud();
@@ -5563,6 +5525,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   const text=id=>document.getElementById(id)?.textContent?.trim()||'';
   const seconds=value=>{const n=value.split(':').map(Number);return n.length===3?n[0]*3600+n[1]*60+n[2]:0};
   function sync(){
+    // Do not publish placeholder/empty timer state before the frame has
+    // finished its initial server hydration. Hidden widget-action/background
+    // WebViews can load all frames at once; an unhydrated frame would otherwise
+    // overwrite another kind's elapsed-timer state with false/empty values.
+    if(window.__initialServerHydrationComplete !== true) return;
     const bridge=window.NativeWidget;
     if(!bridge||typeof bridge.updateSummary!=='function')return;
     const box=document.getElementById('studyTimer');
