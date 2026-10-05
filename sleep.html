@@ -2787,7 +2787,11 @@ $('#periodList').addEventListener('click', async (e) => {
     if(!(await askConfirm(`${idx+1}회 수면을 정말 삭제하시겠습니까?`, true))) return;
     const deletedPeriod = day.periods[idx];
     if(cloudUser && deletedPeriod && Number(deletedPeriod.timerStartedAt) > 0){
-      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), deletedPeriod._id); }catch(_){}
+      let __delRow=null, __wasRunning=false;
+      try{ const __s=recordedStartMsFromFields(deletedPeriod), __e=recordedEndMsFromFields(deletedPeriod); __wasRunning=__s>0&&!(__e>0&&__e>=__s); }catch(_){}
+      try{ await cloudCancelActiveTimerStart(ymKey(cur), dKey(cur), deletedPeriod._id); __delRow=takeTimerRpcRow(); }catch(_){}
+      // 진행 중이던 카드를 지웠으면 부모(인덱스)에게 알려 탭의 빨간 표시를 바로 끈다 (새로고침 없이)
+      if(window.parent!==window && (__delRow||__wasRunning)){ try{ window.parent.postMessage({type:'exclusive-session-cancel-start',kind:'sleep',row:__delRow},location.origin); }catch(_){} }
     }
     tombstonePeriod(day, day.periods[idx]);
     day.periods.splice(idx,1);
@@ -5551,6 +5555,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script id="native-widget-sync">
 (()=>{
   const __widgetFrameBorn=Date.now();
+  const __widgetBg=()=>{try{return new URLSearchParams(window.parent.location.search).get("bg")==="1"}catch(e){return false}};
   let last='';
   let lastWasteKey='';
   const text=id=>document.getElementById(id)?.textContent?.trim()||'';
@@ -5565,7 +5570,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // 실제 기록이 도착하면 월 데이터 객체가 바뀌므로 그때부터 정상 보고.
     try{
       const um=window.__unsureMonthObj;
-      if(um && typeof monthCache!=='undefined' && typeof ymKey==='function' && monthCache[ymKey(cur)]===um && (Date.now()-__widgetFrameBorn)<20000) return;
+      if(um && typeof monthCache!=='undefined' && typeof ymKey==='function' && monthCache[ymKey(cur)]===um && (__widgetBg()||(Date.now()-__widgetFrameBorn)<20000)){ if(__widgetBg()&&Date.now()-__widgetFrameBorn>=12000){try{window.NativeWidget&&window.NativeWidget.noteKind&&window.NativeWidget.noteKind('sleep')}catch(e){}} return; }
     }catch(e){}
     const bridge=window.NativeWidget;
     if(!bridge||typeof bridge.updateSummary!=='function')return;
