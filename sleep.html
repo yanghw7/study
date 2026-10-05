@@ -1725,27 +1725,45 @@ function timerPeriodForCurrentDay(){
   return latest;
 }
 
-function wasteTimerForCurrentDay(){
+// 오늘 칸이 비어 있어도(기준시점이 지난 직후) 직전 날들의 가장 최근 수면 회차를 찾습니다.
+// 이미 불러온 월 캐시만 사용하며, 서버를 새로 읽지 않습니다.
+function latestSleepPeriodUpToToday(){
   const logical = logicalToday();
-  if(ymd(cur) !== ymd(logical)) return null;
+  for(let back = 0; back <= 31; back++){
+    const d = new Date(logical.getFullYear(), logical.getMonth(), logical.getDate() - back, 12, 0, 0, 0);
+    const day = monthCache[ymKey(d)]?.[dKey(d)];
+    if(!day || !Array.isArray(day.periods)) continue;
+    let latest = null;
+    day.periods.forEach((p, idx)=>{
+      const started = recordedStartMsFromFields(p);
+      if(started <= 0) return;
+      if(!latest || started > latest.started || (started === latest.started && idx > latest.idx)){
+        latest = {p, idx, started};
+      }
+    });
+    if(latest){ latest.date = d; return latest; }
+  }
+  return null;
+}
 
-  const day = getDayData();
-  if(!day.periods.length) return null;
-
-  // 경과시간도 가장 최근 회차 하나만 기준으로 합니다.
-  let latest = null;
-  day.periods.forEach((p, idx)=>{
-    const started = recordedStartMsFromFields(p);
-    if(started <= 0) return;
-    if(!latest || started > latest.started || (started === latest.started && idx > latest.idx)){
-      latest = {p, idx, started};
-    }
-  });
+// 날짜 화면과 무관하게 "지금 기준 가장 최근 수면 회차"가 종료된 상태일 때의 경과 기준(종료시각).
+// 위젯·알림바는 어떤 날짜를 보고 있든 이 값과 같아야 합니다.
+function wasteTimerLatest(){
+  const latest = latestSleepPeriodUpToToday();
   if(!latest) return null;
-
   const ended = recordedEndMsFromFields(latest.p);
   if(!(ended > 0 && ended >= latest.started)) return null;
-  return {p:latest.p, idx:latest.idx, startedAt:ended};
+  return {p:latest.p, idx:latest.idx, startedAt:ended, date:latest.date};
+}
+
+// 앱 화면의 기상 후 경과시간. 기준시점이 지나 새 날이 되어도 다음 수면 시작 전까지 이어집니다.
+// 오늘 화면이거나, 기준시점 직전까지 보던 그 기록의 날짜 화면에서만 표시합니다.
+function wasteTimerForCurrentDay(){
+  const w = wasteTimerLatest();
+  if(!w) return null;
+  const curIsToday = ymd(cur) === ymd(logicalToday());
+  if(!curIsToday && ymd(cur) !== ymd(w.date)) return null;
+  return w;
 }
 function updateStudyTimer(){
   const box = $('#studyTimer'), timeEl = $('#studyTimerTime'), labelEl = $('#studyTimerLabel');
@@ -2319,7 +2337,8 @@ function syncAndroidTimer(){
     if(lastAndroidTimerKey === '') lastAndroidTimerSent = {type:'', label:'', ms:0, at:0};
 
     const info = timerPeriodForCurrentDay();
-    if(!info){
+    // 기준시점이 지나 오늘 칸이 비어도, 이어지는 경과시간이 있으면 알림바를 지우지 않습니다.
+    if(!info && !wasteTimerForCurrentDay()){
       if(lastAndroidTimerSent.type !== 'clear'){
         T.clearTimer('sleep');
         lastAndroidTimerSent = {type:'clear', label:'', ms:0, at:Date.now()};
@@ -2338,7 +2357,7 @@ function syncAndroidTimer(){
       lastAndroidTimerKey = type;
     };
 
-    if(info.running){
+    if(info && info.running){
       // 시작 타이머: 화면 "진행 중" 타이머와 같은 시작시각
       const start = effectiveTimerStartedAt(info.p);
       if(Number.isFinite(start) && start > 0){
@@ -5628,7 +5647,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     let wasteOn=false,wasteEpochMs=0,wasteLabel='',wasteStart=0;
     try{
       if(!running&&typeof wasteTimerForCurrentDay==='function'){
-        const w=wasteTimerForCurrentDay();
+        const w=wasteTimerLatest();
         if(w&&Number(w.startedAt)>0){
           wasteOn=true;wasteStart=Number(w.startedAt);
           wasteEpochMs=wasteStart;
