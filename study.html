@@ -4235,6 +4235,7 @@ async function downloadAllFromCloud(){
   const {data,error} = await sbClient.from('study_months')
     .select('ym,data,updated_at,deleted_at')
     .eq('user_id',userId)
+    .gte('updated_at','2026-01-01T00:00:00Z')
     .order('ym');
 
   if(sessionEpoch !== cloudSessionEpoch || cloudUser?.id !== userId) return;

@@ -1269,8 +1269,12 @@
         // Cursor is advanced only from rows actually received.
         // gte intentionally re-reads the latest timestamp as a tiny overlap,
         // avoiding a same-timestamp edge case without using "now - N seconds".
-        if(centralLastMonthSyncAt){
-          monthQuery = monthQuery.gte('updated_at', centralLastMonthSyncAt);
+        // 모든 기록 조회는 2026-01-01 이후로 제한한다(커서가 이보다 늦으면 커서 사용).
+        {
+          const floorIso = '2026-01-01T00:00:00Z';
+          const curMs = Date.parse(centralLastMonthSyncAt || '');
+          const useCursor = Number.isFinite(curMs) && curMs > Date.parse(floorIso);
+          monthQuery = monthQuery.gte('updated_at', useCursor ? centralLastMonthSyncAt : floorIso);
         }
 
         const stampRes = await monthQuery;
