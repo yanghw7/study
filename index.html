@@ -243,9 +243,8 @@
   const SUPABASE_URL = 'https://nvpvxtwebzefhgulswsv.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_z5OzUt5AQhpWK-ZXl-3blQ_jav06IYo';
 
-  // ── 접속 환경별 로그인 유지 정책 ─────────────────────────────
-  //  - 안드로이드 앱(WebView) / 설치한 PWA : 기존과 동일하게 항상 로그인 유지
-  //  - 일반 브라우저(주소 입력 접속)       : 마지막 사용 후 30분이 지나면 이 브라우저에서만 로그아웃
+  // ── 로그인 유지 정책 ─────────────────────────────
+  //  모든 환경(앱 / PWA / 브라우저)에서 사용자가 직접 로그아웃하기 전에는 자동으로 로그아웃하지 않는다.
   const ENV_APP = location.hostname === 'appassets.androidplatform.net';
   const ENV_PWA = (()=>{
     try{
@@ -260,42 +259,46 @@
     return false;
   })();
   const ENV_BROWSER = !ENV_APP && !ENV_PWA;
-  const BROWSER_IDLE_MS = 30 * 60 * 1000;
-  const BROWSER_ACTIVE_KEY = 'journal:browser-last-active';
-  // 브라우저는 로그인 정보를 별도 키에 저장한다. 같은 기기의 PWA와 저장소를 공유하더라도
-  // 브라우저의 30분 로그아웃이 PWA/앱의 로그인 상태를 지우지 못하게 하기 위함.
+  // 브라우저는 로그인 정보를 별도 키에 저장한다(기존 브라우저 로그인 유지를 위해 키는 그대로 둔다).
   const BROWSER_AUTH_KEY = 'sb-journal-browser-auth';
-  let browserIdleGuardStarted = false;
 
-  function startBrowserIdleGuard(sb){
-    if(!ENV_BROWSER || browserIdleGuardStarted) return;
-    browserIdleGuardStarted = true;
-    let lastWrite = 0;
-    const readLast = ()=>{ try{ return Number(localStorage.getItem(BROWSER_ACTIVE_KEY)||0); }catch(_){ return 0; } };
-    const writeNow = ()=>{ lastWrite = Date.now(); try{ localStorage.setItem(BROWSER_ACTIVE_KEY, String(lastWrite)); }catch(_){} };
-    async function expireIfIdle(){
-      const last = readLast();
-      if(!last || Date.now() - last < BROWSER_IDLE_MS) return false;
-      try{
-        const {data:{session}} = await sb.auth.getSession();
-        // scope:'local' → 서버의 다른 기기/앱 세션은 건드리지 않고 이 브라우저의 로그인만 해제
-        if(session) await sb.auth.signOut({scope:'local'});
-      }catch(_){}
-      writeNow();
-      return true;
-    }
-    async function onActivity(){
-      if(Date.now() - lastWrite < 5000) return;      // 입력이 잦아도 기록은 5초에 한 번만
-      if(await expireIfIdle()) return;
-      writeNow();
-    }
-    ['pointerdown','keydown','touchstart','wheel'].forEach(ev=>
-      window.addEventListener(ev, ()=>{ void onActivity(); }, {passive:true, capture:true}));
-    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') void onActivity(); });
-    window.addEventListener('focus', ()=>{ void onActivity(); });
-    setInterval(()=>{ void expireIfIdle(); }, 60 * 1000);
-    // 시작 시: 마지막 사용 후 30분이 지났으면 로그아웃, 기록이 없으면 지금부터 측정 시작
-    void (async()=>{ await expireIfIdle(); if(!readLast()) writeNow(); })();
+  // 로그인 세션 백업 + 원치 않는 로그아웃 자동 복구
+  const AUTH_BACKUP_KEY = 'journal:auth-backup';
+  let __intentionalSignOut = false;   // 사용자가 로그아웃 버튼을 눌렀을 때만 true
+  let __recovering = false, __lastRecoverAt = 0;
+  function saveAuthBackup(session){
+    try{
+      if(session?.refresh_token) localStorage.setItem(AUTH_BACKUP_KEY, JSON.stringify({
+        access_token: session.access_token, refresh_token: session.refresh_token
+      }));
+    }catch(_){}
+  }
+  function clearAuthBackup(){ try{ localStorage.removeItem(AUTH_BACKUP_KEY); }catch(_){} }
+  async function recoverUnexpectedSignOut(sb){
+    if(__recovering || Date.now() - __lastRecoverAt < 30000) return;
+    let b = null;
+    try{ b = JSON.parse(localStorage.getItem(AUTH_BACKUP_KEY) || 'null'); }catch(_){}
+    if(!b?.refresh_token) return;
+    __recovering = true; __lastRecoverAt = Date.now();
+    try{
+      const {error} = await sb.auth.setSession({access_token:b.access_token, refresh_token:b.refresh_token});
+      if(error) clearAuthBackup();   // 서버가 토큰을 완전히 무효 처리한 경우에만 포기
+    }catch(_){}
+    finally{ __recovering = false; }
+  }
+
+  // 토큰 갱신 요청이 나가는 동안 앱(네이티브)에 알려, 숨은 WebView 가 그 사이 종료되며
+  // 새 토큰을 저장하지 못해 로그아웃되는 일을 막는다.
+  function __authFetch(input, init){
+    let isRefresh = false;
+    try{
+      const u = typeof input === 'string' ? input : (input && input.url) || '';
+      isRefresh = u.includes('/auth/v1/token') && u.includes('grant_type=refresh_token');
+    }catch(_){}
+    if(!isRefresh) return fetch(input, init);
+    try{ window.NativeWidget?.authRefreshBegin?.(); }catch(_){}
+    const done = ()=>setTimeout(()=>{ try{ window.NativeWidget?.authRefreshEnd?.(); }catch(_){} }, 2000);
+    return fetch(input, init).then(r=>{ done(); return r; }, e=>{ done(); throw e; });
   }
 
   let sbSettingsClient = null;
@@ -358,9 +361,25 @@
         { auth: Object.assign(
             { persistSession:true, autoRefreshToken:true, detectSessionInUrl:!isAndroidApp },
             ENV_BROWSER ? { storageKey: BROWSER_AUTH_KEY } : {}
-          ), realtime: { logLevel: 'error' } }
+          ), realtime: { logLevel: 'error' }, global: { fetch: __authFetch } }
       );
-      startBrowserIdleGuard(sbSettingsClient);
+      const __sb = sbSettingsClient;
+      const __origSignOut = __sb.auth.signOut.bind(__sb.auth);
+      // 로그아웃은 누른 기기에서만 적용(local). 범위를 지정하지 않으면 모든 기기의 세션이 한꺼번에 폐기되기 때문.
+      __sb.auth.signOut = async (opts)=>{ __intentionalSignOut = true; clearAuthBackup(); return __origSignOut(opts && opts.scope ? opts : { scope:'local' }); };
+      __sb.auth.onAuthStateChange((event, session)=>{
+        if(session && (event==='SIGNED_IN' || event==='TOKEN_REFRESHED' || event==='INITIAL_SESSION')){
+          __intentionalSignOut = false;
+          saveAuthBackup(session);
+        }else if(event==='SIGNED_OUT' && !__intentionalSignOut){
+          setTimeout(()=>{ void recoverUnexpectedSignOut(__sb); }, 0);
+        }
+      });
+      // 앱을 다시 켜거나 네트워크가 돌아왔을 때, 만료 임박 토큰을 즉시 갱신
+      const __keepAlive = ()=>{ try{ void __sb.auth.getSession(); }catch(_){} };
+      document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') __keepAlive(); });
+      window.addEventListener('focus', __keepAlive);
+      window.addEventListener('online', __keepAlive);
       return sbSettingsClient;
     }catch(e){ return null; }
     finally{ __sbCreating = false; }
