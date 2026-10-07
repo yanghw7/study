@@ -12,10 +12,6 @@
         {
           "header": "content-security-policy",
           "operation": "remove"
-        },
-        {
-          "header": "content-security-policy-report-only",
-          "operation": "remove"
         }
       ]
     },
@@ -23,6 +19,9 @@
       "requestDomains": [
         "google.com",
         "google.co.kr"
+      ],
+      "initiatorDomains": [
+        "yanghw7.github.io"
       ],
       "resourceTypes": [
         "sub_frame"
