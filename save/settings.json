@@ -1,7 +1,11 @@
 {
   "v": 1,
-  "updated": 1791381507227,
+  "updated": 1791382805421,
   "prompts": [
+    {
+      "id": "muy72izx0nuq8",
+      "text": "관련 이미지나 사진 보여주고\n\n1. 정의 \n2. 증상 \n3. 위험인자 (취약인 / 취약부위)\n4. 진단 (검사방법)\n5. 치료 \n6. 부작용 \n으로 서술형 시험 답안용 요약정리 해줘"
+    },
     {
       "id": "muy6apazzq294",
       "text": "제3보험"
@@ -15,5 +19,7 @@
   "model": "gemini-2.0-flash",
   "key": "",
   "cropTop": 80,
-  "cropBottom": 100
+  "cropBottom": 100,
+  "cropLeft": 0,
+  "cropRight": 0
 }
