@@ -50,7 +50,7 @@ a{color:var(--accent)}
 
 <div class="card">
   <label>GitHub 토큰 (이 브라우저에만 저장됨)</label>
-  <input type="password" id="tok" placeholder="github_pat_..." autocomplete="off">
+  <form onsubmit="return false" autocomplete="off"><input type="password" id="tok" placeholder="github_pat_..." autocomplete="off"></form>
   <div class="note">
     github.com/settings/personal-access-tokens/new →
     <b>Only select repositories</b> → <b>study</b> 체크 →
@@ -129,7 +129,7 @@ a{color:var(--accent)}
 <div class="card">
   <div class="field">
     <label>Gemini API 키</label>
-    <input type="password" id="key" placeholder="AIza..." autocomplete="off">
+    <form onsubmit="return false" autocomplete="off"><input type="password" id="key" placeholder="AIza..." autocomplete="off"></form>
     <div class="note">aistudio.google.com/apikey 에서 무료 발급. 이 값도 GitHub에 저장돼요. 저장소가 Public이면 노출되니 주의.</div>
   </div>
   <div class="field">
