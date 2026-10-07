@@ -439,6 +439,8 @@ a{color:var(--accent)}
     $('shiftX').value = state.data.shiftX;
     state.cropEdit = false;
     saveNow();
+    // 화면 자르기 설정도 저장 버튼을 누르면 GitHub에 즉시 저장합니다.
+    if(state.token) push();
   };
 
   var MAX_PROMPT = 3500;
