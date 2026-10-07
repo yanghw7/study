@@ -38,6 +38,7 @@ label{display:block;font-size:16px;font-weight:600;color:var(--muted);margin:0 0
 a{color:var(--accent)}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
 </style>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
 </head>
 <body>
 
@@ -258,7 +259,7 @@ a{color:var(--accent)}
         delete d.tokenMemo; memoRender();
       }
       if(remoteKey || hadRemoteMemo){
-        // 원격에 남아 있던 비밀정보는 메모리에서 제거하고, 사용자가 명시적으로 'GitHub에 저장'을 눌렀을 때만 원격에서 정리합니다.
+        // 원격에 남아 있던 비밀정보는 메모리에서 제거합니다. 다음 저장 시 정리된 값으로 업로드됩니다.
         state.dirty = true;
       }
       if(d.cropTop == null) d.cropTop = 0;
@@ -330,11 +331,11 @@ a{color:var(--accent)}
       state.again = false;
     }
   }
-  // 변경은 브라우저의 현재 상태에만 반영합니다. GitHub 저장은 명시적으로 저장 버튼을 눌렀을 때만 합니다.
+  // 변경 사항은 GitHub에 저장할 준비 상태로 표시합니다. 프롬프트 추가/수정은 아래에서 즉시 push합니다.
   function saveNow(){
     state.dirty = true;
     if(!state.token) status('변경됨 · GitHub 토큰을 연결한 뒤 저장 버튼을 누르세요.');
-    else status('변경됨 · [GitHub에 저장] 버튼을 눌러야 원격에 반영됩니다.');
+    else status('변경됨 · 저장 준비 완료');
   }
 
   function touch(){ saveNow(); }
@@ -474,8 +475,7 @@ a{color:var(--accent)}
     resetEditor();
     saveNow();
     render();
-    // 프롬프트 추가/수정은 토큰이 연결되어 있으면 즉시 GitHub에도 저장합니다.
-    // 토큰이 없으면 기존처럼 변경 상태만 유지하고 [GitHub에 저장] 버튼으로 저장할 수 있습니다.
+    // 프롬프트 추가/수정은 연결된 GitHub 토큰으로 즉시 저장합니다.
     if(state.token) push();
   };
   $('edCancel').onclick = resetEditor;
@@ -526,11 +526,6 @@ a{color:var(--accent)}
     $('tok').disabled = false; $('tok').placeholder = 'github_pat_...';
     $('saveTok').hidden = false; $('delTok').hidden = true;
     status('토큰 삭제됨');
-  };
-  $('saveRemote').onclick = function(){
-    if(!state.data) return;
-    if(!state.token){ status('⚠ GitHub 토큰을 먼저 연결하세요.', 'bad'); return; }
-    push();
   };
   $('reload').onclick = function(){ state.cropEdit = false; pull(); };
 
