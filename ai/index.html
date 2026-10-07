@@ -28,6 +28,7 @@ textarea{resize:none;max-height:140px}
 a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* ===== 상단 검색창 ===== */
 .topbar{flex:none;display:flex;gap:8px;align-items:flex-start;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 8px;border-bottom:1px solid var(--border);background:var(--bg)}
 .menu-btn{flex:none;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:18px;line-height:1}
 .menu-btn:hover{border-color:var(--accent)}
@@ -36,6 +37,7 @@ a{color:var(--accent)}
 .go{flex:none;background:var(--accent);color:#fff;font-weight:600;font-size:15px;padding:9px 18px;margin-top:2px}
 .go:disabled{opacity:.6;cursor:default}
 
+/* ===== 레이아웃 ===== */
 .layout{flex:1;min-height:0;display:flex;position:relative}
 aside{flex:none;width:320px;overflow-y:auto;border-right:1px solid var(--border);padding:10px;background:var(--bg);display:flex;flex-direction:column}
 main{flex:1;min-width:0;min-height:0;overflow:auto;padding:10px;display:flex;flex-direction:column;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
@@ -47,6 +49,7 @@ main{flex:1;min-width:0;min-height:0;overflow:auto;padding:10px;display:flex;fle
   body.drawer-open .backdrop{display:block}
 }
 
+/* ===== 아코디언 메뉴 ===== */
 .acc{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;transition:border-color .2s}
 .acc.open{border-color:var(--accent)}
 .acc-head{width:100%;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;text-align:left}
@@ -92,21 +95,20 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
 .spacer{flex:1;min-height:8px}
 
+/* ===== 관리자 링크 (하단 고정) ===== */
 .admin-link{display:flex;align-items:center;gap:10px;padding:11px 12px;text-decoration:none;color:inherit;margin-bottom:0}
 .admin-link .sub{font-size:12px;font-weight:400;color:var(--muted)}
 
-/* ★ 검색 결과 영역: flex column 유지 (frame 정상 작동) + 스크롤 허용 */
-#result{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
+/* ===== 검색 결과 ===== */
+#result{flex:1;min-height:0;display:flex;flex-direction:column}
 #result[hidden]{display:none}
 .fill{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--border);border-radius:12px;background:var(--card)}
 .frame{position:absolute;left:0;top:0;width:100%;border:0;background:var(--card)}
 .crop{display:flex;gap:8px;flex-wrap:wrap}.crop>div{flex:1 1 calc(50% - 8px);min-width:110px}.crop small{margin:0 0 4px}
 .newtab{position:absolute;right:14px;bottom:14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px;padding:6px 12px;text-decoration:none;opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .newtab:hover{opacity:1;border-color:var(--accent)}.newtab.alt{right:130px;background:var(--accent);border-color:var(--accent);color:#fff}
-
-/* ★ 답변 요소: flex-shrink:0 로 찌그러짐 방지 */
-.res-q{font-size:13px;color:var(--muted);margin:0 0 10px;white-space:pre-wrap;word-break:break-word;flex-shrink:0}
-.answer{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font-size:15px;line-height:1.65;word-break:break-word;margin-bottom:12px;flex-shrink:0}
+.res-q{font-size:13px;color:var(--muted);margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
+.answer{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font-size:15px;line-height:1.65;word-break:break-word}
 .answer h3,.answer h4{margin:16px 0 6px;font-size:16px}
 .answer p{margin:0 0 10px}
 .answer ul,.answer ol{margin:0 0 10px;padding-left:22px}
@@ -114,18 +116,16 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .answer .tbl{overflow-x:auto;margin:0 0 10px}
 .answer table{border-collapse:collapse;font-size:14px}
 .answer th,.answer td{border:1px solid var(--border);padding:6px 10px;text-align:left}
-.loading{color:var(--muted);padding:18px;text-align:center;flex-shrink:0}
-.err{color:var(--danger);background:var(--card);border:1px solid var(--danger);border-radius:14px;padding:14px 16px;font-size:14px;white-space:pre-wrap;flex-shrink:0}
-.sources{margin-top:12px;flex-shrink:0}
+.loading{color:var(--muted);padding:18px;text-align:center}
+.err{color:var(--danger);background:var(--card);border:1px solid var(--danger);border-radius:14px;padding:14px 16px;font-size:14px;white-space:pre-wrap}
+.sources{margin-top:12px}
 .sources a{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border:1px solid var(--border);border-radius:999px;font-size:13px;text-decoration:none;color:var(--fg);background:var(--bg)}
-.open-link{display:inline-block;margin-top:6px;font-size:13px;flex-shrink:0}
-
-.override-notice{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px;line-height:1.3}
-.override-notice button{font-size:12px;padding:5px 10px;flex:none}
+.open-link{display:inline-block;margin-top:6px;font-size:13px}
 </style>
 </head>
 <body>
 
+<!-- 상단 검색창 -->
 <div class="topbar">
   <button type="button" class="menu-btn" id="menuBtn" aria-label="메뉴 열기/닫기" title="메뉴 열기/닫기">☰</button>
   <form id="f">
@@ -135,6 +135,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 </div>
 
 <div class="layout">
+  <!-- 왼쪽 메뉴 -->
   <aside id="side">
 
     <div class="acc" data-key="cur">
@@ -157,7 +158,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="editor">
-          <textarea id="ed" rows="3" maxlength="3500" placeholder="자주 쓰는 프롬프트를 입력하세요 (특수문자는 자동 제거됩니다)"></textarea>
+          <textarea id="ed" rows="3" maxlength="3500" placeholder="자주 쓰는 프롬프트를 입력하세요"></textarea>
           <div class="note" id="edCount" style="text-align:right;margin:2px 0 0">0 / 3500자 (공백 포함)</div>
           <div class="row">
             <button type="button" class="btn ghost" id="edCancel" hidden>취소</button>
@@ -208,10 +209,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         <i class="chev"></i>
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
-        <div id="overrideNotice" class="override-notice" hidden>
-          <span>⚠ 이 기기에만 적용된 설정이 있습니다.</span>
-          <button type="button" id="resetOverrides" class="btn ghost">관리자 값으로 되돌리기</button>
-        </div>
         <div class="field">
           <div class="label">검색 결과 표시 방식</div>
           <select id="mode">
@@ -245,6 +242,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
   <div class="backdrop" id="backdrop"></div>
 
+  <!-- 검색 결과 -->
   <main>
     <section id="result" hidden></section>
   </main>
@@ -253,36 +251,25 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 <script>
 (function(){
   var KEY = "aimode_prompts_v2", OLD_KEY = "aimode_prompts_v1", CFG = "aimode_cfg_v1", UIKEY = "aimode_ui_v1";
-  var OVERRIDE_KEY = "aimode_overrides_v1";
+  var DEFAULTS = [
+    "다음 질문에 대해 핵심부터 간결하게, 근거와 함께 한국어로 답해줘.",
+    "초등학생도 이해할 수 있게 쉽게 설명해줘."
+  ];
   var DEFAULT_MODEL = "gemini-2.0-flash";
   var MAX_PROMPT = 3500;
   var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   var DEFAULT_MODE = IS_MOBILE ? "api" : "frame";
   var mq = window.matchMedia("(max-width:720px)");
 
-  var CLEAN_RE = /[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s.,!?()\[\]{}:;'"~`\-]/g;
-  function cleanText(t){
-    if(typeof t !== "string") return "";
-    return t.replace(CLEAN_RE, "");
-  }
-
   var $ = function(id){ return document.getElementById(id); };
   var q = $("q"), ed = $("ed"), edSave = $("edSave"), edCancel = $("edCancel"), edTitle = $("edTitle");
   var list = $("list"), count = $("count"), curBody = $("curBody"), result = $("result"), goBtn = $("goBtn");
-
-  var overrides = loadOverrides();
-  function loadOverrides(){ try{ return JSON.parse(localStorage.getItem(OVERRIDE_KEY)) || {}; }catch(e){ return {}; } }
-  function saveOverrides(){ try{ localStorage.setItem(OVERRIDE_KEY, JSON.stringify(overrides)); }catch(e){} }
-  function hasOverrides(){ for(var k in overrides){ if(overrides[k]) return true; } return false; }
-  function updateOverrideUI(){
-    var el = $("overrideNotice");
-    if(el) el.hidden = !hasOverrides();
-  }
 
   var state = load(), cfg = loadCfg(), ui = loadUi(), editingId = null, syncMsg = "";
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
+  /* ---------- 저장/불러오기 ---------- */
   function load(){
     try{
       var raw = localStorage.getItem(KEY);
@@ -316,6 +303,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return null;
   }
 
+  /* ---------- 아코디언 / 사이드바 ---------- */
   var accs = Array.prototype.slice.call(document.querySelectorAll(".acc[data-key]"));
   function applyAcc(){
     accs.forEach(function(a){
@@ -337,6 +325,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   });
   $("backdrop").addEventListener("click", function(){ document.body.classList.remove("drawer-open"); });
 
+  /* ---------- 마크다운 렌더 (간단) ---------- */
   function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function inline(s){
     s = esc(s);
@@ -374,18 +363,21 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return out.join("");
   }
 
+  /* ---------- 구글 화면 자르기 ---------- */
   function num(el){ var n = parseInt(el.value, 10); return isNaN(n) ? 0 : Math.max(0, Math.min(500, n)); }
   function applyCrop(fr){
     fr.style.top = (-cfg.cropTop) + "px";
     fr.style.height = "calc(100% + " + (cfg.cropTop + cfg.cropBottom) + "px)";
+    // 가로 이동(shiftX): 폭은 그대로 두고 프레임 위치만 좌우로 이동 (+ 오른쪽)
     fr.style.left = (cfg.shiftX - cfg.cropLeft) + "px";
     fr.style.width = "calc(100% + " + (cfg.cropLeft + cfg.cropRight) + "px)";
   }
 
+  /* ---------- 검색 ---------- */
   function buildQuery(text){
     var a = active();
     if(!a) return text;
-    return text.replace(/\s+$/, "") + "\n\n\n" + a.text;
+    return text.replace(/\s+$/, "") + "\n\n\n" + a.text; // 검색어 → 빈 줄 2개 → 프롬프트
   }
   function showResult(node){ result.hidden = false; result.innerHTML = ""; result.appendChild(node); }
   function div(cls, html){ var d = document.createElement("div"); d.className = cls; if(html != null) d.innerHTML = html; return d; }
@@ -467,15 +459,18 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     }
   }
 
+  /* ---------- GitHub에서 설정 자동 불러오기 (읽기 전용) ---------- */
   var REPO = (function(){
     var host = location.hostname, parts = location.pathname.split("/").filter(Boolean);
+    // GitHub Pages
     if(/\.github\.io$/i.test(host)){
       var owner = host.split(".")[0], repo = host;
       if(parts.length){ repo = parts[0]; }
-      return {owner: owner, repo: repo, path: "save/config.json"};
+      return {owner: owner, repo: repo, path: "save/settings.json"};
     }
+    // 로컬 개발 (localhost / 127.0.0.1 / file://)
     if(host === "localhost" || host === "127.0.0.1" || location.protocol === "file:"){
-      return {owner: "yanghw7", repo: "study", path: "save/config.json"};
+      return {owner: "yanghw7", repo: "study", path: "save/settings.json"};
     }
     return null;
   })();
@@ -487,72 +482,66 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function apiUrl(){
     return "https://api.github.com/repos/" + REPO.owner + "/" + REPO.repo + "/contents/" + REPO.path.split("/").map(encodeURIComponent).join("/");
   }
-
   function applyRemote(d){
     if(Array.isArray(d.prompts)){
-      var ps = d.prompts
-        .filter(function(p){ return p && typeof p.id === "string" && typeof p.text === "string"; })
-        .map(function(p){ return {id: p.id, text: cleanText(p.text)}; });
+      var ps = d.prompts.filter(function(p){ return p && typeof p.id === "string" && typeof p.text === "string"; });
       state.prompts = ps; state.activeId = d.activeId; state = fix(state); persist();
     }
-    if(!overrides.model && d.model) cfg.model = d.model;
-    if(!overrides.key && typeof d.key === "string" && d.key) cfg.key = d.key;
-    if(!overrides.cropTop && typeof d.cropTop === "number") cfg.cropTop = d.cropTop;
-    if(!overrides.cropBottom && typeof d.cropBottom === "number") cfg.cropBottom = d.cropBottom;
-    if(!overrides.cropLeft && typeof d.cropLeft === "number") cfg.cropLeft = d.cropLeft;
-    if(!overrides.cropRight && typeof d.cropRight === "number") cfg.cropRight = d.cropRight;
-    if(!overrides.shiftX && typeof d.shiftX === "number") cfg.shiftX = d.shiftX;
+    if(d.model) cfg.model = d.model;
+    if(typeof d.key === "string" && d.key) cfg.key = d.key;
+    if(typeof d.cropTop === "number") cfg.cropTop = d.cropTop;
+    if(typeof d.cropBottom === "number") cfg.cropBottom = d.cropBottom;
+    if(typeof d.cropLeft === "number") cfg.cropLeft = d.cropLeft;
+    if(typeof d.cropRight === "number") cfg.cropRight = d.cropRight;
+    if(typeof d.shiftX === "number") cfg.shiftX = d.shiftX;
     saveCfg();
-
-    if(!overrides.model) $("model").value = cfg.model;
-    if(!overrides.key) $("key").value = cfg.key || "";
-    if(!overrides.cropTop) $("cropTop").value = cfg.cropTop;
-    if(!overrides.cropBottom) $("cropBottom").value = cfg.cropBottom;
-    if(!overrides.cropLeft) $("cropLeft").value = cfg.cropLeft;
-    if(!overrides.cropRight) $("cropRight").value = cfg.cropRight;
-    if(!overrides.shiftX) $("shiftX").value = cfg.shiftX;
-
+    $("model").value = cfg.model; $("key").value = cfg.key || ""; $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom; $("cropLeft").value = cfg.cropLeft; $("cropRight").value = cfg.cropRight; $("shiftX").value = cfg.shiftX;
     var f = document.querySelector(".frame"); if(f) applyCrop(f);
     resetEditor(); render();
   }
-
-  var lastPull = 0;
+  var ETAG_KEY = "aimode_etag_v1", lastPull = 0;
   async function fetchSettings(){
     var why = "";
+    // 1) 같은 사이트(GitHub Pages)의 save/settings.json: 요청 한도 없음. 관리자에서 저장 후 1~2분 뒤 반영
+    try{
+      var r2 = await fetch(new URL("../save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
+      if(r2.ok){
+        var d2 = await r2.json();
+        syncMsg = "✓ 동기화 " + new Date().toLocaleTimeString();
+        return d2;
+      }
+      why = "페이지 파일 " + r2.status;
+    }catch(e){ why = "페이지 파일 오류"; }
+    // 2) 실패하면 GitHub API (한도 있음, 바뀐 게 없으면 304라 한도에 포함 안 됨)
     try{
       var h = {"Accept": "application/vnd.github+json"};
+      var et = null; try{ et = localStorage.getItem(ETAG_KEY); }catch(e){}
+      if(et && localStorage.getItem(KEY)) h["If-None-Match"] = et;
       var r = await fetch(apiUrl() + "?t=" + Date.now(), {headers: h, cache: "no-store"});
+      if(r.status === 304){ syncMsg = "✓ 최신 상태 " + new Date().toLocaleTimeString(); return {__same: true}; }
       if(r.ok){
         var j = await r.json();
+        var tag = r.headers.get("ETag"); if(tag){ try{ localStorage.setItem(ETAG_KEY, tag); }catch(e){} }
         syncMsg = "✓ GitHub 동기화 " + new Date().toLocaleTimeString();
         return JSON.parse(b64dec(j.content || ""));
       }
-      if(r.status === 404){ syncMsg = "⚠ config.json 없음"; return null; }
-      why = "GitHub " + r.status;
+      if(r.status === 404){ syncMsg = "⚠ save/settings.json 없음 (관리자에서 저장 안 됨)"; return null; }
+      why += " / GitHub " + r.status;
       if((r.status === 403 || r.status === 429) && r.headers.get("x-ratelimit-remaining") === "0") why += " 요청 한도 초과";
-    }catch(e){ why = "GitHub 오류"; }
-    try{
-      var r2 = await fetch(new URL("../save/config.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
-      if(r2.ok){
-        var d2 = await r2.json();
-        syncMsg = "✓ 동기화(캐시) " + new Date().toLocaleTimeString();
-        return d2;
-      }
-      why += " / 페이지 " + r2.status;
-    }catch(e){ why += " / 페이지 오류"; }
+    }catch(e){ why += " / 네트워크 오류"; }
     syncMsg = "⚠ 불러오기 실패 (" + why + ") · 이전 값 표시 중";
     return undefined;
   }
-
   async function pullRemote(force){
     if(!REPO){ return; }
-    if(!force && Date.now() - lastPull < 30000) return;
+    if(!force && Date.now() - lastPull < 30000) return; // 너무 자주 요청하지 않기
     lastPull = Date.now();
     var d = await fetchSettings();
-    if(!d){ render(); return; }
+    if(!d || d.__same){ render(); return; }
     applyRemote(d);
   }
 
+  /* ---------- 프롬프트 UI ---------- */
   function autosize(el){ el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }
   function short(t, n){ t = t.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n) + "…" : t; }
   function edCount(){ $("edCount").textContent = ed.value.length + " / " + MAX_PROMPT + "자 (공백 포함)"; }
@@ -596,10 +585,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
   function renderCrop(){ $("subCrop").textContent = "위 " + cfg.cropTop + " · 아래 " + cfg.cropBottom + " · 왼쪽 " + cfg.cropLeft + " · 오른쪽 " + cfg.cropRight + " px" + (cfg.shiftX ? " · 이동 " + cfg.shiftX : ""); }
   function renderSet(){ $("subSet").textContent = cfg.mode === "api" ? "Gemini API 방식" : "구글 화면 그대로"; }
-  function render(){ renderCurrent(); renderList(); renderSet(); renderCrop(); updateOverrideUI(); }
+  function render(){ renderCurrent(); renderList(); renderSet(); renderCrop(); }
 
   edSave.addEventListener("click", function(){
-    ed.value = cleanText(ed.value);
     var v = ed.value.trim().slice(0, MAX_PROMPT); if(!v) return;
     if(editingId) state.prompts.forEach(function(p){ if(p.id === editingId) p.text = v; });
     else state.prompts.unshift({id: uid(), text: v});
@@ -611,7 +599,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("model").value = cfg.model || DEFAULT_MODEL;
   $("mode").value = cfg.mode || DEFAULT_MODE;
   $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom; $("cropLeft").value = cfg.cropLeft; $("cropRight").value = cfg.cropRight; $("shiftX").value = cfg.shiftX;
-
   function liveCrop(){
     cfg.cropTop = num($("cropTop")); cfg.cropBottom = num($("cropBottom"));
     cfg.cropLeft = num($("cropLeft")); cfg.cropRight = num($("cropRight"));
@@ -620,33 +607,19 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var f = document.querySelector(".frame"); if(f) applyCrop(f);
     renderCrop();
   }
+  $("cropTop").addEventListener("input", liveCrop);
+  $("cropBottom").addEventListener("input", liveCrop);
+  $("cropLeft").addEventListener("input", liveCrop);
+  $("cropRight").addEventListener("input", liveCrop);
+  $("shiftX").addEventListener("input", liveCrop);
 
-  $("key").addEventListener("change", function(){
-    cfg.key = $("key").value.trim(); saveCfg();
-    overrides.key = true; saveOverrides(); updateOverrideUI();
-  });
-  $("model").addEventListener("change", function(){
-    cfg.model = $("model").value.trim() || DEFAULT_MODEL; saveCfg();
-    overrides.model = true; saveOverrides(); updateOverrideUI();
-  });
+  $("key").addEventListener("change", function(){ cfg.key = $("key").value.trim(); saveCfg(); });
+  $("model").addEventListener("change", function(){ cfg.model = $("model").value.trim() || DEFAULT_MODEL; saveCfg(); });
   $("mode").addEventListener("change", function(){ cfg.mode = $("mode").value; saveCfg(); renderSet(); });
-  ["cropTop","cropBottom","cropLeft","cropRight","shiftX"].forEach(function(id){
-    $(id).addEventListener("input", function(){
-      overrides[id] = true; saveOverrides();
-      liveCrop(); updateOverrideUI();
-    });
-  });
-
-  $("resetOverrides").addEventListener("click", function(){
-    overrides = {}; saveOverrides(); updateOverrideUI();
-    pullRemote(true);
-  });
 
   $("f").addEventListener("submit", function(ev){ ev.preventDefault(); search(); });
   q.addEventListener("input", function(){ autosize(q); });
   ed.addEventListener("input", function(){
-    var cleaned = cleanText(ed.value);
-    if(cleaned !== ed.value) ed.value = cleaned;
     if(ed.value.length > MAX_PROMPT) ed.value = ed.value.slice(0, MAX_PROMPT);
     autosize(ed); edCount();
   });
@@ -663,9 +636,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
 
   render();
-  pullRemote(true);
-  setInterval(function(){ if(!document.hidden) pullRemote(); }, 30000);
-  document.addEventListener("visibilitychange", function(){ if(!document.hidden) pullRemote(true); });
+  pullRemote();
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) pullRemote(); });
 })();
 </script>
 </body>
