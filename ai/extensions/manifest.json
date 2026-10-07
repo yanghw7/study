@@ -1,21 +1,14 @@
 {
   "manifest_version": 3,
   "name": "AI 모드 프레임 허용 (개인용)",
-  "version": "2.1",
-  "description": "구글 iframe 차단 헤더를 제거해 AI 검색 페이지 안에서 구글이 보이게 합니다. (localhost / GitHub Pages 지원)",
+  "version": "1.2",
+  "description": "내 AI 검색 페이지 안에서 구글 화면이 보이도록, 구글 iframe의 차단 헤더를 내 브라우저에서만 제거합니다.",
   "permissions": [
-    "declarativeNetRequest",
-    "declarativeNetRequestFeedback"
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "https://*.google.com/*",
     "https://*.google.co.kr/*",
-    "https://*.googleapis.com/*",
-    "https://*.gstatic.com/*",
-    "https://*.googleusercontent.com/*",
-    "https://*.googlesyndication.com/*",
-    "https://*.googleadservices.com/*",
-    "https://*.doubleclick.net/*",
     "https://yanghw7.github.io/*",
     "http://localhost/*",
     "http://localhost:*/*",
