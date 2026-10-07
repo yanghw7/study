@@ -371,7 +371,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function buildQuery(text){
     var a = active();
     if(!a) return text;
-    return a.text + (/\s$/.test(a.text) ? "" : "\n") + text;
+    return text.replace(/\s+$/, "") + "\n\n\n" + a.text; // 검색어 → 빈 줄 2개 → 프롬프트
   }
   function showResult(node){ result.hidden = false; result.innerHTML = ""; result.appendChild(node); }
   function div(cls, html){ var d = document.createElement("div"); d.className = cls; if(html != null) d.innerHTML = html; return d; }
