@@ -443,7 +443,15 @@ a{color:var(--accent)}
 
   var MAX_PROMPT = 3500;
   function edCount(){ $('edCount').textContent = $('ed').value.length + ' / ' + MAX_PROMPT + '자 (공백 포함)'; }
+  // 프롬프트 추가/수정 입력창에서는 '/' 문자를 입력할 수 없게 함
+  $('ed').addEventListener('keydown', function(e){
+    if(e.key === '/') e.preventDefault();
+  });
+  $('ed').addEventListener('beforeinput', function(e){
+    if(typeof e.data === 'string' && e.data.indexOf('/') !== -1) e.preventDefault();
+  });
   $('ed').addEventListener('input', function(){
+    this.value = this.value.replace(/\//g, '');
     if(this.value.length > MAX_PROMPT) this.value = this.value.slice(0, MAX_PROMPT);
     edCount();
   });
@@ -464,7 +472,12 @@ a{color:var(--accent)}
       state.data.prompts.unshift({id:id, text:v});
       if(!state.data.activeId) state.data.activeId = id;
     }
-    resetEditor(); saveNow(); render();
+    resetEditor();
+    saveNow();
+    render();
+    // 프롬프트 추가/수정은 토큰이 연결되어 있으면 즉시 GitHub에도 저장합니다.
+    // 토큰이 없으면 기존처럼 변경 상태만 유지하고 [GitHub에 저장] 버튼으로 저장할 수 있습니다.
+    if(state.token) push();
   };
   $('edCancel').onclick = resetEditor;
 
