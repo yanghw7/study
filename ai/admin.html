@@ -84,20 +84,6 @@ a{color:var(--accent)}
 </div>
 <ul class="plist" id="list"></ul>
 
-<h2>🔑 토큰 메모</h2>
-<div class="card" id="tokCard">
-  <div class="field" style="margin-bottom:0">
-    <label for="tokMemo">GitHub 토큰 (메모용)</label>
-    <input type="text" id="tokMemo" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
-    <div class="row" style="margin-top:10px">
-      <button id="memoSave" type="button">저장</button>
-      <button class="ghost" id="memoDel" type="button">삭제</button>
-    </div>
-    <div class="status" id="memoStatus"></div>
-    <div class="note">기록만 해두는 칸이에요. <b>저장</b>을 누르면 이 브라우저에 보관되고, 다시 열어도 항상 보여요. GitHub(settings.json)에는 올리지 않아요. Public 저장소에 토큰이 올라가면 GitHub가 자동으로 폐기할 수 있어서 분리했어요.</div>
-  </div>
-</div>
-
 <h2>✂️ 화면 자르기</h2>
 <div class="card" id="cropCard">
   <div class="note" style="margin:0 0 12px">구글 AI 모드 화면(frame 모드)을 띄울 때 위/아래/왼쪽/오른쪽을 잘라내는 값(px)이에요. <b>저장</b>을 누르면 일반 페이지에 적용됩니다.</div>
@@ -488,26 +474,6 @@ a{color:var(--accent)}
   };
   $('colAll').onclick = function(){ state.open = {}; render(); };
 
-  var MEMO = 'aimode_admin_memo_v1';
-  function loadMemo(){ try{ return JSON.parse(localStorage.getItem(MEMO)) || {}; }catch(e){ return {}; } }
-  function saveMemo(v){ try{ localStorage.setItem(MEMO, JSON.stringify({value:v, at:Date.now()})); }catch(e){} }
-  function memoRender(){
-    var m = loadMemo(), el = $('memoStatus');
-    $('tokMemo').value = m.value || '';
-    if(m.value){ el.textContent = '저장됨 · ' + new Date(m.at || Date.now()).toLocaleString(); el.className = 'status ok'; }
-    else { el.textContent = '저장된 메모가 없어요.'; el.className = 'status'; }
-  }
-  $('memoSave').onclick = function(){
-    var v = $('tokMemo').value.trim();
-    if(!v){ $('memoStatus').textContent = '저장할 내용을 입력하세요'; $('memoStatus').className = 'status bad'; return; }
-    saveMemo(v); memoRender();
-  };
-  $('memoDel').onclick = function(){
-    if(!confirm('토큰 메모를 삭제할까요?')) return;
-    try{ localStorage.removeItem(MEMO); }catch(e){}
-    memoRender();
-  };
-  memoRender();
   $('model').addEventListener('input', function(){ state.data.model = $('model').value; touch(); });
   $('key').addEventListener('input', function(){ saveLocalKey($('key').value.trim()); status('Gemini 키는 이 브라우저에만 저장됩니다.', 'ok'); });
   ['cropTop','cropBottom','cropLeft','cropRight','shiftX'].forEach(function(id){
