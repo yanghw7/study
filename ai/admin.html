@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 검색 · 관리자</title>
+<style>
+:root{--bg:#fff;--fg:#1f1f1f;--muted:#6b7280;--card:#f3f4f8;--border:#e1e3ea;--accent:#4b6bfb;--accent-soft:#e8ecff;--danger:#e5484d;--ok:#16a34a}
+@media(prefers-color-scheme:dark){:root{--bg:#121317;--fg:#ececf1;--muted:#9aa0ad;--card:#1d1f26;--border:#2c2f39;--accent:#7b93ff;--accent-soft:#232a4a;--danger:#ff6b70;--ok:#4ade80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;padding:16px;max-width:760px;margin:0 auto;line-height:1.5}
+h1{font-size:18px;margin:0 0 4px}
+h2{font-size:13px;color:var(--muted);margin:24px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
+input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit;font-size:15px;color:var(--fg);outline:0}
+input:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px;font-family:inherit}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:9px 16px;background:var(--accent);color:#fff;font-weight:600}
+button.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+button.danger{color:var(--danger);border-color:var(--danger);background:transparent}
+button:disabled{opacity:.5;cursor:default}
+button.mini{font-size:12px;padding:5px 10px;border-radius:8px}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 6px}
+.field{margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.plist li{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px}
+.plist li.active{border-color:var(--accent);background:var(--accent-soft)}
+.plist .txt{font-size:14px;white-space:pre-wrap;word-break:break-word;margin-bottom:8px}
+.plist .acts{display:flex;gap:6px;justify-content:flex-end;align-items:center}
+.plist .badge{margin-right:auto;font-size:12px;color:var(--accent);font-weight:600}
+.status{font-size:13px;color:var(--muted);margin-top:10px;min-height:18px}
+.status.bad{color:var(--danger)}
+.status.ok{color:var(--ok)}
+.note{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+a{color:var(--accent)}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <h1>AI 검색 · 관리자</h1>
+    <div class="note">여기서 저장한 설정이 <a href="./index.html">일반 페이지</a>에서 자동으로 적용됩니다.</div>
+  </div>
+</div>
+
+<div class="card">
+  <label>GitHub 토큰 (이 브라우저에만 저장됨)</label>
+  <input type="password" id="tok" placeholder="github_pat_..." autocomplete="off">
+  <div class="note">
+    github.com/settings/personal-access-tokens/new →
+    <b>Only select repositories</b> → <b>study</b> 체크 →
+    <b>Permissions → Contents: Read and write</b> → Generate
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button id="saveTok">토큰 저장 및 연결</button>
+    <button class="ghost" id="delTok" hidden>토큰 삭제</button>
+    <button class="ghost" id="reload">GitHub에서 다시 불러오기</button>
+  </div>
+  <div class="status" id="status">대기 중…</div>
+</div>
+
+<div class="card">
+  <label id="edLabel">새 프롬프트 추가</label>
+  <textarea id="ed" placeholder="자주 쓰는 프롬프트를 입력하세요"></textarea>
+  <div class="row" style="margin-top:10px;justify-content:flex-end">
+    <button class="ghost" id="edCancel" hidden>취소</button>
+    <button id="edSave">추가</button>
+  </div>
+</div>
+
+<h2>프롬프트 목록</h2>
+<ul class="plist" id="list"></ul>
+
+<h2>설정</h2>
+<div class="card">
+  <div class="field">
+    <label>Gemini API 키</label>
+    <input type="password" id="key" placeholder="AIza..." autocomplete="off">
+    <div class="note">aistudio.google.com/apikey 에서 무료 발급. 이 값도 GitHub에 저장돼요. 저장소가 Public이면 노출되니 주의.</div>
+  </div>
+  <div class="field">
+    <label>모델</label>
+    <input type="text" id="model" placeholder="gemini-2.0-flash">
+  </div>
+  <div class="field">
+    <label>화면 자르기 (frame 모드 전용, px)</label>
+    <div class="row">
+      <div style="flex:1"><input type="number" id="cropTop" min="0" max="500" step="10" placeholder="위 0"></div>
+      <div style="flex:1"><input type="number" id="cropBottom" min="0" max="500" step="10" placeholder="아래 100"></div>
+    </div>
+    <div class="note">PC 크롬 확장 프로그램으로 구글 AI 모드 화면을 띄울 때 위/아래 잘라내는 값</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var API = 'https://api.github.com/repos/yanghw7/study/contents/save/settings.json';
+  var GH = 'aimode_admin_gh_v1';
+  var $ = function(id){ return document.getElementById(id); };
+  var state = {token:'', sha:null, data:null, dirty:false, timer:null, editing:null, polling:null};
+
+  function status(msg, kind){
+    var el = $('status'); el.textContent = msg;
+    el.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function emptyData(){
+    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', key:'', cropTop:0, cropBottom:100};
+  }
+  function b64enc(s){
+    var b = new TextEncoder().encode(s), bin = '';
+    for(var i=0;i<b.length;i++) bin += String.fromCharCode(b[i]);
+    return btoa(bin);
+  }
+  function b64dec(x){
+    var bin = atob(x.replace(/\s/g,'')), u = new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) u[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(u);
+  }
+  function loadToken(){ try{ return (JSON.parse(localStorage.getItem(GH))||{}).token||''; }catch(e){ return ''; } }
+  function saveToken(t){ try{ localStorage.setItem(GH, JSON.stringify({token:t})); }catch(e){} }
+
+  async function pull(){
+    var h = {Accept:'application/vnd.github+json'};
+    if(state.token) h.Authorization = 'Bearer ' + state.token;
+    status('불러오는 중…');
+    try{
+      var r = await fetch(API + '?t=' + Date.now(), {headers:h, cache:'no-store'});
+      if(r.status === 404){
+        state.sha = null; state.data = emptyData();
+        status('GitHub에 아직 설정이 없어요. 저장하면 자동 생성됩니다.', 'ok');
+        render(); return;
+      }
+      if(!r.ok){
+        if(r.status === 401) status('토큰이 올바르지 않아요 (401)', 'bad');
+        else if(r.status === 403) status('요청 한도 초과 또는 권한 없음 (403)', 'bad');
+        else status('GitHub 오류 ' + r.status, 'bad');
+        return;
+      }
+      var j = await r.json();
+      state.sha = j.sha;
+      try{ state.data = JSON.parse(b64dec(j.content||'')); }
+      catch(e){ state.data = emptyData(); }
+      var d = state.data;
+      if(!Array.isArray(d.prompts)) d.prompts = [];
+      if(d.model == null) d.model = 'gemini-2.0-flash';
+      if(d.key == null) d.key = '';
+      if(d.cropTop == null) d.cropTop = 0;
+      if(d.cropBottom == null) d.cropBottom = 100;
+      status('불러옴 · ' + new Date().toLocaleTimeString(), 'ok');
+      render();
+    }catch(e){ status('네트워크 오류: ' + e.message, 'bad'); }
+  }
+
+  async function push(){
+    if(!state.token){ status('토큰을 먼저 넣어주세요', 'bad'); return; }
+    clearTimeout(state.timer);
+    state.data.updated = Date.now();
+    var body = {message:'AI 검색 설정 업데이트', content: b64enc(JSON.stringify(state.data, null, 2))};
+    if(state.sha) body.sha = state.sha;
+    status('저장 중…');
+    try{
+      var r = await fetch(API, {
+        method:'PUT',
+        headers:{Authorization:'Bearer '+state.token, Accept:'application/vnd.github+json', 'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      if(r.status === 409 || r.status === 422){
+        // 충돌: 원격 최신 sha 다시 받고 재시도 (1회)
+        var rr = await fetch(API + '?t=' + Date.now(), {headers:{Accept:'application/vnd.github+json', Authorization:'Bearer '+state.token}, cache:'no-store'});
+        if(rr.ok){ var jj = await rr.json(); state.sha = jj.sha; }
+        return push();
+      }
+      if(!r.ok){
+        var t = await r.text();
+        status('저장 실패 (' + r.status + '): ' + t.slice(0,150), 'bad');
+        return;
+      }
+      var j = await r.json();
+      state.sha = j.content.sha;
+      state.dirty = false;
+      status('저장됨 · ' + new Date().toLocaleTimeString(), 'ok');
+    }catch(e){ status('저장 오류: ' + e.message, 'bad'); }
+  }
+
+  function touch(){
+    state.dirty = true;
+    if(!state.token) return;
+    status('변경됨 · 잠시 후 자동 저장…');
+    clearTimeout(state.timer);
+    state.timer = setTimeout(push, 1200);
+  }
+
+  function render(){
+    $('model').value = state.data.model || '';
+    $('key').value = state.data.key || '';
+    $('cropTop').value = state.data.cropTop;
+    $('cropBottom').value = state.data.cropBottom;
+
+    var list = $('list'); list.innerHTML = '';
+    var ps = state.data.prompts;
+    if(!ps.length){
+      var li = document.createElement('li');
+      li.innerHTML = '<div class="txt" style="color:var(--muted)">저장된 프롬프트가 없어요.</div>';
+      list.appendChild(li);
+      return;
+    }
+    ps.forEach(function(p){
+      var isA = p.id === state.data.activeId;
+      var li = document.createElement('li');
+      if(isA) li.className = 'active';
+      var txt = document.createElement('div'); txt.className='txt'; txt.textContent = p.text;
+      var acts = document.createElement('div'); acts.className='acts';
+      var badge = document.createElement('span'); badge.className='badge';
+      badge.textContent = isA ? '● 사용 중' : '';
+      acts.appendChild(badge);
+      function mk(label, cls, fn){
+        var b = document.createElement('button');
+        b.className = 'mini ' + cls; b.textContent = label;
+        b.onclick = fn; acts.appendChild(b);
+      }
+      if(!isA) mk('사용', 'ghost', function(){
+        state.data.activeId = p.id; touch(); render();
+      });
+      mk('수정', 'ghost', function(){
+        state.editing = p.id;
+        $('ed').value = p.text;
+        $('edLabel').textContent = '프롬프트 수정';
+        $('edSave').textContent = '수정 저장';
+        $('edCancel').hidden = false;
+        $('ed').focus();
+      });
+      mk('삭제', 'danger', function(){
+        if(!confirm('삭제할까요?')) return;
+        state.data.prompts = state.data.prompts.filter(function(x){ return x.id !== p.id; });
+        if(state.editing === p.id) resetEditor();
+        if(state.data.activeId === p.id)
+          state.data.activeId = state.data.prompts[0] ? state.data.prompts[0].id : null;
+        touch(); render();
+      });
+      li.appendChild(txt); li.appendChild(acts); list.appendChild(li);
+    });
+  }
+
+  function resetEditor(){
+    state.editing = null;
+    $('ed').value = '';
+    $('edLabel').textContent = '새 프롬프트 추가';
+    $('edSave').textContent = '추가';
+    $('edCancel').hidden = true;
+  }
+
+  $('edSave').onclick = function(){
+    var v = $('ed').value.trim(); if(!v) return;
+    if(state.editing){
+      state.data.prompts.forEach(function(p){ if(p.id === state.editing) p.text = v; });
+    }else{
+      var id = uid();
+      state.data.prompts.unshift({id:id, text:v});
+      if(!state.data.activeId) state.data.activeId = id;
+    }
+    resetEditor(); touch(); render();
+  };
+  $('edCancel').onclick = resetEditor;
+
+  ['model','key'].forEach(function(id){
+    $(id).addEventListener('input', function(){ state.data[id] = $(id).value; touch(); });
+  });
+  ['cropTop','cropBottom'].forEach(function(id){
+    $(id).addEventListener('input', function(){
+      var n = parseInt($(id).value, 10);
+      state.data[id] = isNaN(n) ? 0 : Math.max(0, Math.min(500, n));
+      touch();
+    });
+  });
+
+  $('saveTok').onclick = function(){
+    var t = $('tok').value.trim();
+    if(!t){ status('토큰을 입력하세요', 'bad'); return; }
+    state.token = t; saveToken(t);
+    $('tok').value = ''; $('tok').disabled = true;
+    $('saveTok').hidden = true; $('delTok').hidden = false;
+    pull();
+  };
+  $('delTok').onclick = function(){
+    if(!confirm('토큰을 삭제할까요?')) return;
+    state.token = ''; saveToken('');
+    $('tok').disabled = false; $('tok').placeholder = 'github_pat_...';
+    $('saveTok').hidden = false; $('delTok').hidden = true;
+    status('토큰 삭제됨');
+  };
+  $('reload').onclick = pull;
+
+  (function init(){
+    state.token = loadToken();
+    if(state.token){
+      $('tok').disabled = true;
+      $('saveTok').hidden = true;
+      $('delTok').hidden = false;
+    }
+    pull();
+    // 다른 기기에서 바뀐 것 감지용 주기적 폴링
+    state.polling = setInterval(function(){
+      if(!state.dirty && document.visibilityState === 'visible') pull().catch(function(){});
+    }, 20000);
+    document.addEventListener('visibilitychange', function(){
+      if(!document.hidden && !state.dirty) pull().catch(function(){});
+    });
+  })();
+})();
+</script>
+</body>
+</html>
