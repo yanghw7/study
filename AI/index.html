@@ -20,86 +20,25 @@
   :root{--bg:#121317;--fg:#ececf1;--muted:#9aa0ad;--card:#1d1f26;--border:#2c2f39;--accent:#7b93ff;--accent-soft:#232a4a;--danger:#ff6b70;}
 }
 *{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
-button{border:0;font:inherit;color:inherit;cursor:pointer;border-radius:999px;background:none}
-textarea,input[type=text],input[type=password],select{width:100%;border:0;outline:0;background:transparent;color:var(--fg);font:inherit;font-size:16px;line-height:1.5;padding:6px 0}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif}
+button{border:0;font:inherit;cursor:pointer;border-radius:999px}
+textarea,input[type=text],input[type=password]{width:100%;border:0;outline:0;background:transparent;color:var(--fg);font:inherit;font-size:16px;line-height:1.5;padding:6px 0}
 textarea{resize:none;max-height:140px}
 a{color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-/* ===== 상단 검색창 ===== */
-.topbar{flex:none;display:flex;gap:8px;align-items:flex-start;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 8px;border-bottom:1px solid var(--border);background:var(--bg)}
-.menu-btn{flex:none;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:18px;line-height:1}
-.menu-btn:hover{border-color:var(--accent)}
-#f{flex:1;min-width:0;display:flex;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:3px 4px 3px 16px;align-items:flex-start}
-#f:focus-within{border-color:var(--accent)}
-.go{flex:none;background:var(--accent);color:#fff;font-weight:600;font-size:15px;padding:9px 18px;margin-top:2px}
+/* 상단 고정 검색창 */
+.topbar{position:sticky;top:0;z-index:10;background:var(--bg);padding:calc(12px + env(safe-area-inset-top,0px)) 16px 10px;border-bottom:1px solid var(--border)}
+.topbar-in{max-width:720px;margin:0 auto}
+#f{display:flex;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:6px 6px 6px 16px;align-items:flex-start}
+.go{background:var(--accent);color:#fff;font-weight:600;font-size:15px;padding:10px 18px;flex:none;margin-top:1px}
 .go:disabled{opacity:.6;cursor:default}
+.tip{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;margin:6px 6px 0}
+.tip b{color:var(--accent);font-weight:600}
 
-/* ===== 레이아웃 ===== */
-.layout{flex:1;min-height:0;display:flex;position:relative}
-aside{flex:none;width:320px;overflow-y:auto;border-right:1px solid var(--border);padding:10px;background:var(--bg)}
-main{flex:1;min-width:0;min-height:0;overflow:auto;padding:10px;display:flex;flex-direction:column;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
-.backdrop{display:none;position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:15}
-@media (min-width:721px){ body.side-hidden aside{display:none} }
-@media (max-width:720px){
-  aside{position:absolute;top:0;bottom:0;left:0;z-index:20;width:min(88vw,340px);transform:translateX(-102%);transition:transform .25s ease}
-  body.drawer-open aside{transform:none;box-shadow:0 0 30px rgba(0,0,0,.3)}
-  body.drawer-open .backdrop{display:block}
-}
+main{max-width:720px;margin:0 auto;padding:18px 16px calc(56px + env(safe-area-inset-bottom,0px))}
 
-/* ===== 아코디언 메뉴 ===== */
-.acc{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;transition:border-color .2s}
-.acc.open{border-color:var(--accent)}
-.acc-head{width:100%;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;text-align:left}
-.acc-head:hover{background:var(--accent-soft)}
-.acc .ico{flex:none;width:24px;text-align:center;font-size:16px}
-.acc .ttl{flex:1;min-width:0;display:flex;flex-direction:column;font-size:14px;font-weight:600}
-.acc .sub{font-size:12px;font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.acc .sub:empty{display:none}
-.chev{flex:none;width:8px;height:8px;margin-right:4px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .25s;opacity:.55}
-.acc.open .chev{transform:rotate(-135deg)}
-.acc-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
-.acc.open .acc-body{grid-template-rows:1fr}
-.acc-inner{overflow:hidden;min-height:0;visibility:hidden;transition:visibility .25s}
-.acc.open .acc-inner{visibility:visible}
-.acc-pad{padding:2px 12px 12px}
-
-.label{font-size:12px;font-weight:600;color:var(--muted);margin:0 0 6px}
-.cur-body{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:10px 12px}
-.cur-body.none{color:var(--muted);background:transparent;border-color:var(--border)}
-.note{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.5}
-
-.editor{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
-.editor textarea{font-size:15px}
-.editor .row{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
-.btn{font-size:13px;padding:7px 14px}
-.primary{background:var(--accent);color:#fff;font-weight:600}
-.ghost{color:var(--muted);border:1px solid var(--border)}
-
-ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.plist li{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 10px 8px 12px}
-.plist li.active{border-color:var(--accent)}
-.plist .txt{font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
-.plist .acts{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:8px}
-.plist .badge{margin-right:auto;font-size:12px;color:var(--accent);font-weight:600}
-.plist .mini{font-size:12px;padding:4px 10px;border:1px solid var(--border)}
-.plist .mini.set{background:var(--accent);border-color:var(--accent);color:#fff}
-.plist .mini.del{color:var(--danger)}
-.empty{color:var(--muted);font-size:13px;text-align:center;padding:10px}
-
-.field{margin-bottom:12px}
-.field input,.field select{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:16px}
-.field small{display:block;color:var(--muted);font-size:12px;margin-top:5px;line-height:1.5}
-
-/* ===== 검색 결과 ===== */
-#result{flex:1;min-height:0;display:flex;flex-direction:column}
-#result[hidden]{display:none}
-.fill{flex:1;min-height:0;display:flex;position:relative}
-.frame{flex:1;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--card)}
-.newtab{position:absolute;right:14px;bottom:14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px;padding:6px 12px;text-decoration:none;opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.15)}
-.newtab:hover{opacity:1;border-color:var(--accent)}
+/* 검색 결과 */
+#result{margin-bottom:8px}
 .res-q{font-size:13px;color:var(--muted);margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
 .answer{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font-size:15px;line-height:1.65;word-break:break-word}
 .answer h3,.answer h4{margin:16px 0 6px;font-size:16px}
@@ -112,107 +51,117 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .loading{color:var(--muted);padding:18px;text-align:center}
 .err{color:var(--danger);background:var(--card);border:1px solid var(--danger);border-radius:14px;padding:14px 16px;font-size:14px;white-space:pre-wrap}
 .sources{margin-top:12px}
+.sources .label{margin-bottom:6px}
 .sources a{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border:1px solid var(--border);border-radius:999px;font-size:13px;text-decoration:none;color:var(--fg);background:var(--bg)}
-.open-link{display:inline-block;margin-top:6px;font-size:13px}
+.open{display:inline-block;margin-top:6px;font-size:13px}
+
+.label{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 8px}
+.current{margin-top:22px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:16px;padding:14px 16px}
+.current .label{color:var(--accent)}
+.current .body{font-size:15px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.current .none{color:var(--muted)}
+.current .note{color:var(--muted);font-size:12px;margin-top:8px}
+
+hr{border:0;border-top:1px solid var(--border);margin:26px 0}
+
+.editor{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px}
+.editor .row{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.btn{font-size:14px;padding:8px 16px}
+.primary{background:var(--accent);color:#fff;font-weight:600}
+.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+
+h2{font-size:15px;margin:28px 0 10px;display:flex;justify-content:space-between;align-items:center}
+h2 small{color:var(--muted);font-weight:400}
+ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.plist li{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 12px 10px 14px}
+.plist li.active{border-color:var(--accent)}
+.plist .txt{font-size:14px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.plist .acts{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:8px}
+.plist .badge{margin-right:auto;font-size:12px;color:var(--accent);font-weight:600}
+.plist .mini{font-size:13px;padding:5px 12px;background:transparent;border:1px solid var(--border);color:var(--fg)}
+.plist .mini.set{background:var(--accent);border-color:var(--accent);color:#fff}
+.plist .mini.del{color:var(--danger)}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:16px}
+
+details.settings{margin-top:30px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 16px}
+details.settings summary{cursor:pointer;font-weight:600;font-size:14px}
+.field{margin-top:12px}
+.field input{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:16px}
+select{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px}
+.frame{width:100%;height:calc(100vh - 150px);height:calc(100dvh - 150px);min-height:480px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
+.field small{display:block;color:var(--muted);font-size:12px;margin-top:5px;line-height:1.5}
 </style>
 </head>
 <body>
 
-<!-- 상단 검색창 -->
+<!-- 최상단 고정 검색창 -->
 <div class="topbar">
-  <button type="button" class="menu-btn" id="menuBtn" aria-label="메뉴 열기/닫기" title="메뉴 열기/닫기">☰</button>
-  <form id="f">
-    <textarea id="q" rows="1" placeholder="검색할 내용을 입력하세요 (Enter: 검색 / Shift+Enter: 줄바꿈)" autofocus></textarea>
-    <button type="submit" class="go" id="goBtn">검색</button>
-  </form>
+  <div class="topbar-in">
+    <form id="f">
+      <textarea id="q" rows="1" placeholder="검색할 내용을 입력하세요" autofocus></textarea>
+      <button type="submit" class="go" id="goBtn">검색</button>
+    </form>
+    <div class="tip"><span>Enter 검색 · Shift+Enter 줄바꿈</span><span id="tipActive"></span></div>
+  </div>
 </div>
 
-<div class="layout">
-  <!-- 왼쪽 메뉴 -->
-  <aside id="side">
+<main>
+  <!-- 검색 결과: 검색창 바로 아래 -->
+  <section id="result" hidden></section>
 
-    <div class="acc" data-key="cur">
-      <button type="button" class="acc-head" aria-expanded="false">
-        <span class="ico">📌</span>
-        <span class="ttl">현재 설정된 프롬프트<span class="sub" id="subCur"></span></span>
-        <i class="chev"></i>
-      </button>
-      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
-        <div class="cur-body" id="curBody"></div>
-        <div class="note">검색할 때 이 프롬프트가 입력 내용 앞에 자동으로 붙어요.</div>
-      </div></div></div>
+  <!-- 현재 설정된 프롬프트 -->
+  <section class="current">
+    <div class="label">현재 설정된 프롬프트</div>
+    <div class="body" id="curBody"></div>
+    <div class="note">검색할 때 이 프롬프트가 입력 내용 앞에 자동으로 붙어요.</div>
+  </section>
+
+  <hr>
+
+  <!-- 프롬프트 추가 / 수정 -->
+  <section>
+    <div class="label" id="edLabel">프롬프트 추가</div>
+    <div class="editor">
+      <textarea id="ed" rows="2" placeholder="자주 쓰는 프롬프트를 입력하세요"></textarea>
+      <div class="row">
+        <button type="button" class="btn ghost" id="edCancel" hidden>취소</button>
+        <button type="button" class="btn primary" id="edSave">추가</button>
+      </div>
     </div>
+  </section>
 
-    <div class="acc" data-key="add">
-      <button type="button" class="acc-head" aria-expanded="false">
-        <span class="ico">✏️</span>
-        <span class="ttl"><span id="edTitle">프롬프트 추가</span><span class="sub" id="subAdd"></span></span>
-        <i class="chev"></i>
-      </button>
-      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
-        <div class="editor">
-          <textarea id="ed" rows="3" placeholder="자주 쓰는 프롬프트를 입력하세요"></textarea>
-          <div class="row">
-            <button type="button" class="btn ghost" id="edCancel" hidden>취소</button>
-            <button type="button" class="btn primary" id="edSave">추가</button>
-          </div>
-        </div>
-      </div></div></div>
+  <!-- 프롬프트 목록 -->
+  <h2>프롬프트 목록 <small id="count"></small></h2>
+  <ul class="plist" id="list"></ul>
+
+  <!-- 설정 -->
+  <details class="settings" id="settings">
+    <summary>⚙ 설정</summary>
+    <div class="field">
+      <div class="label">검색 결과 표시 방식</div>
+      <select id="mode">
+        <option value="frame">구글 AI 모드 화면 그대로 (확장 프로그램 필요)</option>
+        <option value="api">Gemini API 답변 (API 키 필요)</option>
+      </select>
+      <small>화면 그대로 보기는 PC 크롬/엣지에 확장 프로그램을 설치해야 해요. 모바일에서는 Gemini API 방식을 쓰세요.</small>
     </div>
-
-    <div class="acc" data-key="list">
-      <button type="button" class="acc-head" aria-expanded="false">
-        <span class="ico">📚</span>
-        <span class="ttl">프롬프트 목록<span class="sub" id="count"></span></span>
-        <i class="chev"></i>
-      </button>
-      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
-        <ul class="plist" id="list"></ul>
-      </div></div></div>
+    <div class="field">
+      <div class="label">Gemini API 키</div>
+      <input type="password" id="key" placeholder="AIza..." autocomplete="off">
+      <small>Google AI Studio(aistudio.google.com/apikey)에서 무료로 발급할 수 있어요. 키는 이 브라우저에만 저장되고, 검색할 때 Google 서버로만 전송돼요.</small>
     </div>
-
-    <div class="acc" data-key="set">
-      <button type="button" class="acc-head" aria-expanded="false">
-        <span class="ico">⚙️</span>
-        <span class="ttl">설정<span class="sub" id="subSet"></span></span>
-        <i class="chev"></i>
-      </button>
-      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
-        <div class="field">
-          <div class="label">검색 결과 표시 방식</div>
-          <select id="mode">
-            <option value="frame">구글 AI 모드 화면 그대로 (확장 프로그램 필요)</option>
-            <option value="api">Gemini API 답변 (API 키 필요)</option>
-          </select>
-          <small>화면 그대로 보기는 PC 크롬/엣지에 확장 프로그램을 설치해야 해요. 모바일에서는 Gemini API 방식을 쓰세요.</small>
-        </div>
-        <div class="field">
-          <div class="label">Gemini API 키</div>
-          <input type="password" id="key" placeholder="AIza..." autocomplete="off">
-          <small>Google AI Studio(aistudio.google.com/apikey)에서 무료로 발급할 수 있어요. 키는 이 브라우저에만 저장되고, 검색할 때 Google 서버로만 전송돼요.</small>
-        </div>
-        <div class="field">
-          <div class="label">모델</div>
-          <input type="text" id="model" placeholder="gemini-3.8-flash">
-          <small>모델 이름이 바뀌어 오류가 나면 여기만 최신 이름으로 고치세요.</small>
-        </div>
-        <button type="button" class="btn primary" id="cfgSave">설정 저장</button>
-      </div></div></div>
+    <div class="field">
+      <div class="label">모델</div>
+      <input type="text" id="model" placeholder="gemini-3.8-flash">
+      <small>모델 이름이 바뀌어 오류가 나면 여기만 최신 이름으로 고치세요.</small>
     </div>
-
-  </aside>
-
-  <div class="backdrop" id="backdrop"></div>
-
-  <!-- 검색 결과 -->
-  <main>
-    <section id="result" hidden></section>
-  </main>
-</div>
+    <div class="field"><button type="button" class="btn primary" id="cfgSave">설정 저장</button></div>
+  </details>
+</main>
 
 <script>
 (function(){
-  var KEY = "aimode_prompts_v2", OLD_KEY = "aimode_prompts_v1", CFG = "aimode_cfg_v1", UIKEY = "aimode_ui_v1";
+  var KEY = "aimode_prompts_v2", OLD_KEY = "aimode_prompts_v1", CFG = "aimode_cfg_v1";
   var DEFAULTS = [
     "다음 질문에 대해 핵심부터 간결하게, 근거와 함께 한국어로 답해줘.",
     "초등학생도 이해할 수 있게 쉽게 설명해줘."
@@ -220,13 +169,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   var DEFAULT_MODEL = "gemini-3.8-flash";
   var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   var DEFAULT_MODE = IS_MOBILE ? "api" : "frame";
-  var mq = window.matchMedia("(max-width:720px)");
 
   var $ = function(id){ return document.getElementById(id); };
-  var q = $("q"), ed = $("ed"), edSave = $("edSave"), edCancel = $("edCancel"), edTitle = $("edTitle");
+  var q = $("q"), ed = $("ed"), edSave = $("edSave"), edCancel = $("edCancel"), edLabel = $("edLabel");
   var list = $("list"), count = $("count"), curBody = $("curBody"), result = $("result"), goBtn = $("goBtn");
 
-  var state = load(), cfg = loadCfg(), ui = loadUi(), editingId = null;
+  var state = load();
+  var cfg = loadCfg();
+  var editingId = null;
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -253,37 +203,10 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; return c; } }catch(e){}
     return {key: "", model: DEFAULT_MODEL, mode: DEFAULT_MODE};
   }
-  function loadUi(){
-    try{ var u = JSON.parse(localStorage.getItem(UIKEY)); if(u && u.open) return u; }catch(e){}
-    return {open: {}, side: true};
-  }
-  function saveUi(){ try{ localStorage.setItem(UIKEY, JSON.stringify(ui)); }catch(e){} }
   function active(){
     for(var i = 0; i < state.prompts.length; i++) if(state.prompts[i].id === state.activeId) return state.prompts[i];
     return null;
   }
-
-  /* ---------- 아코디언 / 사이드바 ---------- */
-  var accs = Array.prototype.slice.call(document.querySelectorAll(".acc"));
-  function applyAcc(){
-    accs.forEach(function(a){
-      var on = !!ui.open[a.getAttribute("data-key")];
-      a.classList.toggle("open", on);
-      a.querySelector(".acc-head").setAttribute("aria-expanded", on ? "true" : "false");
-    });
-  }
-  function setAcc(key, on){ ui.open[key] = on; applyAcc(); saveUi(); }
-  accs.forEach(function(a){
-    a.querySelector(".acc-head").addEventListener("click", function(){
-      var k = a.getAttribute("data-key"); setAcc(k, !ui.open[k]);
-    });
-  });
-  function applySide(){ document.body.classList.toggle("side-hidden", !ui.side); }
-  $("menuBtn").addEventListener("click", function(){
-    if(mq.matches) document.body.classList.toggle("drawer-open");
-    else { ui.side = !ui.side; saveUi(); applySide(); }
-  });
-  $("backdrop").addEventListener("click", function(){ document.body.classList.remove("drawer-open"); });
 
   /* ---------- 마크다운 렌더 (간단) ---------- */
   function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -295,8 +218,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return s;
   }
   function md(src){
-    var lines = src.replace(/\r/g, "").split("\n"), out = [], i = 0, lst = null;
-    function closeList(){ if(lst){ out.push("</" + lst + ">"); lst = null; } }
+    var lines = src.replace(/\r/g, "").split("\n"), out = [], i = 0, list = null;
+    function closeList(){ if(list){ out.push("</" + list + ">"); list = null; } }
     while(i < lines.length){
       var l = lines[i], m;
       if(/^\s*\|.*\|\s*$/.test(l)){
@@ -313,8 +236,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         continue;
       }
       if((m = l.match(/^\s*(#{1,4})\s+(.*)$/))){ closeList(); out.push((m[1].length <= 2 ? "<h3>" : "<h4>") + inline(m[2]) + (m[1].length <= 2 ? "</h3>" : "</h4>")); }
-      else if((m = l.match(/^\s*[-*•]\s+(.*)$/))){ if(lst !== "ul"){ closeList(); out.push("<ul>"); lst = "ul"; } out.push("<li>" + inline(m[1]) + "</li>"); }
-      else if((m = l.match(/^\s*\d+[.)]\s+(.*)$/))){ if(lst !== "ol"){ closeList(); out.push("<ol>"); lst = "ol"; } out.push("<li>" + inline(m[1]) + "</li>"); }
+      else if((m = l.match(/^\s*[-*•]\s+(.*)$/))){ if(list !== "ul"){ closeList(); out.push("<ul>"); list = "ul"; } out.push("<li>" + inline(m[1]) + "</li>"); }
+      else if((m = l.match(/^\s*\d+[.)]\s+(.*)$/))){ if(list !== "ol"){ closeList(); out.push("<ol>"); list = "ol"; } out.push("<li>" + inline(m[1]) + "</li>"); }
       else if(!l.trim()){ closeList(); }
       else { closeList(); out.push("<p>" + inline(l) + "</p>"); }
       i++;
@@ -335,27 +258,24 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   async function search(){
     var text = q.value.trim();
     if(!text) return;
-    document.body.classList.remove("drawer-open");
-
     if(cfg.mode !== "api"){
-      var url = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(buildQuery(text));
-      var w = div("fill");
+      var fullQ = buildQuery(text);
+      var url = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(fullQ);
+      var w = document.createElement("div");
+      var rq0 = div("res-q"); rq0.textContent = "Q. " + text; w.appendChild(rq0);
       var fr = document.createElement("iframe");
-      fr.className = "frame"; fr.src = url; fr.title = "Google AI 모드";
+      fr.className = "frame"; fr.src = url; fr.setAttribute("referrerpolicy", "no-referrer");
       w.appendChild(fr);
-      var nt = document.createElement("a");
-      nt.className = "newtab"; nt.target = "_blank"; nt.rel = "noopener noreferrer"; nt.href = url;
-      nt.textContent = "새 탭에서 열기 ↗";
-      w.appendChild(nt);
+      var o0 = document.createElement("a");
+      o0.className = "open"; o0.target = "_blank"; o0.rel = "noopener noreferrer"; o0.href = url;
+      o0.textContent = "화면이 비어 있으면 새 탭에서 열기 ↗ (확장 프로그램 설치 필요)";
+      w.appendChild(o0);
       showResult(w);
       return;
     }
-
     if(!cfg.key){
-      showResult(div("err", "먼저 Gemini API 키를 설정해 주세요. 왼쪽 메뉴의 '설정'에서 입력할 수 있어요."));
-      setAcc("set", true);
-      if(mq.matches) document.body.classList.add("drawer-open");
-      else if(!ui.side){ ui.side = true; saveUi(); applySide(); }
+      showResult(div("err", "먼저 Gemini API 키를 설정해 주세요. 아래 '⚙ 설정'에서 입력할 수 있어요."));
+      var s = $("settings"); s.open = true; s.scrollIntoView({behavior: "smooth", block: "center"});
       return;
     }
     var full = buildQuery(text);
@@ -386,15 +306,15 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       });
       if(links.length){
         var src = div("sources"); src.appendChild(div("label", "출처"));
-        links.forEach(function(wl){
+        links.forEach(function(w){
           var a = document.createElement("a");
-          a.href = wl.uri; a.target = "_blank"; a.rel = "noopener noreferrer";
-          a.textContent = wl.title || wl.uri; src.appendChild(a);
+          a.href = w.uri; a.target = "_blank"; a.rel = "noopener noreferrer";
+          a.textContent = w.title || w.uri; src.appendChild(a);
         });
         wrap.appendChild(src);
       }
       var o = document.createElement("a");
-      o.className = "open-link"; o.target = "_blank"; o.rel = "noopener noreferrer";
+      o.className = "open"; o.target = "_blank"; o.rel = "noopener noreferrer";
       o.href = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(full);
       o.textContent = "Google AI 모드에서 같은 질문 열기 ↗";
       wrap.appendChild(o);
@@ -408,21 +328,19 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
   /* ---------- 프롬프트 UI ---------- */
   function autosize(el){ el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }
-  function short(t, n){ t = t.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n) + "…" : t; }
   function resetEditor(){
-    editingId = null; ed.value = "";
-    edTitle.textContent = "프롬프트 추가"; $("subAdd").textContent = "";
+    editingId = null; ed.value = ""; edLabel.textContent = "프롬프트 추가";
     edSave.textContent = "추가"; edCancel.hidden = true; autosize(ed);
   }
   function renderCurrent(){
     var a = active();
-    curBody.className = "cur-body" + (a ? "" : " none");
-    curBody.textContent = a ? a.text : "설정된 프롬프트가 없어요. '프롬프트 추가'에서 만들어 주세요.";
-    $("subCur").textContent = a ? short(a.text, 40) : "없음";
+    curBody.className = "body" + (a ? "" : " none");
+    curBody.textContent = a ? a.text : "설정된 프롬프트가 없어요. 아래에서 추가해주세요.";
+    $("tipActive").innerHTML = a ? "<b>프롬프트 적용 중</b>" : "프롬프트 없음";
   }
   function renderList(){
     list.innerHTML = "";
-    count.textContent = state.prompts.length + "개";
+    count.textContent = state.prompts.length ? state.prompts.length + "개" : "";
     if(!state.prompts.length){ list.appendChild(div("empty", "저장된 프롬프트가 없어요.")); return; }
     state.prompts.forEach(function(p){
       var isActive = p.id === state.activeId;
@@ -434,10 +352,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       function mk(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "mini " + cls; b.textContent = label; b.onclick = fn; acts.appendChild(b); }
       if(!isActive) mk("설정", "set", function(){ state.activeId = p.id; persist(); render(); });
       mk("수정", "", function(){
-        editingId = p.id; ed.value = p.text;
-        edTitle.textContent = "프롬프트 수정"; $("subAdd").textContent = "수정 중";
-        edSave.textContent = "수정 저장"; edCancel.hidden = false;
-        setAcc("add", true); autosize(ed); ed.focus();
+        editingId = p.id; ed.value = p.text; edLabel.textContent = "프롬프트 수정";
+        edSave.textContent = "수정 저장"; edCancel.hidden = false; autosize(ed); ed.focus();
+        ed.scrollIntoView({behavior: "smooth", block: "center"});
       });
       mk("삭제", "del", function(){
         state.prompts = state.prompts.filter(function(x){ return x.id !== p.id; });
@@ -447,8 +364,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       li.appendChild(t); li.appendChild(acts); list.appendChild(li);
     });
   }
-  function renderSet(){ $("subSet").textContent = cfg.mode === "api" ? "Gemini API 방식" : "구글 화면 그대로"; }
-  function render(){ renderCurrent(); renderList(); renderSet(); }
+  function render(){ renderCurrent(); renderList(); }
 
   edSave.addEventListener("click", function(){
     var v = ed.value.trim(); if(!v) return;
@@ -464,10 +380,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("cfgSave").addEventListener("click", function(){
     cfg = {key: $("key").value.trim(), model: $("model").value.trim() || DEFAULT_MODEL, mode: $("mode").value};
     try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){}
-    renderSet();
-    var b = $("cfgSave"); b.textContent = "저장됨 ✓";
-    setTimeout(function(){ b.textContent = "설정 저장"; }, 1400);
+    $("settings").open = false;
   });
+  if(cfg.mode === "api" && !cfg.key) $("settings").open = true;
 
   $("f").addEventListener("submit", function(ev){ ev.preventDefault(); search(); });
   q.addEventListener("input", function(){ autosize(q); });
@@ -475,9 +390,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   q.addEventListener("keydown", function(ev){
     if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); search(); }
   });
-
-  if(cfg.mode === "api" && !cfg.key) ui.open.set = true;
-  applyAcc(); applySide();
 
   if("serviceWorker" in navigator && /^https?:$/.test(location.protocol)){
     window.addEventListener("load", function(){
