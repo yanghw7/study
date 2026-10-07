@@ -87,7 +87,12 @@ a{color:var(--accent)}
   <div class="field" style="margin-bottom:0">
     <label for="tokMemo">GitHub 토큰 (메모용)</label>
     <input type="text" id="tokMemo" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
-    <div class="note">기록만 해두는 칸이에요. 일반 페이지나 다른 설정에는 전혀 반영되지 않고, 위쪽 연결용 토큰과도 별개예요. 입력하면 설정 파일(settings.json)에 같이 저장돼요.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="memoSave" type="button">저장</button>
+      <button class="ghost" id="memoDel" type="button">삭제</button>
+    </div>
+    <div class="status" id="memoStatus"></div>
+    <div class="note">기록만 해두는 칸이에요. <b>저장</b>을 누르면 이 브라우저에 보관되고, 다시 열어도 항상 보여요. GitHub(settings.json)에는 올리지 않아요. Public 저장소에 토큰이 올라가면 GitHub가 자동으로 폐기할 수 있어서 분리했어요.</div>
   </div>
 </div>
 
@@ -136,7 +141,7 @@ a{color:var(--accent)}
   }
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   function emptyData(){
-    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', key:'', tokenMemo:'', cropTop:0, cropBottom:100};
+    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', key:'', cropTop:0, cropBottom:100};
   }
   function b64enc(s){
     var b = new TextEncoder().encode(s), bin = '';
@@ -176,7 +181,11 @@ a{color:var(--accent)}
       if(!Array.isArray(d.prompts)) d.prompts = [];
       if(d.model == null) d.model = 'gemini-2.0-flash';
       if(d.key == null) d.key = '';
-      if(d.tokenMemo == null) d.tokenMemo = '';
+      if(d.tokenMemo){ // 예전에 GitHub에 저장된 메모 → 이 브라우저로 옮기고 원격에서는 제거
+        if(!loadMemo().value) saveMemo(d.tokenMemo);
+        delete d.tokenMemo; memoRender();
+        if(state.token) setTimeout(function(){ state.dirty = true; push(); }, 0);
+      }
       if(d.cropTop == null) d.cropTop = 0;
       if(d.cropBottom == null) d.cropBottom = 100;
       status('불러옴 · ' + new Date().toLocaleTimeString(), 'ok');
@@ -184,40 +193,51 @@ a{color:var(--accent)}
     }catch(e){ status('네트워크 오류: ' + e.message, 'bad'); }
   }
 
-  async function push(){
-    if(!state.token){ status('토큰을 먼저 넣어주세요', 'bad'); return; }
+  async function push(retry){
+    retry = retry || 0;
+    if(!state.token){ status('⚠ 토큰이 연결되지 않아 저장 못 했어요. 위에서 토큰을 먼저 연결하세요.', 'bad'); return; }
     clearTimeout(state.timer);
-    state.data.updated = Date.now();
-    var body = {message:'AI 검색 설정 업데이트', content: b64enc(JSON.stringify(state.data, null, 2))};
-    if(state.sha) body.sha = state.sha;
-    status('저장 중…');
+    if(state.pushing){ state.again = true; return; }
+    state.pushing = true;
     try{
+      delete state.data.tokenMemo;
+      state.data.updated = Date.now();
+      var body = {message:'AI 검색 설정 업데이트', content: b64enc(JSON.stringify(state.data, null, 2))};
+      if(state.sha) body.sha = state.sha;
+      status('저장 중…');
       var r = await fetch(API, {
         method:'PUT',
         headers:{Authorization:'Bearer '+state.token, Accept:'application/vnd.github+json', 'Content-Type':'application/json'},
         body: JSON.stringify(body)
       });
-      if(r.status === 409 || r.status === 422){
-        // 충돌: 원격 최신 sha 다시 받고 재시도 (1회)
+      if((r.status === 409 || r.status === 422) && retry < 2){
         var rr = await fetch(API + '?t=' + Date.now(), {headers:{Accept:'application/vnd.github+json', Authorization:'Bearer '+state.token}, cache:'no-store'});
         if(rr.ok){ var jj = await rr.json(); state.sha = jj.sha; }
-        return push();
+        state.pushing = false;
+        return push(retry + 1);
       }
       if(!r.ok){
-        var t = await r.text();
-        status('저장 실패 (' + r.status + '): ' + t.slice(0,150), 'bad');
+        if(r.status === 401) status('⚠ 저장 실패: 토큰이 올바르지 않거나 폐기됐어요 (401). 새 토큰을 발급해 다시 연결하세요.', 'bad');
+        else if(r.status === 403 || r.status === 404) status('⚠ 저장 실패: 토큰 권한 부족 (' + r.status + '). study 저장소 Contents: Read and write 확인.', 'bad');
+        else status('⚠ 저장 실패 (' + r.status + '): ' + (await r.text()).slice(0,150), 'bad');
         return;
       }
       var j = await r.json();
       state.sha = j.content.sha;
       state.dirty = false;
       status('저장됨 · ' + new Date().toLocaleTimeString(), 'ok');
-    }catch(e){ status('저장 오류: ' + e.message, 'bad'); }
+    }catch(e){ status('⚠ 저장 오류: ' + e.message, 'bad'); }
+    finally{
+      state.pushing = false;
+      if(state.again){ state.again = false; push(); }
+    }
   }
+  // 프롬프트 추가/수정/삭제/사용 변경은 기다리지 않고 바로 저장
+  function saveNow(){ state.dirty = true; push(); }
 
   function touch(){
     state.dirty = true;
-    if(!state.token) return;
+    if(!state.token){ status('⚠ 토큰이 연결되지 않아 저장되지 않아요. 위에서 토큰을 연결하세요.', 'bad'); return; }
     status('변경됨 · 잠시 후 자동 저장…');
     clearTimeout(state.timer);
     state.timer = setTimeout(push, 1200);
@@ -226,7 +246,6 @@ a{color:var(--accent)}
   function render(){
     $('model').value = state.data.model || '';
     $('key').value = state.data.key || '';
-    $('tokMemo').value = state.data.tokenMemo || '';
     $('cropTop').value = state.data.cropTop;
     $('cropBottom').value = state.data.cropBottom;
     cropInfo();
@@ -268,7 +287,7 @@ a{color:var(--accent)}
         state.open[p.id] = !state.open[p.id]; render();
       });
       if(!isA) mk('사용', 'ghost', function(){
-        state.data.activeId = p.id; touch(); render();
+        state.data.activeId = p.id; saveNow(); render();
       });
       mk('수정', 'ghost', function(){
         state.editing = p.id;
@@ -284,7 +303,7 @@ a{color:var(--accent)}
         if(state.editing === p.id) resetEditor();
         if(state.data.activeId === p.id)
           state.data.activeId = state.data.prompts[0] ? state.data.prompts[0].id : null;
-        touch(); render();
+        saveNow(); render();
       });
       li.appendChild(txt); li.appendChild(acts); list.appendChild(li);
     });
@@ -322,7 +341,7 @@ a{color:var(--accent)}
       state.data.prompts.unshift({id:id, text:v});
       if(!state.data.activeId) state.data.activeId = id;
     }
-    resetEditor(); touch(); render();
+    resetEditor(); saveNow(); render();
   };
   $('edCancel').onclick = resetEditor;
 
@@ -332,7 +351,26 @@ a{color:var(--accent)}
   };
   $('colAll').onclick = function(){ state.open = {}; render(); };
 
-  $('tokMemo').addEventListener('input', function(){ state.data.tokenMemo = this.value.trim(); touch(); });
+  var MEMO = 'aimode_admin_memo_v1';
+  function loadMemo(){ try{ return JSON.parse(localStorage.getItem(MEMO)) || {}; }catch(e){ return {}; } }
+  function saveMemo(v){ try{ localStorage.setItem(MEMO, JSON.stringify({value:v, at:Date.now()})); }catch(e){} }
+  function memoRender(){
+    var m = loadMemo(), el = $('memoStatus');
+    $('tokMemo').value = m.value || '';
+    if(m.value){ el.textContent = '저장됨 · ' + new Date(m.at || Date.now()).toLocaleString(); el.className = 'status ok'; }
+    else { el.textContent = '저장된 메모가 없어요.'; el.className = 'status'; }
+  }
+  $('memoSave').onclick = function(){
+    var v = $('tokMemo').value.trim();
+    if(!v){ $('memoStatus').textContent = '저장할 내용을 입력하세요'; $('memoStatus').className = 'status bad'; return; }
+    saveMemo(v); memoRender();
+  };
+  $('memoDel').onclick = function(){
+    if(!confirm('토큰 메모를 삭제할까요?')) return;
+    try{ localStorage.removeItem(MEMO); }catch(e){}
+    memoRender();
+  };
+  memoRender();
   ['model','key'].forEach(function(id){
     $(id).addEventListener('input', function(){ state.data[id] = $(id).value; touch(); });
   });
@@ -374,7 +412,11 @@ a{color:var(--accent)}
       if(!state.dirty && document.visibilityState === 'visible') pull().catch(function(){});
     }, 20000);
     document.addEventListener('visibilitychange', function(){
-      if(!document.hidden && !state.dirty) pull().catch(function(){});
+      if(document.hidden){ if(state.dirty && state.token) push(); }
+      else if(!state.dirty) pull().catch(function(){});
+    });
+    window.addEventListener('beforeunload', function(e){
+      if(state.dirty){ e.preventDefault(); e.returnValue = ''; }
     });
   })();
 })();
