@@ -120,6 +120,13 @@ a{color:var(--accent)}
     </div>
   </div>
   <div class="row">
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="centerWidth">가운데 정렬 폭 (px)</label>
+      <input type="number" id="centerWidth" min="0" max="3000" step="10" inputmode="numeric">
+      <div class="note">구글 화면의 가로 폭을 이 값으로 줄여 가운데에 놓아요. 0이면 가운데 정렬을 꺼요.</div>
+    </div>
+  </div>
+  <div class="row">
     <button id="cropSave" type="button">저장</button>
   </div>
   <div class="note" id="cropInfo"></div>
@@ -151,7 +158,7 @@ a{color:var(--accent)}
   }
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   function emptyData(){
-    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', key:'', cropTop:0, cropBottom:100, cropLeft:0, cropRight:0};
+    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', key:'', cropTop:0, cropBottom:100, cropLeft:0, cropRight:0, centerWidth:760};
   }
   function b64enc(s){
     var b = new TextEncoder().encode(s), bin = '';
@@ -200,6 +207,7 @@ a{color:var(--accent)}
       if(d.cropBottom == null) d.cropBottom = 100;
       if(d.cropLeft == null) d.cropLeft = 0;
       if(d.cropRight == null) d.cropRight = 0;
+      if(d.centerWidth == null) d.centerWidth = 760;
       status('불러옴 · ' + new Date().toLocaleTimeString(), 'ok');
       render();
     }catch(e){ status('네트워크 오류: ' + e.message, 'bad'); }
@@ -264,6 +272,7 @@ a{color:var(--accent)}
       $('cropBottom').value = state.data.cropBottom;
       $('cropLeft').value = state.data.cropLeft;
       $('cropRight').value = state.data.cropRight;
+      $('centerWidth').value = state.data.centerWidth;
     }
     state.savedCrop = cropSnap(state.data);
     cropInfo();
@@ -327,16 +336,16 @@ a{color:var(--accent)}
     });
   }
 
-  function cropSnap(d){ return {top:d.cropTop, bottom:d.cropBottom, left:d.cropLeft, right:d.cropRight}; }
+  function cropSnap(d){ return {top:d.cropTop, bottom:d.cropBottom, left:d.cropLeft, right:d.cropRight, cw:d.centerWidth}; }
   function cropVal(id){
     var n = parseInt($(id).value, 10);
-    return isNaN(n) ? 0 : Math.max(0, Math.min(500, n));
+    return isNaN(n) ? 0 : Math.max(0, Math.min(id === 'centerWidth' ? 3000 : 500, n));
   }
   // 저장된 값만 표시 (입력 중인 값은 표시하지 않음)
   function cropInfo(){
     var c = state.savedCrop;
     $('cropInfo').textContent = c
-      ? '현재 저장값: 위 ' + c.top + 'px · 아래 ' + c.bottom + 'px · 왼쪽 ' + c.left + 'px · 오른쪽 ' + c.right + 'px'
+      ? '현재 저장값: 위 ' + c.top + 'px · 아래 ' + c.bottom + 'px · 왼쪽 ' + c.left + 'px · 오른쪽 ' + c.right + 'px · 가운데 정렬 폭 ' + c.cw + 'px'
       : '';
   }
   $('cropSave').onclick = function(){
@@ -345,10 +354,12 @@ a{color:var(--accent)}
     state.data.cropBottom = cropVal('cropBottom');
     state.data.cropLeft = cropVal('cropLeft');
     state.data.cropRight = cropVal('cropRight');
+    state.data.centerWidth = cropVal('centerWidth');
     $('cropTop').value = state.data.cropTop;
     $('cropBottom').value = state.data.cropBottom;
     $('cropLeft').value = state.data.cropLeft;
     $('cropRight').value = state.data.cropRight;
+    $('centerWidth').value = state.data.centerWidth;
     state.cropEdit = false;
     saveNow();
   };
@@ -409,7 +420,7 @@ a{color:var(--accent)}
   ['model','key'].forEach(function(id){
     $(id).addEventListener('input', function(){ state.data[id] = $(id).value; touch(); });
   });
-  ['cropTop','cropBottom','cropLeft','cropRight'].forEach(function(id){
+  ['cropTop','cropBottom','cropLeft','cropRight','centerWidth'].forEach(function(id){
     $(id).addEventListener('input', function(){ state.cropEdit = true; });
   });
 
