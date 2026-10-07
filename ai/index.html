@@ -202,7 +202,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
           </div>
           <small>구글 화면 안의 "무엇이든 물어보세요" 입력창이 가려지도록 위/아래/왼쪽/오른쪽을 잘라내요. 숫자를 바꾸면 바로 적용돼요.</small>
         </div>
-        <div class="note">관리자 페이지에서 저장한 값이 자동 적용돼요. 여기서 바꾸면 이 기기에만 임시 적용됩니다.</div>
+        <div class="note">관리자에서 저장한 설정은 여기서 <b>갱신</b> 버튼을 눌렀을 때 적용돼요. 여기서 바꾸면 이 기기에만 임시 적용됩니다.</div>
       </div></div></div>
     </div>
 
@@ -224,7 +224,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         <div class="field">
           <div class="label">Gemini API 키</div>
           <form onsubmit="return false" autocomplete="off"><input type="password" id="key" placeholder="AIza..." autocomplete="off"></form>
-          <small>관리자 페이지에서 저장한 값이 자동으로 불러와져요. 여기서 바꾸면 이 기기에만 임시 적용돼요.</small>
+          <small>관리자 페이지의 설정은 <b>갱신</b> 버튼을 눌렀을 때만 불러와져요. 여기서 바꾸면 이 기기에만 임시 적용돼요.</small>
         </div>
         <div class="field">
           <div class="label">모델</div>
@@ -508,7 +508,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   var ETAG_KEY = "aimode_etag_v1";
   async function fetchSettings(){
     var why = "";
-    // 1) 같은 사이트(GitHub Pages)의 save/settings.json: 수동 갱신할 때만 확인합니다.
+    // 1) 같은 사이트(GitHub Pages)의 save/settings.json: 사용자가 [갱신]을 눌렀을 때만 확인합니다.
     try{
       var r2 = await fetch(new URL("../save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
       if(r2.ok){

@@ -44,7 +44,7 @@ a{color:var(--accent)}
 <div class="top">
   <div>
     <h1>AI 검색 · 관리자</h1>
-    <div class="note">여기서 저장한 설정이 <a href="./index.html">일반 페이지</a>에서 자동으로 적용됩니다.</div>
+    <div class="note">여기서 저장한 설정을 GitHub에 올리고, 일반 페이지에서는 <b>갱신</b> 버튼을 눌렀을 때 반영합니다.</div>
   </div>
 </div>
 
@@ -59,6 +59,7 @@ a{color:var(--accent)}
   <div class="row" style="margin-top:10px">
     <button id="saveTok">토큰 저장 및 연결</button>
     <button class="ghost" id="delTok" hidden>토큰 삭제</button>
+    <button id="saveRemote" type="button">GitHub에 저장</button>
     <button class="ghost" id="reload">GitHub에서 다시 불러오기</button>
   </div>
   <div class="status" id="status">대기 중…</div>
@@ -151,7 +152,7 @@ a{color:var(--accent)}
   var GH = 'aimode_admin_gh_v1';
   var LOCAL_KEY = 'aimode_gemini_key_v1';
   var $ = function(id){ return document.getElementById(id); };
-  var state = {token:'', sha:null, data:null, dirty:false, cropEdit:false, savedCrop:null, timer:null, editing:null, polling:null, open:{}, q:''};
+  var state = {token:'', sha:null, data:null, dirty:false, cropEdit:false, savedCrop:null, editing:null, open:{}, q:''};
 
   function status(msg, kind){
     var el = $('status'); el.textContent = msg;
@@ -159,7 +160,7 @@ a{color:var(--accent)}
   }
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   function emptyData(){
-    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', key:'', cropTop:0, cropBottom:100, cropLeft:0, cropRight:0, shiftX:0};
+    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', cropTop:0, cropBottom:100, cropLeft:0, cropRight:0, shiftX:0};
   }
   function b64enc(s){
     var b = new TextEncoder().encode(s), bin = '';
@@ -175,6 +176,53 @@ a{color:var(--accent)}
   function saveToken(t){ try{ localStorage.setItem(GH, JSON.stringify({token:t})); }catch(e){} }
   function loadLocalKey(){ try{ return localStorage.getItem(LOCAL_KEY) || ''; }catch(e){ return ''; } }
   function saveLocalKey(v){ try{ if(v) localStorage.setItem(LOCAL_KEY, v); else localStorage.removeItem(LOCAL_KEY); }catch(e){} }
+
+  // GitHub에 보내기 전에 저장 데이터 전체를 점검합니다.
+  // 비밀처럼 보이는 문자열이 있으면 업로드하지 않고 위치를 알려줍니다.
+  function findSecretLike(value, path, out){
+    out = out || [];
+    if(out.length >= 3) return out;
+    if(typeof value === 'string'){
+      var patterns = [
+        {name:'Google API 키', re:/AIza[0-9A-Za-z_-]{20,}/},
+        {name:'GitHub 토큰', re:/(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}/},
+        {name:'Google OAuth 토큰', re:/ya29\.[A-Za-z0-9_-]{20,}/},
+        {name:'Slack 토큰', re:/xox[baprs]-[A-Za-z0-9-]{20,}/},
+        {name:'AWS 액세스 키', re:/AKIA[0-9A-Z]{16}/},
+        {name:'Private Key', re:/-----BEGIN [A-Z ]+PRIVATE KEY-----/}
+      ];
+      for(var i=0;i<patterns.length;i++) if(patterns[i].re.test(value)){
+        out.push({name:patterns[i].name, path:path, sample:value.slice(0,32)+'…'});
+        break;
+      }
+      return out;
+    }
+    if(!value || typeof value !== 'object') return out;
+    if(Array.isArray(value)){
+      for(var j=0;j<value.length && out.length<3;j++) findSecretLike(value[j], path+'['+j+']', out);
+      return out;
+    }
+    Object.keys(value).forEach(function(k){
+      if(out.length>=3) return;
+      var low = k.toLowerCase();
+      // 예전 버전에서 저장했을 가능성이 있는 비밀정보 필드는 값 자체를 업로드하지 않습니다.
+      if(/^(key|apikey|api_key|api-key|secret|token|tokenmemo|accesstoken|access_token|refreshtoken|refresh_token|authorization)$/.test(low)) return;
+      findSecretLike(value[k], path ? path+'.'+k : k, out);
+    });
+    return out;
+  }
+
+  function cleanForGithub(value){
+    if(Array.isArray(value)) return value.map(cleanForGithub);
+    if(!value || typeof value !== 'object') return value;
+    var o = {};
+    Object.keys(value).forEach(function(k){
+      var low = k.toLowerCase();
+      if(/^(key|apikey|api_key|api-key|secret|token|tokenmemo|accesstoken|access_token|refreshtoken|refresh_token|authorization)$/.test(low)) return;
+      o[k] = cleanForGithub(value[k]);
+    });
+    return o;
+  }
 
   async function pull(){
     var h = {Accept:'application/vnd.github+json'};
@@ -198,7 +246,7 @@ a{color:var(--accent)}
       try{ state.data = JSON.parse(b64dec(j.content||'')); }
       catch(e){ state.data = emptyData(); }
       var d = state.data;
-      // 과거 버전이 GitHub에 올린 Gemini 키가 있으면 로컬로 옮긴 뒤 원격에서 제거합니다.
+      // 과거 버전이 GitHub에 올린 Gemini 키가 있으면 로컬로 옮긴 뒤 이후 저장 시 원격에서 제거합니다.
       var remoteKey = typeof d.key === 'string' ? d.key : '';
       if(remoteKey && !loadLocalKey()) saveLocalKey(remoteKey);
       delete d.key;
@@ -209,9 +257,9 @@ a{color:var(--accent)}
         if(!loadMemo().value) saveMemo(d.tokenMemo);
         delete d.tokenMemo; memoRender();
       }
-      if(state.token && (remoteKey || hadRemoteMemo)) {
-        // 원격에 남아 있던 비밀정보가 정리되도록 다음 저장에서 다시 씁니다.
-        setTimeout(function(){ state.dirty = true; push(); }, 0);
+      if(remoteKey || hadRemoteMemo){
+        // 원격에 남아 있던 비밀정보는 메모리에서 제거하고, 사용자가 명시적으로 'GitHub에 저장'을 눌렀을 때만 원격에서 정리합니다.
+        state.dirty = true;
       }
       if(d.cropTop == null) d.cropTop = 0;
       if(d.cropBottom == null) d.cropBottom = 100;
@@ -227,14 +275,19 @@ a{color:var(--accent)}
   async function push(retry){
     retry = retry || 0;
     if(!state.token){ status('⚠ 토큰이 연결되지 않아 저장 못 했어요. 위에서 토큰을 먼저 연결하세요.', 'bad'); return; }
-    clearTimeout(state.timer);
     if(state.pushing){ state.again = true; return; }
     state.pushing = true;
     try{
-      delete state.data.tokenMemo;
-      delete state.data.key; // Gemini 비밀키는 절대로 GitHub에 올리지 않습니다.
-      state.data.updated = Date.now();
-      var body = {message:'AI 검색 설정 업데이트', content: b64enc(JSON.stringify(state.data, null, 2))};
+      var secretHits = findSecretLike(state.data, 'settings');
+      if(secretHits.length){
+        state.pushing = false;
+        var hitText = secretHits.map(function(x){ return x.name+' · '+x.path; }).join(' / ');
+        status('⚠ 저장 중단: 비밀정보로 보이는 값이 발견됨 → '+hitText+' · 해당 내용을 지운 뒤 다시 저장하세요.', 'bad');
+        return;
+      }
+      var uploadData = cleanForGithub(state.data);
+      uploadData.updated = Date.now();
+      var body = {message:'AI 검색 설정 업데이트', content:b64enc(JSON.stringify(uploadData, null, 2))};
       if(state.sha) body.sha = state.sha;
       status('저장 중…');
       var r = await fetch(API, {
@@ -251,7 +304,16 @@ a{color:var(--accent)}
       if(!r.ok){
         var detail = ''; try{ detail = await r.text(); }catch(e){}
         if(r.status === 401) status('⚠ 저장 실패: GitHub 토큰이 올바르지 않거나 폐기됐어요 (401). 새 토큰을 발급해 다시 연결하세요.', 'bad');
-        else if(r.status === 409) status('⚠ GitHub 보안 차단(409): 비밀정보가 포함된 저장을 막았습니다. 새 버전은 Gemini 키를 GitHub에 저장하지 않도록 수정되어 있습니다. 페이지를 새로고침한 뒤 다시 저장하세요.', 'bad');
+        else if(r.status === 409){
+          var info = null; try{ info = JSON.parse(detail); }catch(e){}
+          var ss = info && info.metadata && info.metadata.secret_scanning;
+          var extra = '';
+          if(ss){
+            if(ss.alert_url) extra += ' 확인: '+ss.alert_url;
+            if(ss.locations_url) extra += ' 위치: '+ss.locations_url;
+          }
+          status('⚠ GitHub 보안 차단(409): GitHub가 저장 내용에서 비밀정보를 탐지했습니다.' + extra, 'bad');
+        }
         else if(r.status === 403) status('⚠ 저장 실패: 권한 부족 또는 요청 제한 (403). study 저장소 Contents: Read and write 확인.', 'bad');
         else if(r.status === 404) status('⚠ 저장 실패: study 저장소 또는 settings.json 경로를 찾지 못했습니다 (404).', 'bad');
         else status('⚠ 저장 실패 (' + r.status + '): ' + detail.slice(0,180), 'bad');
@@ -265,19 +327,17 @@ a{color:var(--accent)}
     }catch(e){ status('⚠ 저장 오류: ' + e.message, 'bad'); }
     finally{
       state.pushing = false;
-      if(state.again){ state.again = false; push(); }
+      state.again = false;
     }
   }
-  // 프롬프트 추가/수정/삭제/사용 변경은 기다리지 않고 바로 저장
-  function saveNow(){ state.dirty = true; push(); }
-
-  function touch(){
+  // 변경은 브라우저의 현재 상태에만 반영합니다. GitHub 저장은 명시적으로 저장 버튼을 눌렀을 때만 합니다.
+  function saveNow(){
     state.dirty = true;
-    if(!state.token){ status('⚠ 토큰이 연결되지 않아 저장되지 않아요. 위에서 토큰을 연결하세요.', 'bad'); return; }
-    status('변경됨 · 잠시 후 자동 저장…');
-    clearTimeout(state.timer);
-    state.timer = setTimeout(push, 1200);
+    if(!state.token) status('변경됨 · GitHub 토큰을 연결한 뒤 저장 버튼을 누르세요.');
+    else status('변경됨 · [GitHub에 저장] 버튼을 눌러야 원격에 반영됩니다.');
   }
+
+  function touch(){ saveNow(); }
 
   function render(){
     $('model').value = state.data.model || '';
@@ -454,6 +514,11 @@ a{color:var(--accent)}
     $('saveTok').hidden = false; $('delTok').hidden = true;
     status('토큰 삭제됨');
   };
+  $('saveRemote').onclick = function(){
+    if(!state.data) return;
+    if(!state.token){ status('⚠ GitHub 토큰을 먼저 연결하세요.', 'bad'); return; }
+    push();
+  };
   $('reload').onclick = function(){ state.cropEdit = false; pull(); };
 
   (function init(){
@@ -463,11 +528,8 @@ a{color:var(--accent)}
       $('saveTok').hidden = true;
       $('delTok').hidden = false;
     }
-    // 관리자 페이지는 초기 로딩 1회만 불러오며, 이후에는 상단 '새로고침/불러오기' 버튼으로 수동 갱신합니다.
+    // 관리자 페이지는 최초 1회만 원격 설정을 읽습니다. 이후 다시 불러오기는 버튼으로만 수행합니다.
     pull();
-    document.addEventListener('visibilitychange', function(){
-      if(document.hidden && state.dirty && state.token) push();
-    });
     window.addEventListener('beforeunload', function(e){
       if(state.dirty || state.cropEdit){ e.preventDefault(); e.returnValue = ''; }
     });
