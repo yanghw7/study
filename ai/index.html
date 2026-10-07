@@ -179,6 +179,25 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </div></div></div>
     </div>
 
+    <div class="acc" data-key="crop">
+      <button type="button" class="acc-head" aria-expanded="false">
+        <span class="ico">✂️</span>
+        <span class="ttl">화면 자르기<span class="sub" id="subCrop"></span></span>
+        <i class="chev"></i>
+      </button>
+      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
+        <div class="field">
+          <div class="label">구글 화면 잘라내기 (px)</div>
+          <div class="crop">
+            <div><small>위쪽</small><input type="number" id="cropTop" min="0" max="500" step="10"></div>
+            <div><small>아래쪽</small><input type="number" id="cropBottom" min="0" max="500" step="10"></div>
+          </div>
+          <small>구글 화면 안의 "무엇이든 물어보세요" 입력창이 가려지도록 위/아래를 잘라내요. 숫자를 바꾸면 바로 적용돼요.</small>
+        </div>
+        <div class="note">관리자 페이지에서 저장한 값이 자동 적용돼요. 여기서 바꾸면 이 기기에만 임시 적용됩니다.</div>
+      </div></div></div>
+    </div>
+
     <div class="acc" data-key="set">
       <button type="button" class="acc-head" aria-expanded="false">
         <span class="ico">⚙️</span>
@@ -203,14 +222,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
           <div class="label">모델</div>
           <input type="text" id="model" placeholder="gemini-2.0-flash">
           <small>모델 이름이 바뀌어 오류가 나면 여기만 최신 이름으로 고치세요.</small>
-        </div>
-        <div class="field">
-          <div class="label">구글 화면 잘라내기 (px)</div>
-          <div class="crop">
-            <div><small>위쪽</small><input type="number" id="cropTop" min="0" max="500" step="10"></div>
-            <div><small>아래쪽</small><input type="number" id="cropBottom" min="0" max="500" step="10"></div>
-          </div>
-          <small>구글 화면 안의 "무엇이든 물어보세요" 입력창이 가려지도록 위/아래를 잘라내요. 숫자를 바꾸면 바로 적용돼요.</small>
         </div>
         <div class="note">이 기기에서만 임시 적용됩니다. 모든 기기에 반영하려면 관리자 페이지에서 저장하세요.</div>
       </div></div></div>
@@ -531,8 +542,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       li.appendChild(t); li.appendChild(acts); list.appendChild(li);
     });
   }
+  function renderCrop(){ $("subCrop").textContent = "위 " + cfg.cropTop + " · 아래 " + cfg.cropBottom + " px"; }
   function renderSet(){ $("subSet").textContent = cfg.mode === "api" ? "Gemini API 방식" : "구글 화면 그대로"; }
-  function render(){ renderCurrent(); renderList(); renderSet(); }
+  function render(){ renderCurrent(); renderList(); renderSet(); renderCrop(); }
 
   edSave.addEventListener("click", function(){
     var v = ed.value.trim(); if(!v) return;
@@ -550,6 +562,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     cfg.cropTop = num($("cropTop")); cfg.cropBottom = num($("cropBottom"));
     saveCfg();
     var f = document.querySelector(".frame"); if(f) applyCrop(f);
+    renderCrop();
   }
   $("cropTop").addEventListener("input", liveCrop);
   $("cropBottom").addEventListener("input", liveCrop);

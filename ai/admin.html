@@ -8,31 +8,31 @@
 :root{--bg:#fff;--fg:#1f1f1f;--muted:#6b7280;--card:#f3f4f8;--border:#e1e3ea;--accent:#4b6bfb;--accent-soft:#e8ecff;--danger:#e5484d;--ok:#16a34a}
 @media(prefers-color-scheme:dark){:root{--bg:#121317;--fg:#ececf1;--muted:#9aa0ad;--card:#1d1f26;--border:#2c2f39;--accent:#7b93ff;--accent-soft:#232a4a;--danger:#ff6b70;--ok:#4ade80}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;padding:16px;max-width:760px;margin:0 auto;line-height:1.5}
-h1{font-size:18px;margin:0 0 4px}
-h2{font-size:13px;color:var(--muted);margin:24px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
-input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit;font-size:15px;color:var(--fg);outline:0}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;font-size:18px;padding:18px;max-width:820px;margin:0 auto;line-height:1.6}
+h1{font-size:26px;margin:0 0 6px}
+h2{font-size:18px;color:var(--muted);margin:28px 0 10px;font-weight:700;letter-spacing:.3px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;font:inherit;font-size:18px;color:var(--fg);outline:0}
 input:focus,textarea:focus{border-color:var(--accent)}
-textarea{resize:vertical;min-height:70px;font-family:inherit}
-button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:9px 16px;background:var(--accent);color:#fff;font-weight:600}
+textarea{resize:vertical;min-height:90px;font-family:inherit}
+button{font:inherit;font-size:17px;cursor:pointer;border:0;border-radius:10px;padding:11px 18px;background:var(--accent);color:#fff;font-weight:600}
 button.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
 button.danger{color:var(--danger);border-color:var(--danger);background:transparent}
 button:disabled{opacity:.5;cursor:default}
-button.mini{font-size:12px;padding:5px 10px;border-radius:8px}
-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 6px}
+button.mini{font-size:15px;padding:7px 13px;border-radius:8px}
+label{display:block;font-size:16px;font-weight:600;color:var(--muted);margin:0 0 8px}
 .field{margin-bottom:12px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .plist li{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px}
 .plist li.active{border-color:var(--accent);background:var(--accent-soft)}
-.plist .txt{font-size:14px;white-space:pre-wrap;word-break:break-word;margin-bottom:8px}
+.plist .txt{font-size:18px;white-space:pre-wrap;word-break:break-word;margin-bottom:8px}
 .plist .acts{display:flex;gap:6px;justify-content:flex-end;align-items:center}
-.plist .badge{margin-right:auto;font-size:12px;color:var(--accent);font-weight:600}
-.status{font-size:13px;color:var(--muted);margin-top:10px;min-height:18px}
+.plist .badge{margin-right:auto;font-size:15px;color:var(--accent);font-weight:600}
+.status{font-size:16px;color:var(--muted);margin-top:10px;min-height:18px}
 .status.bad{color:var(--danger)}
 .status.ok{color:var(--ok)}
-.note{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+.note{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5}
 a{color:var(--accent)}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
 </style>
@@ -74,6 +74,25 @@ a{color:var(--accent)}
 <h2>프롬프트 목록</h2>
 <ul class="plist" id="list"></ul>
 
+<h2>✂️ 화면 자르기</h2>
+<div class="card" id="cropCard">
+  <div class="note" style="margin:0 0 12px">구글 AI 모드 화면(frame 모드)을 띄울 때 위/아래를 잘라내는 값(px)이에요. 저장하면 일반 페이지에 자동 적용됩니다.</div>
+  <div class="row">
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="cropTop">위쪽 (px)</label>
+      <input type="number" id="cropTop" min="0" max="500" step="10" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="cropBottom">아래쪽 (px)</label>
+      <input type="number" id="cropBottom" min="0" max="500" step="10" inputmode="numeric" placeholder="100">
+    </div>
+  </div>
+  <div class="row">
+    <button class="ghost" id="cropReset" type="button">기본값 (위 0 · 아래 100)</button>
+  </div>
+  <div class="note" id="cropInfo"></div>
+</div>
+
 <h2>설정</h2>
 <div class="card">
   <div class="field">
@@ -84,14 +103,6 @@ a{color:var(--accent)}
   <div class="field">
     <label>모델</label>
     <input type="text" id="model" placeholder="gemini-2.0-flash">
-  </div>
-  <div class="field">
-    <label>화면 자르기 (frame 모드 전용, px)</label>
-    <div class="row">
-      <div style="flex:1"><input type="number" id="cropTop" min="0" max="500" step="10" placeholder="위 0"></div>
-      <div style="flex:1"><input type="number" id="cropBottom" min="0" max="500" step="10" placeholder="아래 100"></div>
-    </div>
-    <div class="note">PC 크롬 확장 프로그램으로 구글 AI 모드 화면을 띄울 때 위/아래 잘라내는 값</div>
   </div>
 </div>
 
@@ -199,6 +210,7 @@ a{color:var(--accent)}
     $('key').value = state.data.key || '';
     $('cropTop').value = state.data.cropTop;
     $('cropBottom').value = state.data.cropBottom;
+    cropInfo();
 
     var list = $('list'); list.innerHTML = '';
     var ps = state.data.prompts;
@@ -245,6 +257,15 @@ a{color:var(--accent)}
     });
   }
 
+  function cropInfo(){
+    $('cropInfo').textContent = '현재 저장값: 위 ' + state.data.cropTop + 'px · 아래 ' + state.data.cropBottom + 'px';
+  }
+  $('cropReset').onclick = function(){
+    state.data.cropTop = 0; state.data.cropBottom = 100;
+    $('cropTop').value = 0; $('cropBottom').value = 100;
+    cropInfo(); touch();
+  };
+
   function resetEditor(){
     state.editing = null;
     $('ed').value = '';
@@ -273,7 +294,7 @@ a{color:var(--accent)}
     $(id).addEventListener('input', function(){
       var n = parseInt($(id).value, 10);
       state.data[id] = isNaN(n) ? 0 : Math.max(0, Math.min(500, n));
-      touch();
+      cropInfo(); touch();
     });
   });
 

@@ -1,13 +1,16 @@
 {
   "manifest_version": 3,
   "name": "AI 모드 프레임 허용 (개인용)",
-  "version": "1.3",
-  "description": "내 AI 검색 페이지(로컬/배포 모두) 안에서 구글 화면이 보이도록, 구글 iframe의 차단 헤더를 내 브라우저에서만 제거합니다.",
+  "version": "1.1",
+  "description": "내 AI 검색 페이지 안에서 구글 화면이 보이도록, 구글 iframe의 차단 헤더를 내 브라우저에서만 제거합니다.",
   "permissions": [
     "declarativeNetRequest"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://*.google.com/*",
+    "https://*.google.co.kr/*",
+    "https://yanghw7.github.io/*",
+    "file:///*"
   ],
   "declarative_net_request": {
     "rule_resources": [
