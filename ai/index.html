@@ -95,16 +95,18 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .admin-link{display:flex;align-items:center;gap:10px;padding:11px 12px;text-decoration:none;color:inherit;margin-bottom:0}
 .admin-link .sub{font-size:12px;font-weight:400;color:var(--muted)}
 
-/* ★ 여기가 문제였던 부분 — display:flex 제거, overflow-y:auto 추가 */
-#result{flex:1;min-height:0;overflow-y:auto}
+/* ★ 검색 결과 영역: flex column 유지 (frame 정상 작동) + 스크롤 허용 */
+#result{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 #result[hidden]{display:none}
 .fill{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--border);border-radius:12px;background:var(--card)}
 .frame{position:absolute;left:0;top:0;width:100%;border:0;background:var(--card)}
 .crop{display:flex;gap:8px;flex-wrap:wrap}.crop>div{flex:1 1 calc(50% - 8px);min-width:110px}.crop small{margin:0 0 4px}
 .newtab{position:absolute;right:14px;bottom:14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px;padding:6px 12px;text-decoration:none;opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .newtab:hover{opacity:1;border-color:var(--accent)}.newtab.alt{right:130px;background:var(--accent);border-color:var(--accent);color:#fff}
-.res-q{font-size:13px;color:var(--muted);margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
-.answer{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font-size:15px;line-height:1.65;word-break:break-word;margin-bottom:12px}
+
+/* ★ 답변 요소: flex-shrink:0 로 찌그러짐 방지 */
+.res-q{font-size:13px;color:var(--muted);margin:0 0 10px;white-space:pre-wrap;word-break:break-word;flex-shrink:0}
+.answer{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font-size:15px;line-height:1.65;word-break:break-word;margin-bottom:12px;flex-shrink:0}
 .answer h3,.answer h4{margin:16px 0 6px;font-size:16px}
 .answer p{margin:0 0 10px}
 .answer ul,.answer ol{margin:0 0 10px;padding-left:22px}
@@ -112,11 +114,11 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .answer .tbl{overflow-x:auto;margin:0 0 10px}
 .answer table{border-collapse:collapse;font-size:14px}
 .answer th,.answer td{border:1px solid var(--border);padding:6px 10px;text-align:left}
-.loading{color:var(--muted);padding:18px;text-align:center}
-.err{color:var(--danger);background:var(--card);border:1px solid var(--danger);border-radius:14px;padding:14px 16px;font-size:14px;white-space:pre-wrap}
-.sources{margin-top:12px}
+.loading{color:var(--muted);padding:18px;text-align:center;flex-shrink:0}
+.err{color:var(--danger);background:var(--card);border:1px solid var(--danger);border-radius:14px;padding:14px 16px;font-size:14px;white-space:pre-wrap;flex-shrink:0}
+.sources{margin-top:12px;flex-shrink:0}
 .sources a{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border:1px solid var(--border);border-radius:999px;font-size:13px;text-decoration:none;color:var(--fg);background:var(--bg)}
-.open-link{display:inline-block;margin-top:6px;font-size:13px}
+.open-link{display:inline-block;margin-top:6px;font-size:13px;flex-shrink:0}
 
 .override-notice{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px;line-height:1.3}
 .override-notice button{font-size:12px;padding:5px 10px;flex:none}
