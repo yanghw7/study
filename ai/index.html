@@ -201,7 +201,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         </div>
         <div class="field">
           <div class="label">모델</div>
-          <input type="text" id="model" placeholder="gemini-3.8-flash">
+          <input type="text" id="model" placeholder="gemini-2.0-flash">
           <small>모델 이름이 바뀌어 오류가 나면 여기만 최신 이름으로 고치세요.</small>
         </div>
         <div class="field">
@@ -240,7 +240,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     "다음 질문에 대해 핵심부터 간결하게, 근거와 함께 한국어로 답해줘.",
     "초등학생도 이해할 수 있게 쉽게 설명해줘."
   ];
-  var DEFAULT_MODEL = "gemini-3.8-flash";
+  var DEFAULT_MODEL = "gemini-2.0-flash";
   var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   var DEFAULT_MODE = IS_MOBILE ? "api" : "frame";
   var mq = window.matchMedia("(max-width:720px)");
@@ -437,10 +437,17 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   /* ---------- GitHub에서 설정 자동 불러오기 (읽기 전용) ---------- */
   var REPO = (function(){
     var host = location.hostname, parts = location.pathname.split("/").filter(Boolean);
-    if(!/\.github\.io$/i.test(host)) return null;
-    var owner = host.split(".")[0], repo = host;
-    if(parts.length){ repo = parts[0]; }
-    return {owner: owner, repo: repo, path: "save/settings.json"};
+    // GitHub Pages
+    if(/\.github\.io$/i.test(host)){
+      var owner = host.split(".")[0], repo = host;
+      if(parts.length){ repo = parts[0]; }
+      return {owner: owner, repo: repo, path: "save/settings.json"};
+    }
+    // 로컬 개발 (localhost / 127.0.0.1 / file://)
+    if(host === "localhost" || host === "127.0.0.1" || location.protocol === "file:"){
+      return {owner: "yanghw7", repo: "study", path: "save/settings.json"};
+    }
+    return null;
   })();
   function b64dec(b64){
     var bin = atob(b64.replace(/\s/g, "")), bytes = new Uint8Array(bin.length);
@@ -465,14 +472,16 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     resetEditor(); render();
   }
   async function pullRemote(){
-    if(!REPO) return;
+    if(!REPO){ console.warn("[AI검색] GitHub 저장소 경로를 인식 못 함"); return; }
     try{
       var r = await fetch(apiUrl() + "?t=" + Date.now(), {headers: {"Accept": "application/vnd.github+json"}, cache: "no-store"});
-      if(!r.ok) return;
+      if(r.status === 404){ console.warn("[AI검색] save/settings.json 아직 없음"); return; }
+      if(!r.ok){ console.warn("[AI검색] GitHub 오류 " + r.status); return; }
       var j = await r.json();
       var d = JSON.parse(b64dec(j.content || ""));
+      console.log("[AI검색] 원격 설정 불러옴:", d);
       applyRemote(d);
-    }catch(e){}
+    }catch(e){ console.warn("[AI검색] 불러오기 실패:", e.message); }
   }
 
   /* ---------- 프롬프트 UI ---------- */
