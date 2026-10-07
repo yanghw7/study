@@ -137,7 +137,7 @@ a{color:var(--accent)}
   <div class="field">
     <label>Gemini API 키</label>
     <form onsubmit="return false" autocomplete="off"><input type="password" id="key" placeholder="AIza..." autocomplete="off"></form>
-    <div class="note">aistudio.google.com/apikey 에서 무료 발급. 이 값도 GitHub에 저장돼요. 저장소가 Public이면 노출되니 주의.</div>
+    <div class="note">aistudio.google.com/apikey 에서 무료 발급. <b>이 키는 GitHub에 저장하지 않고 이 브라우저에만 저장</b>합니다. 프롬프트와 화면 설정만 GitHub에 동기화됩니다.</div>
   </div>
   <div class="field">
     <label>모델</label>
@@ -149,6 +149,7 @@ a{color:var(--accent)}
 (function(){
   var API = 'https://api.github.com/repos/yanghw7/study/contents/save/settings.json';
   var GH = 'aimode_admin_gh_v1';
+  var LOCAL_KEY = 'aimode_gemini_key_v1';
   var $ = function(id){ return document.getElementById(id); };
   var state = {token:'', sha:null, data:null, dirty:false, cropEdit:false, savedCrop:null, timer:null, editing:null, polling:null, open:{}, q:''};
 
@@ -172,6 +173,8 @@ a{color:var(--accent)}
   }
   function loadToken(){ try{ return (JSON.parse(localStorage.getItem(GH))||{}).token||''; }catch(e){ return ''; } }
   function saveToken(t){ try{ localStorage.setItem(GH, JSON.stringify({token:t})); }catch(e){} }
+  function loadLocalKey(){ try{ return localStorage.getItem(LOCAL_KEY) || ''; }catch(e){ return ''; } }
+  function saveLocalKey(v){ try{ if(v) localStorage.setItem(LOCAL_KEY, v); else localStorage.removeItem(LOCAL_KEY); }catch(e){} }
 
   async function pull(){
     var h = {Accept:'application/vnd.github+json'};
@@ -195,13 +198,20 @@ a{color:var(--accent)}
       try{ state.data = JSON.parse(b64dec(j.content||'')); }
       catch(e){ state.data = emptyData(); }
       var d = state.data;
+      // 과거 버전이 GitHub에 올린 Gemini 키가 있으면 로컬로 옮긴 뒤 원격에서 제거합니다.
+      var remoteKey = typeof d.key === 'string' ? d.key : '';
+      if(remoteKey && !loadLocalKey()) saveLocalKey(remoteKey);
+      delete d.key;
+      if(!d.model) d.model = 'gemini-2.0-flash';
       if(!Array.isArray(d.prompts)) d.prompts = [];
-      if(d.model == null) d.model = 'gemini-2.0-flash';
-      if(d.key == null) d.key = '';
+      var hadRemoteMemo = !!d.tokenMemo;
       if(d.tokenMemo){ // 예전에 GitHub에 저장된 메모 → 이 브라우저로 옮기고 원격에서는 제거
         if(!loadMemo().value) saveMemo(d.tokenMemo);
         delete d.tokenMemo; memoRender();
-        if(state.token) setTimeout(function(){ state.dirty = true; push(); }, 0);
+      }
+      if(state.token && (remoteKey || hadRemoteMemo)) {
+        // 원격에 남아 있던 비밀정보가 정리되도록 다음 저장에서 다시 씁니다.
+        setTimeout(function(){ state.dirty = true; push(); }, 0);
       }
       if(d.cropTop == null) d.cropTop = 0;
       if(d.cropBottom == null) d.cropBottom = 100;
@@ -222,6 +232,7 @@ a{color:var(--accent)}
     state.pushing = true;
     try{
       delete state.data.tokenMemo;
+      delete state.data.key; // Gemini 비밀키는 절대로 GitHub에 올리지 않습니다.
       state.data.updated = Date.now();
       var body = {message:'AI 검색 설정 업데이트', content: b64enc(JSON.stringify(state.data, null, 2))};
       if(state.sha) body.sha = state.sha;
@@ -231,16 +242,19 @@ a{color:var(--accent)}
         headers:{Authorization:'Bearer '+state.token, Accept:'application/vnd.github+json', 'Content-Type':'application/json'},
         body: JSON.stringify(body)
       });
-      if((r.status === 409 || r.status === 422) && retry < 2){
+      if(r.status === 422 && retry < 2){
         var rr = await fetch(API + '?t=' + Date.now(), {headers:{Accept:'application/vnd.github+json', Authorization:'Bearer '+state.token}, cache:'no-store'});
         if(rr.ok){ var jj = await rr.json(); state.sha = jj.sha; }
         state.pushing = false;
         return push(retry + 1);
       }
       if(!r.ok){
-        if(r.status === 401) status('⚠ 저장 실패: 토큰이 올바르지 않거나 폐기됐어요 (401). 새 토큰을 발급해 다시 연결하세요.', 'bad');
-        else if(r.status === 403 || r.status === 404) status('⚠ 저장 실패: 토큰 권한 부족 (' + r.status + '). study 저장소 Contents: Read and write 확인.', 'bad');
-        else status('⚠ 저장 실패 (' + r.status + '): ' + (await r.text()).slice(0,150), 'bad');
+        var detail = ''; try{ detail = await r.text(); }catch(e){}
+        if(r.status === 401) status('⚠ 저장 실패: GitHub 토큰이 올바르지 않거나 폐기됐어요 (401). 새 토큰을 발급해 다시 연결하세요.', 'bad');
+        else if(r.status === 409) status('⚠ GitHub 보안 차단(409): 비밀정보가 포함된 저장을 막았습니다. 새 버전은 Gemini 키를 GitHub에 저장하지 않도록 수정되어 있습니다. 페이지를 새로고침한 뒤 다시 저장하세요.', 'bad');
+        else if(r.status === 403) status('⚠ 저장 실패: 권한 부족 또는 요청 제한 (403). study 저장소 Contents: Read and write 확인.', 'bad');
+        else if(r.status === 404) status('⚠ 저장 실패: study 저장소 또는 settings.json 경로를 찾지 못했습니다 (404).', 'bad');
+        else status('⚠ 저장 실패 (' + r.status + '): ' + detail.slice(0,180), 'bad');
         return;
       }
       var j = await r.json();
@@ -267,7 +281,7 @@ a{color:var(--accent)}
 
   function render(){
     $('model').value = state.data.model || '';
-    $('key').value = state.data.key || '';
+    $('key').value = loadLocalKey();
     if(!state.cropEdit){
       $('cropTop').value = state.data.cropTop;
       $('cropBottom').value = state.data.cropBottom;
@@ -419,9 +433,8 @@ a{color:var(--accent)}
     memoRender();
   };
   memoRender();
-  ['model','key'].forEach(function(id){
-    $(id).addEventListener('input', function(){ state.data[id] = $(id).value; touch(); });
-  });
+  $('model').addEventListener('input', function(){ state.data.model = $('model').value; touch(); });
+  $('key').addEventListener('input', function(){ saveLocalKey($('key').value.trim()); status('Gemini 키는 이 브라우저에만 저장됩니다.', 'ok'); });
   ['cropTop','cropBottom','cropLeft','cropRight','shiftX'].forEach(function(id){
     $(id).addEventListener('input', function(){ state.cropEdit = true; });
   });

@@ -32,6 +32,9 @@ a{color:var(--accent)}
 .topbar{flex:none;display:flex;gap:8px;align-items:flex-start;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 8px;border-bottom:1px solid var(--border);background:var(--bg)}
 .menu-btn{flex:none;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:18px;line-height:1}
 .menu-btn:hover{border-color:var(--accent)}
+.sync-btn{flex:none;height:44px;min-width:44px;padding:0 12px;border-radius:22px;background:var(--card);border:1px solid var(--border);font-size:14px;line-height:1;white-space:nowrap}
+.sync-btn:hover{border-color:var(--accent)}
+.sync-btn:disabled{opacity:.6;cursor:default}
 #f{flex:1;min-width:0;display:flex;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:3px 4px 3px 16px;align-items:flex-start}
 #f:focus-within{border-color:var(--accent)}
 .go{flex:none;background:var(--accent);color:#fff;font-weight:600;font-size:15px;padding:9px 18px;margin-top:2px}
@@ -128,6 +131,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 <!-- 상단 검색창 -->
 <div class="topbar">
   <button type="button" class="menu-btn" id="menuBtn" aria-label="메뉴 열기/닫기" title="메뉴 열기/닫기">☰</button>
+  <button type="button" class="sync-btn" id="syncBtn" aria-label="GitHub 설정 갱신" title="GitHub에서 프롬프트와 설정 다시 받아오기">갱신</button>
   <form id="f">
     <textarea id="q" rows="1" placeholder="검색할 내용을 입력하세요 (Enter: 검색 / Shift+Enter: 줄바꿈)" autofocus></textarea>
     <button type="submit" class="go" id="goBtn">검색</button>
@@ -256,6 +260,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     "초등학생도 이해할 수 있게 쉽게 설명해줘."
   ];
   var DEFAULT_MODEL = "gemini-2.0-flash";
+  var LOCAL_KEY = "aimode_gemini_key_v1";
   var MAX_PROMPT = 3500;
   var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   var DEFAULT_MODE = IS_MOBILE ? "api" : "frame";
@@ -288,9 +293,10 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return s;
   }
   function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+  function loadLocalKey(){ try{ return localStorage.getItem(LOCAL_KEY) || ''; }catch(e){ return ''; } }
   function loadCfg(){
-    try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; if(c.cropTop == null) c.cropTop = 0; if(c.cropBottom == null) c.cropBottom = 100; if(c.cropLeft == null) c.cropLeft = 0; if(c.cropRight == null) c.cropRight = 0; if(c.shiftX == null) c.shiftX = 0; return c; } }catch(e){}
-    return {key: "", model: DEFAULT_MODEL, mode: DEFAULT_MODE, cropTop: 0, cropBottom: 100, cropLeft: 0, cropRight: 0, shiftX: 0};
+    try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; c.key = loadLocalKey(); if(c.cropTop == null) c.cropTop = 0; if(c.cropBottom == null) c.cropBottom = 100; if(c.cropLeft == null) c.cropLeft = 0; if(c.cropRight == null) c.cropRight = 0; if(c.shiftX == null) c.shiftX = 0; return c; } }catch(e){}
+    return {key: loadLocalKey(), model: DEFAULT_MODEL, mode: DEFAULT_MODE, cropTop: 0, cropBottom: 100, cropLeft: 0, cropRight: 0, shiftX: 0};
   }
   function saveCfg(){ try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){} }
   function loadUi(){
@@ -459,7 +465,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     }
   }
 
-  /* ---------- GitHub에서 설정 자동 불러오기 (읽기 전용) ---------- */
+  /* ---------- GitHub에서 설정 불러오기 (읽기 전용 · 수동 갱신) ---------- */
   var REPO = (function(){
     var host = location.hostname, parts = location.pathname.split("/").filter(Boolean);
     // GitHub Pages
@@ -488,7 +494,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       state.prompts = ps; state.activeId = d.activeId; state = fix(state); persist();
     }
     if(d.model) cfg.model = d.model;
-    if(typeof d.key === "string" && d.key) cfg.key = d.key;
+    cfg.key = loadLocalKey();
     if(typeof d.cropTop === "number") cfg.cropTop = d.cropTop;
     if(typeof d.cropBottom === "number") cfg.cropBottom = d.cropBottom;
     if(typeof d.cropLeft === "number") cfg.cropLeft = d.cropLeft;
@@ -499,10 +505,10 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var f = document.querySelector(".frame"); if(f) applyCrop(f);
     resetEditor(); render();
   }
-  var ETAG_KEY = "aimode_etag_v1", lastPull = 0;
+  var ETAG_KEY = "aimode_etag_v1";
   async function fetchSettings(){
     var why = "";
-    // 1) 같은 사이트(GitHub Pages)의 save/settings.json: 요청 한도 없음. 관리자에서 저장 후 1~2분 뒤 반영
+    // 1) 같은 사이트(GitHub Pages)의 save/settings.json: 수동 갱신할 때만 확인합니다.
     try{
       var r2 = await fetch(new URL("../save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
       if(r2.ok){
@@ -532,10 +538,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     syncMsg = "⚠ 불러오기 실패 (" + why + ") · 이전 값 표시 중";
     return undefined;
   }
-  async function pullRemote(force){
-    if(!REPO){ return; }
-    if(!force && Date.now() - lastPull < 30000) return; // 너무 자주 요청하지 않기
-    lastPull = Date.now();
+  async function pullRemote(){
+    if(!REPO){
+      syncMsg = "⚠ GitHub 저장소 정보를 찾을 수 없음";
+      render();
+      return;
+    }
     var d = await fetchSettings();
     if(!d || d.__same){ render(); return; }
     applyRemote(d);
@@ -635,9 +643,23 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     });
   }
 
+  var syncBtn = $("syncBtn");
+  syncBtn.addEventListener("click", async function(){
+    if(syncBtn.disabled) return;
+    syncBtn.disabled = true;
+    syncBtn.textContent = "갱신 중…";
+    try{
+      await pullRemote();
+    }catch(e){
+      syncMsg = "⚠ 갱신 실패 · 이전 값 표시 중";
+      render();
+    }finally{
+      syncBtn.disabled = false;
+      syncBtn.textContent = "갱신";
+    }
+  });
+
   render();
-  pullRemote();
-  document.addEventListener("visibilitychange", function(){ if(!document.hidden) pullRemote(); });
 })();
 </script>
 </body>
