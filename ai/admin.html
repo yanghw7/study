@@ -84,12 +84,48 @@ a{color:var(--accent)}
 </div>
 <ul class="plist" id="list"></ul>
 
+<h2>✂️ 화면 자르기</h2>
+<div class="card" id="cropCard">
+  <div class="note" style="margin:0 0 12px">구글 AI 모드 화면(frame 모드)을 띄울 때 위/아래/왼쪽/오른쪽을 잘라내는 값(px)이에요. <b>저장</b>을 누르면 일반 페이지에 적용됩니다.</div>
+  <div class="row">
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="cropTop">위쪽 (px)</label>
+      <input type="number" id="cropTop" min="0" max="500" step="10" inputmode="numeric">
+    </div>
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="cropBottom">아래쪽 (px)</label>
+      <input type="number" id="cropBottom" min="0" max="500" step="10" inputmode="numeric">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="cropLeft">왼쪽 (px)</label>
+      <input type="number" id="cropLeft" min="0" max="500" step="10" inputmode="numeric">
+    </div>
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="cropRight">오른쪽 (px)</label>
+      <input type="number" id="cropRight" min="0" max="500" step="10" inputmode="numeric">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field" style="flex:1;min-width:140px">
+      <label for="shiftX">가로 이동 (px)</label>
+      <input type="number" id="shiftX" min="-500" max="500" step="10" inputmode="numeric">
+      <div class="note">구글 화면을 좌우로 옮겨요. 양수(+)는 오른쪽, 음수(−)는 왼쪽으로 이동해요.</div>
+    </div>
+  </div>
+  <div class="row">
+    <button id="cropSave" type="button">저장</button>
+  </div>
+  <div class="note" id="cropInfo"></div>
+</div>
+
 <h2>설정</h2>
 <div class="card">
   <div class="field">
     <label>Gemini API 키</label>
     <form onsubmit="return false" autocomplete="off"><input type="password" id="key" placeholder="AIza..." autocomplete="off"></form>
-    <div class="note">aistudio.google.com/apikey 에서 무료 발급. <b>이 키는 GitHub에 저장하지 않고 이 브라우저에만 저장</b>합니다. 프롬프트 설정만 GitHub에 동기화됩니다.</div>
+    <div class="note">aistudio.google.com/apikey 에서 무료 발급. <b>이 키는 GitHub에 저장하지 않고 이 브라우저에만 저장</b>합니다. 프롬프트와 화면 설정만 GitHub에 동기화됩니다.</div>
   </div>
   <div class="field">
     <label>모델</label>
@@ -103,7 +139,7 @@ a{color:var(--accent)}
   var GH = 'aimode_admin_gh_v1';
   var LOCAL_KEY = 'aimode_gemini_key_v1';
   var $ = function(id){ return document.getElementById(id); };
-  var state = {token:'', sha:null, data:null, dirty:false, editing:null, open:{}, q:''};
+  var state = {token:'', sha:null, data:null, dirty:false, cropEdit:false, savedCrop:null, editing:null, open:{}, q:''};
 
   function status(msg, kind){
     var el = $('status'); el.textContent = msg;
@@ -111,7 +147,7 @@ a{color:var(--accent)}
   }
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   function emptyData(){
-    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash'};
+    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', cropTop:0, cropBottom:100, cropLeft:0, cropRight:0, shiftX:0};
   }
   function b64enc(s){
     var b = new TextEncoder().encode(s), bin = '';
@@ -212,8 +248,12 @@ a{color:var(--accent)}
         // 원격에 남아 있던 비밀정보는 메모리에서 제거합니다. 다음 저장 시 정리된 값으로 업로드됩니다.
         state.dirty = true;
       }
-      // 예전 화면 자르기 설정값은 제거합니다. 다음 저장 시 settings.json에서도 정리됩니다.
-      ['cropTop','cropBottom','cropLeft','cropRight','shiftX','centerWidth'].forEach(function(k){ delete d[k]; });
+      if(d.cropTop == null) d.cropTop = 0;
+      if(d.cropBottom == null) d.cropBottom = 100;
+      if(d.cropLeft == null) d.cropLeft = 0;
+      if(d.cropRight == null) d.cropRight = 0;
+      if(d.shiftX == null) d.shiftX = 0;
+      delete d.centerWidth;
       status('불러옴 · ' + new Date().toLocaleTimeString(), 'ok');
       render();
     }catch(e){ status('네트워크 오류: ' + e.message, 'bad'); }
@@ -269,6 +309,7 @@ a{color:var(--accent)}
       var j = await r.json();
       state.sha = j.content.sha;
       state.dirty = false;
+      state.savedCrop = cropSnap(state.data); cropInfo();
       status('저장됨 · ' + new Date().toLocaleTimeString(), 'ok');
     }catch(e){ status('⚠ 저장 오류: ' + e.message, 'bad'); }
     finally{
@@ -288,6 +329,15 @@ a{color:var(--accent)}
   function render(){
     $('model').value = state.data.model || '';
     $('key').value = loadLocalKey();
+    if(!state.cropEdit){
+      $('cropTop').value = state.data.cropTop;
+      $('cropBottom').value = state.data.cropBottom;
+      $('cropLeft').value = state.data.cropLeft;
+      $('cropRight').value = state.data.cropRight;
+      $('shiftX').value = state.data.shiftX;
+    }
+    state.savedCrop = cropSnap(state.data);
+    cropInfo();
 
     var list = $('list'); list.innerHTML = '';
     var all = state.data.prompts;
@@ -348,6 +398,37 @@ a{color:var(--accent)}
     });
   }
 
+  function cropSnap(d){ return {top:d.cropTop, bottom:d.cropBottom, left:d.cropLeft, right:d.cropRight, sx:d.shiftX}; }
+  function cropVal(id){
+    var n = parseInt($(id).value, 10);
+    return isNaN(n) ? 0 : (id === 'shiftX' ? Math.max(-500, Math.min(500, n)) : Math.max(0, Math.min(500, n)));
+  }
+  // 저장된 값만 표시 (입력 중인 값은 표시하지 않음)
+  function cropInfo(){
+    var c = state.savedCrop;
+    $('cropInfo').textContent = c
+      ? '현재 저장값: 위 ' + c.top + 'px · 아래 ' + c.bottom + 'px · 왼쪽 ' + c.left + 'px · 오른쪽 ' + c.right + 'px · 가로 이동 ' + c.sx + 'px'
+      : '';
+  }
+  $('cropSave').onclick = function(){
+    if(!state.data) return;
+    state.data.cropTop = cropVal('cropTop');
+    state.data.cropBottom = cropVal('cropBottom');
+    state.data.cropLeft = cropVal('cropLeft');
+    state.data.cropRight = cropVal('cropRight');
+    state.data.shiftX = cropVal('shiftX');
+    delete state.data.centerWidth;
+    $('cropTop').value = state.data.cropTop;
+    $('cropBottom').value = state.data.cropBottom;
+    $('cropLeft').value = state.data.cropLeft;
+    $('cropRight').value = state.data.cropRight;
+    $('shiftX').value = state.data.shiftX;
+    state.cropEdit = false;
+    saveNow();
+    // 화면 자르기 설정도 저장 버튼을 누르면 GitHub에 즉시 저장합니다.
+    if(state.token) push();
+  };
+
   var MAX_PROMPT = 3500;
   function edCount(){ $('edCount').textContent = $('ed').value.length + ' / ' + MAX_PROMPT + '자 (공백 포함)'; }
   // 프롬프트 추가/수정 입력창에서는 '/' 문자를 입력할 수 없게 함
@@ -395,6 +476,9 @@ a{color:var(--accent)}
 
   $('model').addEventListener('input', function(){ state.data.model = $('model').value; touch(); });
   $('key').addEventListener('input', function(){ saveLocalKey($('key').value.trim()); status('Gemini 키는 이 브라우저에만 저장됩니다.', 'ok'); });
+  ['cropTop','cropBottom','cropLeft','cropRight','shiftX'].forEach(function(id){
+    $(id).addEventListener('input', function(){ state.cropEdit = true; });
+  });
 
   $('saveTok').onclick = function(){
     var t = $('tok').value.trim();
@@ -411,7 +495,7 @@ a{color:var(--accent)}
     $('saveTok').hidden = false; $('delTok').hidden = true;
     status('토큰 삭제됨');
   };
-  $('reload').onclick = function(){ pull(); };
+  $('reload').onclick = function(){ state.cropEdit = false; pull(); };
 
   (function init(){
     state.token = loadToken();
@@ -423,7 +507,7 @@ a{color:var(--accent)}
     // 관리자 페이지는 최초 1회만 원격 설정을 읽습니다. 이후 다시 불러오기는 버튼으로만 수행합니다.
     pull();
     window.addEventListener('beforeunload', function(e){
-      if(state.dirty){ e.preventDefault(); e.returnValue = ''; }
+      if(state.dirty || state.cropEdit){ e.preventDefault(); e.returnValue = ''; }
     });
   })();
 })();

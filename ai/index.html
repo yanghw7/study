@@ -106,7 +106,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 #result{flex:1;min-height:0;display:flex;flex-direction:column}
 #result[hidden]{display:none}
 .fill{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--border);border-radius:12px;background:var(--card)}
-.frame{position:absolute;left:0;top:0;width:100%;height:100%;border:0;background:var(--card)}
+.frame{position:absolute;left:0;top:0;width:100%;border:0;background:var(--card)}
+.crop{display:flex;gap:8px;flex-wrap:wrap}.crop>div{flex:1 1 calc(50% - 8px);min-width:110px}.crop small{margin:0 0 4px}
 .newtab{position:absolute;right:14px;bottom:14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);font-size:12px;padding:6px 12px;text-decoration:none;opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .newtab:hover{opacity:1;border-color:var(--accent)}.newtab.alt{right:130px;background:var(--accent);border-color:var(--accent);color:#fff}
 .res-q{font-size:13px;color:var(--muted);margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
@@ -180,6 +181,28 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <ul class="plist" id="list"></ul>
+      </div></div></div>
+    </div>
+
+    <div class="acc" data-key="crop">
+      <button type="button" class="acc-head" aria-expanded="false">
+        <span class="ico">✂️</span>
+        <span class="ttl">화면 자르기<span class="sub" id="subCrop"></span></span>
+        <i class="chev"></i>
+      </button>
+      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
+        <div class="field">
+          <div class="label">구글 화면 잘라내기 (px)</div>
+          <div class="crop">
+            <div><small>위쪽</small><input type="number" id="cropTop" min="0" max="500" step="10"></div>
+            <div><small>아래쪽</small><input type="number" id="cropBottom" min="0" max="500" step="10"></div>
+            <div><small>왼쪽</small><input type="number" id="cropLeft" min="0" max="500" step="10"></div>
+            <div><small>오른쪽</small><input type="number" id="cropRight" min="0" max="500" step="10"></div>
+            <div style="flex-basis:100%"><small>가로 이동 (+ 오른쪽 / − 왼쪽)</small><input type="number" id="shiftX" min="-500" max="500" step="10"></div>
+          </div>
+          <small>구글 화면 안의 "무엇이든 물어보세요" 입력창이 가려지도록 위/아래/왼쪽/오른쪽을 잘라내요. 숫자를 바꾸면 바로 적용돼요.</small>
+        </div>
+        <div class="note">관리자에서 저장한 설정은 여기서 <b>갱신</b> 버튼을 눌렀을 때 적용돼요. 여기서 바꾸면 이 기기에만 임시 적용됩니다.</div>
       </div></div></div>
     </div>
 
@@ -272,8 +295,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
   function loadLocalKey(){ try{ return localStorage.getItem(LOCAL_KEY) || ''; }catch(e){ return ''; } }
   function loadCfg(){
-    try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; c.key = loadLocalKey(); ['cropTop','cropBottom','cropLeft','cropRight','shiftX'].forEach(function(k){ delete c[k]; }); return c; } }catch(e){}
-    return {key: loadLocalKey(), model: DEFAULT_MODEL, mode: DEFAULT_MODE};
+    try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; c.key = loadLocalKey(); if(c.cropTop == null) c.cropTop = 0; if(c.cropBottom == null) c.cropBottom = 100; if(c.cropLeft == null) c.cropLeft = 0; if(c.cropRight == null) c.cropRight = 0; if(c.shiftX == null) c.shiftX = 0; return c; } }catch(e){}
+    return {key: loadLocalKey(), model: DEFAULT_MODEL, mode: DEFAULT_MODE, cropTop: 0, cropBottom: 100, cropLeft: 0, cropRight: 0, shiftX: 0};
   }
   function saveCfg(){ try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){} }
   function loadUi(){
@@ -346,6 +369,20 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return out.join("");
   }
 
+  /* ---------- 구글 화면 자르기 ---------- */
+  function num(el){ var n = parseInt(el.value, 10); return isNaN(n) ? 0 : Math.max(0, Math.min(500, n)); }
+  function applyCrop(fr){
+    // Google AI 모드 상단의 "무엇이든 물어보세요" 입력창은 iframe 바깥에서
+    // 직접 삭제할 수 없으므로, iframe을 위로 올려 해당 영역을 잘라냅니다.
+    // 관리자가 지정한 값이 작아도 최소 130px은 잘라내도록 합니다.
+    var top = Math.max(130, cfg.cropTop || 0);
+    fr.style.top = (-top) + "px";
+    fr.style.height = "calc(100% + " + (top + cfg.cropBottom) + "px)";
+    // 가로 이동(shiftX): 폭은 그대로 두고 프레임 위치만 좌우로 이동 (+ 오른쪽)
+    fr.style.left = (cfg.shiftX - cfg.cropLeft) + "px";
+    fr.style.width = "calc(100% + " + (cfg.cropLeft + cfg.cropRight) + "px)";
+  }
+
   /* ---------- 검색 ---------- */
   function buildQuery(text){
     var a = active();
@@ -364,7 +401,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       var url = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(buildQuery(text));
       var w = div("fill");
       var fr = document.createElement("iframe");
-      fr.className = "frame"; fr.referrerPolicy = "no-referrer"; fr.src = url; fr.title = "Google AI 모드";
+      fr.className = "frame"; fr.referrerPolicy = "no-referrer"; fr.src = url; fr.title = "Google AI 모드"; applyCrop(fr);
       w.appendChild(fr);
       var nt = document.createElement("a");
       nt.className = "newtab"; nt.target = "_blank"; nt.rel = "noopener noreferrer"; nt.href = url;
@@ -462,8 +499,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     }
     if(d.model) cfg.model = d.model;
     cfg.key = loadLocalKey();
+    if(typeof d.cropTop === "number") cfg.cropTop = d.cropTop;
+    if(typeof d.cropBottom === "number") cfg.cropBottom = d.cropBottom;
+    if(typeof d.cropLeft === "number") cfg.cropLeft = d.cropLeft;
+    if(typeof d.cropRight === "number") cfg.cropRight = d.cropRight;
+    if(typeof d.shiftX === "number") cfg.shiftX = d.shiftX;
     saveCfg();
-    $("model").value = cfg.model; $("key").value = cfg.key || "";
+    $("model").value = cfg.model; $("key").value = cfg.key || ""; $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom; $("cropLeft").value = cfg.cropLeft; $("cropRight").value = cfg.cropRight; $("shiftX").value = cfg.shiftX;
+    var f = document.querySelector(".frame"); if(f) applyCrop(f);
     resetEditor(); render();
   }
   var ETAG_KEY = "aimode_etag_v1";
@@ -552,8 +595,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       li.appendChild(t); li.appendChild(acts); list.appendChild(li);
     });
   }
+  function renderCrop(){ $("subCrop").textContent = "위 " + cfg.cropTop + " · 아래 " + cfg.cropBottom + " · 왼쪽 " + cfg.cropLeft + " · 오른쪽 " + cfg.cropRight + " px" + (cfg.shiftX ? " · 이동 " + cfg.shiftX : ""); }
   function renderSet(){ $("subSet").textContent = cfg.mode === "api" ? "Gemini API 방식" : "구글 화면 그대로"; }
-  function render(){ renderCurrent(); renderList(); renderSet(); }
+  function render(){ renderCurrent(); renderList(); renderSet(); renderCrop(); }
 
   edSave.addEventListener("click", function(){
     var v = ed.value.trim().slice(0, MAX_PROMPT); if(!v) return;
@@ -566,6 +610,21 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("key").value = cfg.key || "";
   $("model").value = cfg.model || DEFAULT_MODEL;
   $("mode").value = cfg.mode || DEFAULT_MODE;
+  $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom; $("cropLeft").value = cfg.cropLeft; $("cropRight").value = cfg.cropRight; $("shiftX").value = cfg.shiftX;
+  function liveCrop(){
+    cfg.cropTop = num($("cropTop")); cfg.cropBottom = num($("cropBottom"));
+    cfg.cropLeft = num($("cropLeft")); cfg.cropRight = num($("cropRight"));
+    var sxv = parseInt($("shiftX").value, 10); cfg.shiftX = isNaN(sxv) ? 0 : Math.max(-500, Math.min(500, sxv));
+    saveCfg();
+    var f = document.querySelector(".frame"); if(f) applyCrop(f);
+    renderCrop();
+  }
+  $("cropTop").addEventListener("input", liveCrop);
+  $("cropBottom").addEventListener("input", liveCrop);
+  $("cropLeft").addEventListener("input", liveCrop);
+  $("cropRight").addEventListener("input", liveCrop);
+  $("shiftX").addEventListener("input", liveCrop);
+
   $("key").addEventListener("change", function(){ cfg.key = $("key").value.trim(); saveCfg(); });
   $("model").addEventListener("change", function(){ cfg.model = $("model").value.trim() || DEFAULT_MODEL; saveCfg(); });
   $("mode").addEventListener("change", function(){ cfg.mode = $("mode").value; saveCfg(); renderSet(); });
