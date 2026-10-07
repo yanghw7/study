@@ -39,7 +39,7 @@ a{color:var(--accent)}
 
 /* ===== 레이아웃 ===== */
 .layout{flex:1;min-height:0;display:flex;position:relative}
-aside{flex:none;width:320px;overflow-y:auto;border-right:1px solid var(--border);padding:10px;background:var(--bg)}
+aside{flex:none;width:320px;overflow-y:auto;border-right:1px solid var(--border);padding:10px;background:var(--bg);display:flex;flex-direction:column}
 main{flex:1;min-width:0;min-height:0;overflow:auto;padding:10px;display:flex;flex-direction:column;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .backdrop{display:none;position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:15}
 @media (min-width:721px){ body.side-hidden aside{display:none} }
@@ -93,7 +93,11 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .field input,.field select{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:16px}
 .field small{display:block;color:var(--muted);font-size:12px;margin-top:5px;line-height:1.5}
 
-.sync-btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.spacer{flex:1;min-height:8px}
+
+/* ===== 관리자 링크 (하단 고정) ===== */
+.admin-link{display:flex;align-items:center;gap:10px;padding:11px 12px;text-decoration:none;color:inherit;margin-bottom:0}
+.admin-link .sub{font-size:12px;font-weight:400;color:var(--muted)}
 
 /* ===== 검색 결과 ===== */
 #result{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -160,6 +164,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
             <button type="button" class="btn primary" id="edSave">추가</button>
           </div>
         </div>
+        <div class="note">여기서 추가한 건 이 기기에만 임시로 적용돼요. 모든 기기에 반영하려면 관리자 페이지에서 저장하세요.</div>
       </div></div></div>
     </div>
 
@@ -192,11 +197,11 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         <div class="field">
           <div class="label">Gemini API 키</div>
           <input type="password" id="key" placeholder="AIza..." autocomplete="off">
-          <small>Google AI Studio(aistudio.google.com/apikey)에서 무료로 발급할 수 있어요. 키는 이 브라우저에 저장되고, GitHub 동기화를 켜면 비공개 Gist에도 함께 저장돼요. 검색할 때는 Google 서버로만 전송돼요.</small>
+          <small>관리자 페이지에서 저장한 값이 자동으로 불러와져요. 여기서 바꾸면 이 기기에만 임시 적용돼요.</small>
         </div>
         <div class="field">
           <div class="label">모델</div>
-          <input type="text" id="model" placeholder="gemini-3.8-flash">
+          <input type="text" id="model" placeholder="gemini-2.0-flash">
           <small>모델 이름이 바뀌어 오류가 나면 여기만 최신 이름으로 고치세요.</small>
         </div>
         <div class="field">
@@ -207,32 +212,16 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
           </div>
           <small>구글 화면 안의 "무엇이든 물어보세요" 입력창이 가려지도록 위/아래를 잘라내요. 숫자를 바꾸면 바로 적용돼요.</small>
         </div>
-        <button type="button" class="btn primary" id="cfgSave">설정 저장</button>
+        <div class="note">이 기기에서만 임시 적용됩니다. 모든 기기에 반영하려면 관리자 페이지에서 저장하세요.</div>
       </div></div></div>
     </div>
 
-    <div class="acc" data-key="sync">
-      <button type="button" class="acc-head" aria-expanded="false">
-        <span class="ico">☁️</span>
-        <span class="ttl">GitHub 동기화<span class="sub" id="subSync"></span></span>
-        <i class="chev"></i>
-      </button>
-      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
-        <div class="note" style="margin:0 0 12px">설정은 <b id="ghWhere">저장소</b>에 저장돼요. 이 주소를 여는 모든 기기가 토큰 없이 자동으로 불러와요.</div>
-        <div class="field">
-          <div class="label">GitHub 토큰 (이 기기에서 변경을 저장하려는 경우만)</div>
-          <input type="password" id="ghToken" placeholder="github_pat_..." autocomplete="off">
-          <small>github.com/settings/personal-access-tokens/new → Repository access: Only select repositories → <b>study</b> 선택 → Permissions: <b>Contents → Read and write</b> → Generate token. 토큰은 이 기기 브라우저에만 저장돼요.</small>
-        </div>
-        <div class="sync-btns">
-          <button type="button" class="btn primary" id="ghSaveTok">토큰 저장</button>
-          <button type="button" class="btn ghost" id="ghSync">지금 동기화</button>
-          <button type="button" class="btn ghost" id="ghDelTok" hidden>토큰 삭제</button>
-        </div>
-        <div class="note" id="ghStatus"></div>
-        <div class="note">저장되는 것: 프롬프트 목록, 현재 설정된 프롬프트, Gemini API 키, 모델, 화면 자르기 값. 기기마다 따로 두는 것: 표시 방식, GitHub 토큰. 저장소가 Public이라 settings.json은 누구나 볼 수 있어요(API 키 포함).</div>
-      </div></div></div>
-    </div>
+    <div class="spacer"></div>
+
+    <a href="./admin.html" class="acc admin-link">
+      <span class="ico">🛠️</span>
+      <span class="ttl">관리자 페이지<span class="sub">모든 기기에 설정 반영</span></span>
+    </a>
 
   </aside>
 
@@ -251,7 +240,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     "다음 질문에 대해 핵심부터 간결하게, 근거와 함께 한국어로 답해줘.",
     "초등학생도 이해할 수 있게 쉽게 설명해줘."
   ];
-  var DEFAULT_MODEL = "gemini-3.8-flash";
+  var DEFAULT_MODEL = "gemini-2.0-flash";
   var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   var DEFAULT_MODE = IS_MOBILE ? "api" : "frame";
   var mq = window.matchMedia("(max-width:720px)");
@@ -261,7 +250,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   var list = $("list"), count = $("count"), curBody = $("curBody"), result = $("result"), goBtn = $("goBtn");
 
   var state = load(), cfg = loadCfg(), ui = loadUi(), editingId = null;
-  var gh = loadGh(), ghTimer = null;
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -283,11 +271,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     if(!ok) s.activeId = s.prompts.length ? s.prompts[0].id : null;
     return s;
   }
-  function persist(quiet){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} if(!quiet) markDirty(); }
+  function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
   function loadCfg(){
     try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; if(c.cropTop == null) c.cropTop = 0; if(c.cropBottom == null) c.cropBottom = 100; return c; } }catch(e){}
     return {key: "", model: DEFAULT_MODEL, mode: DEFAULT_MODE, cropTop: 0, cropBottom: 100};
   }
+  function saveCfg(){ try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){} }
   function loadUi(){
     try{ var u = JSON.parse(localStorage.getItem(UIKEY)); if(u && u.open) return u; }catch(e){}
     return {open: {}, side: true};
@@ -299,7 +288,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
 
   /* ---------- 아코디언 / 사이드바 ---------- */
-  var accs = Array.prototype.slice.call(document.querySelectorAll(".acc"));
+  var accs = Array.prototype.slice.call(document.querySelectorAll(".acc[data-key]"));
   function applyAcc(){
     accs.forEach(function(a){
       var on = !!ui.open[a.getAttribute("data-key")];
@@ -392,7 +381,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       var ab = document.createElement("button");
       ab.type = "button"; ab.className = "newtab alt"; ab.textContent = "화면이 안 나오면: API로 검색";
       ab.addEventListener("click", function(){
-        cfg.mode = "api"; try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){} $("mode").value = "api"; renderSet(); search();
+        cfg.mode = "api"; saveCfg(); $("mode").value = "api"; renderSet(); search();
       });
       w.appendChild(ab);
       showResult(w);
@@ -400,10 +389,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     }
 
     if(!cfg.key){
-      showResult(div("err", "먼저 Gemini API 키를 설정해 주세요. 왼쪽 메뉴의 '설정'에서 입력할 수 있어요."));
-      setAcc("set", true);
-      if(mq.matches) document.body.classList.add("drawer-open");
-      else if(!ui.side){ ui.side = true; saveUi(); applySide(); }
+      showResult(div("err", "아직 Gemini API 키가 없어요. 관리자 페이지에서 설정해 주세요."));
       return;
     }
     var full = buildQuery(text);
@@ -454,40 +440,21 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     }
   }
 
-  /* ---------- GitHub 동기화 (저장소의 settings.json) ---------- */
-  var GH_KEY = "aimode_gh_v2";
+  /* ---------- GitHub에서 설정 자동 불러오기 (읽기 전용) ---------- */
   var REPO = (function(){
     var host = location.hostname, parts = location.pathname.split("/").filter(Boolean);
-    if(!/\.github\.io$/i.test(host)) return null;
-    var owner = host.split(".")[0], repo = host, rest = [];
-    if(parts.length){ repo = parts[0]; rest = parts.slice(1); }
-    if(rest.length && /\.[a-z0-9]+$/i.test(rest[rest.length - 1])) rest.pop();
-    return {owner: owner, repo: repo, path: (rest.length ? rest.join("/") + "/" : "") + "settings.json"};
+    // GitHub Pages
+    if(/\.github\.io$/i.test(host)){
+      var owner = host.split(".")[0], repo = host;
+      if(parts.length){ repo = parts[0]; }
+      return {owner: owner, repo: repo, path: "save/settings.json"};
+    }
+    // 로컬 개발 (localhost / 127.0.0.1 / file://)
+    if(host === "localhost" || host === "127.0.0.1" || location.protocol === "file:"){
+      return {owner: "yanghw7", repo: "study", path: "save/settings.json"};
+    }
+    return null;
   })();
-  function loadGh(){
-    try{ var g = JSON.parse(localStorage.getItem(GH_KEY)); if(g) return g; }catch(e){}
-    return {token: "", localTs: 0};
-  }
-  function saveGh(){ try{ localStorage.setItem(GH_KEY, JSON.stringify(gh)); }catch(e){} }
-  function canWrite(){ return !!gh.token; }
-  function nowStr(){ var d = new Date(); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
-  function ghStatus(msg, bad){
-    var el = $("ghStatus"); el.textContent = msg; el.style.color = bad ? "var(--danger)" : "";
-  }
-  function ghUi(){
-    var has = !!gh.token;
-    $("ghSaveTok").hidden = has; $("ghDelTok").hidden = !has;
-    $("ghToken").disabled = has;
-    $("ghToken").placeholder = has ? "토큰 저장됨 (이 기기)" : "github_pat_...";
-    if(has) $("ghToken").value = "";
-    $("ghSync").hidden = !REPO;
-    $("subSync").textContent = !REPO ? "사용 불가" : has ? "저장 가능" : "읽기 전용";
-  }
-  function b64enc(str){
-    var bytes = new TextEncoder().encode(str), bin = "";
-    for(var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin);
-  }
   function b64dec(b64){
     var bin = atob(b64.replace(/\s/g, "")), bytes = new Uint8Array(bin.length);
     for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -496,105 +463,31 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function apiUrl(){
     return "https://api.github.com/repos/" + REPO.owner + "/" + REPO.repo + "/contents/" + REPO.path.split("/").map(encodeURIComponent).join("/");
   }
-  async function readRemote(withAuth){
-    var h = {"Accept": "application/vnd.github+json"};
-    if(withAuth && gh.token) h["Authorization"] = "Bearer " + gh.token;
-    var r = await fetch(apiUrl() + "?t=" + Date.now(), {headers: h, cache: "no-store"});
-    if(r.status === 404) return null;
-    if(!r.ok){
-      throw new Error(r.status === 401 ? "토큰이 올바르지 않아요 (401)" :
-        r.status === 403 ? "요청 한도를 넘었어요. 잠시 후 다시 시도하세요 (403)" : "GitHub 오류 (" + r.status + ")");
-    }
-    var j = await r.json();
-    return {sha: j.sha, data: JSON.parse(b64dec(j.content || ""))};
-  }
-  function snapshot(ts){
-    return {v: 1, updated: ts, prompts: state.prompts, activeId: state.activeId, model: cfg.model, key: cfg.key, cropTop: cfg.cropTop, cropBottom: cfg.cropBottom};
-  }
   function applyRemote(d){
     if(Array.isArray(d.prompts)){
       var ps = d.prompts.filter(function(p){ return p && typeof p.id === "string" && typeof p.text === "string"; });
-      state.prompts = ps; state.activeId = d.activeId; state = fix(state); persist(true);
+      state.prompts = ps; state.activeId = d.activeId; state = fix(state); persist();
     }
     if(d.model) cfg.model = d.model;
     if(typeof d.key === "string" && d.key) cfg.key = d.key;
     if(typeof d.cropTop === "number") cfg.cropTop = d.cropTop;
     if(typeof d.cropBottom === "number") cfg.cropBottom = d.cropBottom;
-    try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){}
+    saveCfg();
     $("model").value = cfg.model; $("key").value = cfg.key || ""; $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom;
     var f = document.querySelector(".frame"); if(f) applyCrop(f);
     resetEditor(); render();
   }
-  async function push(retry){
-    if(!REPO) return;
-    if(!canWrite()){ ghStatus("읽기 전용 기기라 GitHub에는 저장되지 않아요 (토큰을 넣으면 저장돼요)"); return; }
+  async function pullRemote(){
+    if(!REPO){ console.warn("[AI검색] GitHub 저장소 경로를 인식 못 함"); return; }
     try{
-      ghStatus("GitHub에 저장 중…");
-      var cur = await readRemote(true);
-      var body = {message: "AI 검색 설정 업데이트", content: b64enc(JSON.stringify(snapshot(gh.localTs), null, 2))};
-      if(cur) body.sha = cur.sha;
-      var r = await fetch(apiUrl(), {
-        method: "PUT",
-        headers: {"Authorization": "Bearer " + gh.token, "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
-        body: JSON.stringify(body)
-      });
-      if((r.status === 409 || r.status === 422) && !retry) return push(true);
-      if(!r.ok){
-        throw new Error(r.status === 401 ? "토큰이 올바르지 않아요 (401)" :
-          (r.status === 403 || r.status === 404) ? "토큰 권한을 확인하세요 (저장소 Contents 읽기/쓰기)" : "GitHub 오류 (" + r.status + ")");
-      }
-      ghStatus("GitHub에 저장됨 · " + nowStr() + " (다른 기기에는 바로 반영돼요)");
-    }catch(e){ ghStatus("저장 실패: " + e.message, true); }
-  }
-  function markDirty(){
-    if(!REPO) return;
-    gh.localTs = Date.now(); saveGh();
-    clearTimeout(ghTimer);
-    if(!canWrite()){ ghStatus("읽기 전용: 이 기기의 변경은 GitHub에 저장되지 않아요"); return; }
-    ghStatus("변경됨 · 곧 GitHub에 저장해요");
-    ghTimer = setTimeout(push, 1500);
-  }
-  async function syncNow(){
-    if(!REPO) return;
-    try{
-      ghStatus("GitHub와 동기화 중…");
-      var cur = await readRemote(false);
-      if(!cur){
-        if(canWrite()){ if(!gh.localTs){ gh.localTs = Date.now(); saveGh(); } await push(); }
-        else ghStatus("아직 저장된 설정이 없어요. 토큰이 있는 기기에서 먼저 저장해 주세요.");
-        return;
-      }
-      var r = cur.data, rts = r.updated || 0;
-      if(rts > gh.localTs){
-        applyRemote(r); gh.localTs = rts; saveGh();
-        ghStatus("GitHub의 최신 설정을 불러왔어요 · " + nowStr());
-        if(canWrite() && cfg.key && !r.key) markDirty();
-      }else if(gh.localTs > rts){
-        await push();
-      }else{
-        ghStatus("동기화됨 · " + nowStr());
-      }
-    }catch(e){ ghStatus("동기화 실패: " + e.message, true); }
-  }
-  async function saveToken(){
-    var tk = $("ghToken").value.trim();
-    if(!tk){ ghStatus("토큰을 입력해 주세요", true); return; }
-    gh.token = tk; saveGh(); ghUi();
-    await syncNow();
-  }
-  function delToken(){
-    clearTimeout(ghTimer); gh.token = ""; saveGh(); ghUi();
-    ghStatus("토큰을 삭제했어요. 이 기기는 읽기 전용이 돼요.");
-  }
-  function syncInit(){
-    ghUi();
-    $("ghSaveTok").addEventListener("click", saveToken);
-    $("ghSync").addEventListener("click", syncNow);
-    $("ghDelTok").addEventListener("click", delToken);
-    if(!REPO){ ghStatus("GitHub Pages 주소(…github.io)에서 열었을 때만 동기화돼요."); return; }
-    $("ghWhere").textContent = REPO.owner + "/" + REPO.repo + " 저장소의 " + REPO.path;
-    document.addEventListener("visibilitychange", function(){ if(!document.hidden) syncNow(); });
-    syncNow();
+      var r = await fetch(apiUrl() + "?t=" + Date.now(), {headers: {"Accept": "application/vnd.github+json"}, cache: "no-store"});
+      if(r.status === 404){ console.warn("[AI검색] save/settings.json 아직 없음"); return; }
+      if(!r.ok){ console.warn("[AI검색] GitHub 오류 " + r.status); return; }
+      var j = await r.json();
+      var d = JSON.parse(b64dec(j.content || ""));
+      console.log("[AI검색] 원격 설정 불러옴:", d);
+      applyRemote(d);
+    }catch(e){ console.warn("[AI검색] 불러오기 실패:", e.message); }
   }
 
   /* ---------- 프롬프트 UI ---------- */
@@ -608,7 +501,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function renderCurrent(){
     var a = active();
     curBody.className = "cur-body" + (a ? "" : " none");
-    curBody.textContent = a ? a.text : "설정된 프롬프트가 없어요. '프롬프트 추가'에서 만들어 주세요.";
+    curBody.textContent = a ? a.text : "설정된 프롬프트가 없어요. 관리자 페이지에서 만들어 주세요.";
     $("subCur").textContent = a ? short(a.text, 40) : "없음";
   }
   function renderList(){
@@ -655,19 +548,15 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom;
   function liveCrop(){
     cfg.cropTop = num($("cropTop")); cfg.cropBottom = num($("cropBottom"));
-    try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){}
+    saveCfg();
     var f = document.querySelector(".frame"); if(f) applyCrop(f);
-    markDirty();
   }
   $("cropTop").addEventListener("input", liveCrop);
   $("cropBottom").addEventListener("input", liveCrop);
-  $("cfgSave").addEventListener("click", function(){
-    cfg = {key: $("key").value.trim(), model: $("model").value.trim() || DEFAULT_MODEL, mode: $("mode").value, cropTop: num($("cropTop")), cropBottom: num($("cropBottom"))};
-    try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){}
-    renderSet(); markDirty();
-    var b = $("cfgSave"); b.textContent = "저장됨 ✓";
-    setTimeout(function(){ b.textContent = "설정 저장"; }, 1400);
-  });
+
+  $("key").addEventListener("change", function(){ cfg.key = $("key").value.trim(); saveCfg(); });
+  $("model").addEventListener("change", function(){ cfg.model = $("model").value.trim() || DEFAULT_MODEL; saveCfg(); });
+  $("mode").addEventListener("change", function(){ cfg.mode = $("mode").value; saveCfg(); renderSet(); });
 
   $("f").addEventListener("submit", function(ev){ ev.preventDefault(); search(); });
   q.addEventListener("input", function(){ autosize(q); });
@@ -676,17 +565,16 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); search(); }
   });
 
-  if(cfg.mode === "api" && !cfg.key) ui.open.set = true;
   applyAcc(); applySide();
-
   if("serviceWorker" in navigator && /^https?:$/.test(location.protocol)){
     window.addEventListener("load", function(){
       navigator.serviceWorker.register("sw.js").catch(function(){});
     });
   }
 
-  persist(true); render();
-  syncInit();
+  render();
+  pullRemote();
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) pullRemote(); });
 })();
 </script>
 </body>
