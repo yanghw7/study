@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791382814112,
+  "updated": 1791382819962,
   "prompts": [
     {
       "id": "muy72izx0nuq8",
@@ -20,6 +20,6 @@
   "key": "",
   "cropTop": 80,
   "cropBottom": 100,
-  "cropLeft": 0,
+  "cropLeft": 55,
   "cropRight": 0
 }
