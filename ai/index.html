@@ -510,7 +510,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var why = "";
     // 1) 같은 사이트(GitHub Pages)의 save/settings.json: 사용자가 [갱신]을 눌렀을 때만 확인합니다.
     try{
-      var r2 = await fetch(new URL("../save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
+      var r2 = await fetch(new URL("./save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
       if(r2.ok){
         var d2 = await r2.json();
         syncMsg = "✓ 동기화 " + new Date().toLocaleTimeString();
