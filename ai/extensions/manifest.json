@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI 모드 프레임 허용 (개인용)",
-  "version": "1.2",
+  "version": "1.1",
   "description": "내 AI 검색 페이지 안에서 구글 화면이 보이도록, 구글 iframe의 차단 헤더를 내 브라우저에서만 제거합니다.",
   "permissions": [
     "declarativeNetRequest"
@@ -20,20 +20,5 @@
         "path": "rules.json"
       }
     ]
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.google.com/search*",
-        "https://www.google.co.kr/search*",
-        "https://google.com/search*",
-        "https://google.co.kr/search*"
-      ],
-      "js": [
-        "hide-ai-box.js"
-      ],
-      "all_frames": true,
-      "run_at": "document_idle"
-    }
-  ]
+  }
 }
