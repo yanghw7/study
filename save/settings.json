@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791382805421,
+  "updated": 1791382808375,
   "prompts": [
     {
       "id": "muy72izx0nuq8",
@@ -15,7 +15,7 @@
       "text": "1. 정의 \n2. 증상 \n3. 위험인자 (취약인 / 취약부위)\n4. 진단 (검사방법)\n5. 치료 \n6. 부작용 \n으로 서술형 시험 답안용 요약정리 해줘"
     }
   ],
-  "activeId": "muy0l5un4m570",
+  "activeId": "muy72izx0nuq8",
   "model": "gemini-2.0-flash",
   "key": "",
   "cropTop": 80,
