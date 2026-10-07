@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#4b6bfb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AI 검색">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>AI 검색</title>
+<style>
+:root{
+  --bg:#ffffff;--fg:#1f1f1f;--muted:#6b7280;--card:#f3f4f8;--border:#e1e3ea;--accent:#4b6bfb;--accent-soft:#e8ecff;--danger:#e5484d;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121317;--fg:#ececf1;--muted:#9aa0ad;--card:#1d1f26;--border:#2c2f39;--accent:#7b93ff;--accent-soft:#232a4a;--danger:#ff6b70;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif}
+button{border:0;font:inherit;cursor:pointer;border-radius:999px}
+textarea,input[type=text],input[type=password]{width:100%;border:0;outline:0;background:transparent;color:var(--fg);font:inherit;font-size:16px;line-height:1.5;padding:6px 0}
+textarea{resize:none;max-height:140px}
+a{color:var(--accent)}
+
+/* 상단 고정 검색창 */
+.topbar{position:sticky;top:0;z-index:10;background:var(--bg);padding:calc(12px + env(safe-area-inset-top,0px)) 16px 10px;border-bottom:1px solid var(--border)}
+.topbar-in{max-width:720px;margin:0 auto}
+#f{display:flex;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:6px 6px 6px 16px;align-items:flex-start}
+.go{background:var(--accent);color:#fff;font-weight:600;font-size:15px;padding:10px 18px;flex:none;margin-top:1px}
+.go:disabled{opacity:.6;cursor:default}
+.tip{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;margin:6px 6px 0}
+.tip b{color:var(--accent);font-weight:600}
+
+main{max-width:720px;margin:0 auto;padding:18px 16px calc(56px + env(safe-area-inset-bottom,0px))}
+
+/* 검색 결과 */
+#result{margin-bottom:8px}
+.res-q{font-size:13px;color:var(--muted);margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
+.answer{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font-size:15px;line-height:1.65;word-break:break-word}
+.answer h3,.answer h4{margin:16px 0 6px;font-size:16px}
+.answer p{margin:0 0 10px}
+.answer ul,.answer ol{margin:0 0 10px;padding-left:22px}
+.answer code{background:var(--border);padding:1px 5px;border-radius:5px;font-size:13px}
+.answer .tbl{overflow-x:auto;margin:0 0 10px}
+.answer table{border-collapse:collapse;font-size:14px}
+.answer th,.answer td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.loading{color:var(--muted);padding:18px;text-align:center}
+.err{color:var(--danger);background:var(--card);border:1px solid var(--danger);border-radius:14px;padding:14px 16px;font-size:14px;white-space:pre-wrap}
+.sources{margin-top:12px}
+.sources .label{margin-bottom:6px}
+.sources a{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border:1px solid var(--border);border-radius:999px;font-size:13px;text-decoration:none;color:var(--fg);background:var(--bg)}
+.open{display:inline-block;margin-top:6px;font-size:13px}
+
+.label{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 8px}
+.current{margin-top:22px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:16px;padding:14px 16px}
+.current .label{color:var(--accent)}
+.current .body{font-size:15px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.current .none{color:var(--muted)}
+.current .note{color:var(--muted);font-size:12px;margin-top:8px}
+
+hr{border:0;border-top:1px solid var(--border);margin:26px 0}
+
+.editor{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px}
+.editor .row{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.btn{font-size:14px;padding:8px 16px}
+.primary{background:var(--accent);color:#fff;font-weight:600}
+.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+
+h2{font-size:15px;margin:28px 0 10px;display:flex;justify-content:space-between;align-items:center}
+h2 small{color:var(--muted);font-weight:400}
+ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.plist li{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 12px 10px 14px}
+.plist li.active{border-color:var(--accent)}
+.plist .txt{font-size:14px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.plist .acts{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:8px}
+.plist .badge{margin-right:auto;font-size:12px;color:var(--accent);font-weight:600}
+.plist .mini{font-size:13px;padding:5px 12px;background:transparent;border:1px solid var(--border);color:var(--fg)}
+.plist .mini.set{background:var(--accent);border-color:var(--accent);color:#fff}
+.plist .mini.del{color:var(--danger)}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:16px}
+
+details.settings{margin-top:30px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 16px}
+details.settings summary{cursor:pointer;font-weight:600;font-size:14px}
+.field{margin-top:12px}
+.field input{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:16px}
+select{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px}
+.frame{width:100%;height:calc(100vh - 150px);height:calc(100dvh - 150px);min-height:480px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
+.field small{display:block;color:var(--muted);font-size:12px;margin-top:5px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- 최상단 고정 검색창 -->
+<div class="topbar">
+  <div class="topbar-in">
+    <form id="f">
+      <textarea id="q" rows="1" placeholder="검색할 내용을 입력하세요" autofocus></textarea>
+      <button type="submit" class="go" id="goBtn">검색</button>
+    </form>
+    <div class="tip"><span>Enter 검색 · Shift+Enter 줄바꿈</span><span id="tipActive"></span></div>
+  </div>
+</div>
+
+<main>
+  <!-- 검색 결과: 검색창 바로 아래 -->
+  <section id="result" hidden></section>
+
+  <!-- 현재 설정된 프롬프트 -->
+  <section class="current">
+    <div class="label">현재 설정된 프롬프트</div>
+    <div class="body" id="curBody"></div>
+    <div class="note">검색할 때 이 프롬프트가 입력 내용 앞에 자동으로 붙어요.</div>
+  </section>
+
+  <hr>
+
+  <!-- 프롬프트 추가 / 수정 -->
+  <section>
+    <div class="label" id="edLabel">프롬프트 추가</div>
+    <div class="editor">
+      <textarea id="ed" rows="2" placeholder="자주 쓰는 프롬프트를 입력하세요"></textarea>
+      <div class="row">
+        <button type="button" class="btn ghost" id="edCancel" hidden>취소</button>
+        <button type="button" class="btn primary" id="edSave">추가</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 프롬프트 목록 -->
+  <h2>프롬프트 목록 <small id="count"></small></h2>
+  <ul class="plist" id="list"></ul>
+
+  <!-- 설정 -->
+  <details class="settings" id="settings">
+    <summary>⚙ 설정</summary>
+    <div class="field">
+      <div class="label">검색 결과 표시 방식</div>
+      <select id="mode">
+        <option value="frame">구글 AI 모드 화면 그대로 (확장 프로그램 필요)</option>
+        <option value="api">Gemini API 답변 (API 키 필요)</option>
+      </select>
+      <small>화면 그대로 보기는 PC 크롬/엣지에 확장 프로그램을 설치해야 해요. 모바일에서는 Gemini API 방식을 쓰세요.</small>
+    </div>
+    <div class="field">
+      <div class="label">Gemini API 키</div>
+      <input type="password" id="key" placeholder="AIza..." autocomplete="off">
+      <small>Google AI Studio(aistudio.google.com/apikey)에서 무료로 발급할 수 있어요. 키는 이 브라우저에만 저장되고, 검색할 때 Google 서버로만 전송돼요.</small>
+    </div>
+    <div class="field">
+      <div class="label">모델</div>
+      <input type="text" id="model" placeholder="gemini-3.8-flash">
+      <small>모델 이름이 바뀌어 오류가 나면 여기만 최신 이름으로 고치세요.</small>
+    </div>
+    <div class="field"><button type="button" class="btn primary" id="cfgSave">설정 저장</button></div>
+  </details>
+</main>
+
+<script>
+(function(){
+  var KEY = "aimode_prompts_v2", OLD_KEY = "aimode_prompts_v1", CFG = "aimode_cfg_v1";
+  var DEFAULTS = [
+    "다음 질문에 대해 핵심부터 간결하게, 근거와 함께 한국어로 답해줘.",
+    "초등학생도 이해할 수 있게 쉽게 설명해줘."
+  ];
+  var DEFAULT_MODEL = "gemini-3.8-flash";
+  var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var DEFAULT_MODE = IS_MOBILE ? "api" : "frame";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var q = $("q"), ed = $("ed"), edSave = $("edSave"), edCancel = $("edCancel"), edLabel = $("edLabel");
+  var list = $("list"), count = $("count"), curBody = $("curBody"), result = $("result"), goBtn = $("goBtn");
+
+  var state = load();
+  var cfg = loadCfg();
+  var editingId = null;
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  /* ---------- 저장/불러오기 ---------- */
+  function load(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(raw){ var s = JSON.parse(raw); if(s && Array.isArray(s.prompts)) return fix(s); }
+      var old = localStorage.getItem(OLD_KEY);
+      if(old){
+        var a = JSON.parse(old);
+        if(Array.isArray(a) && a.length) return fix({prompts: a.map(function(t){ return {id: uid(), text: String(t)}; }), activeId: null});
+      }
+    }catch(e){}
+    return fix({prompts: DEFAULTS.map(function(t){ return {id: uid(), text: t}; }), activeId: null});
+  }
+  function fix(s){
+    var ok = s.prompts.some(function(p){ return p.id === s.activeId; });
+    if(!ok) s.activeId = s.prompts.length ? s.prompts[0].id : null;
+    return s;
+  }
+  function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+  function loadCfg(){
+    try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; return c; } }catch(e){}
+    return {key: "", model: DEFAULT_MODEL, mode: DEFAULT_MODE};
+  }
+  function active(){
+    for(var i = 0; i < state.prompts.length; i++) if(state.prompts[i].id === state.activeId) return state.prompts[i];
+    return null;
+  }
+
+  /* ---------- 마크다운 렌더 (간단) ---------- */
+  function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function inline(s){
+    s = esc(s);
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    return s;
+  }
+  function md(src){
+    var lines = src.replace(/\r/g, "").split("\n"), out = [], i = 0, list = null;
+    function closeList(){ if(list){ out.push("</" + list + ">"); list = null; } }
+    while(i < lines.length){
+      var l = lines[i], m;
+      if(/^\s*\|.*\|\s*$/.test(l)){
+        closeList();
+        var rows = [];
+        while(i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){ rows.push(lines[i]); i++; }
+        rows = rows.filter(function(r){ return !/^\s*\|[\s:\-|]+\|\s*$/.test(r); });
+        var html = '<div class="tbl"><table>';
+        rows.forEach(function(r, ri){
+          var cells = r.trim().replace(/^\||\|$/g, "").split("|");
+          html += "<tr>" + cells.map(function(c){ var t = ri === 0 ? "th" : "td"; return "<" + t + ">" + inline(c.trim()) + "</" + t + ">"; }).join("") + "</tr>";
+        });
+        out.push(html + "</table></div>");
+        continue;
+      }
+      if((m = l.match(/^\s*(#{1,4})\s+(.*)$/))){ closeList(); out.push((m[1].length <= 2 ? "<h3>" : "<h4>") + inline(m[2]) + (m[1].length <= 2 ? "</h3>" : "</h4>")); }
+      else if((m = l.match(/^\s*[-*•]\s+(.*)$/))){ if(list !== "ul"){ closeList(); out.push("<ul>"); list = "ul"; } out.push("<li>" + inline(m[1]) + "</li>"); }
+      else if((m = l.match(/^\s*\d+[.)]\s+(.*)$/))){ if(list !== "ol"){ closeList(); out.push("<ol>"); list = "ol"; } out.push("<li>" + inline(m[1]) + "</li>"); }
+      else if(!l.trim()){ closeList(); }
+      else { closeList(); out.push("<p>" + inline(l) + "</p>"); }
+      i++;
+    }
+    closeList();
+    return out.join("");
+  }
+
+  /* ---------- 검색 ---------- */
+  function buildQuery(text){
+    var a = active();
+    if(!a) return text;
+    return a.text + (/\s$/.test(a.text) ? "" : "\n") + text;
+  }
+  function showResult(node){ result.hidden = false; result.innerHTML = ""; result.appendChild(node); }
+  function div(cls, html){ var d = document.createElement("div"); d.className = cls; if(html != null) d.innerHTML = html; return d; }
+
+  async function search(){
+    var text = q.value.trim();
+    if(!text) return;
+    if(cfg.mode !== "api"){
+      var fullQ = buildQuery(text);
+      var url = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(fullQ);
+      var w = document.createElement("div");
+      var rq0 = div("res-q"); rq0.textContent = "Q. " + text; w.appendChild(rq0);
+      var fr = document.createElement("iframe");
+      fr.className = "frame"; fr.src = url; fr.setAttribute("referrerpolicy", "no-referrer");
+      w.appendChild(fr);
+      var o0 = document.createElement("a");
+      o0.className = "open"; o0.target = "_blank"; o0.rel = "noopener noreferrer"; o0.href = url;
+      o0.textContent = "화면이 비어 있으면 새 탭에서 열기 ↗ (확장 프로그램 설치 필요)";
+      w.appendChild(o0);
+      showResult(w);
+      return;
+    }
+    if(!cfg.key){
+      showResult(div("err", "먼저 Gemini API 키를 설정해 주세요. 아래 '⚙ 설정'에서 입력할 수 있어요."));
+      var s = $("settings"); s.open = true; s.scrollIntoView({behavior: "smooth", block: "center"});
+      return;
+    }
+    var full = buildQuery(text);
+    goBtn.disabled = true; goBtn.textContent = "검색 중…";
+    showResult(div("loading", "검색 중입니다…"));
+    try{
+      var model = (cfg.model || DEFAULT_MODEL).trim();
+      var res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+        method: "POST",
+        headers: {"Content-Type": "application/json", "x-goog-api-key": cfg.key},
+        body: JSON.stringify({contents: [{role: "user", parts: [{text: full}]}], tools: [{google_search: {}}]})
+      });
+      var data = await res.json();
+      if(!res.ok) throw new Error((data.error && data.error.message) || ("요청 실패 (" + res.status + ")"));
+      var cand = data.candidates && data.candidates[0];
+      var parts = (cand && cand.content && cand.content.parts) || [];
+      var answer = parts.filter(function(p){ return p.text && !p.thought; }).map(function(p){ return p.text; }).join("");
+      if(!answer) throw new Error("응답이 비어 있어요. 다른 표현으로 다시 시도해 보세요.");
+
+      var wrap = document.createElement("div");
+      var rq = div("res-q"); rq.textContent = "Q. " + text; wrap.appendChild(rq);
+      wrap.appendChild(div("answer", md(answer)));
+
+      var chunks = (cand.groundingMetadata && cand.groundingMetadata.groundingChunks) || [];
+      var seen = {}, links = [];
+      chunks.forEach(function(c){
+        if(c.web && /^https?:\/\//.test(c.web.uri) && !seen[c.web.uri]){ seen[c.web.uri] = 1; links.push(c.web); }
+      });
+      if(links.length){
+        var src = div("sources"); src.appendChild(div("label", "출처"));
+        links.forEach(function(w){
+          var a = document.createElement("a");
+          a.href = w.uri; a.target = "_blank"; a.rel = "noopener noreferrer";
+          a.textContent = w.title || w.uri; src.appendChild(a);
+        });
+        wrap.appendChild(src);
+      }
+      var o = document.createElement("a");
+      o.className = "open"; o.target = "_blank"; o.rel = "noopener noreferrer";
+      o.href = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(full);
+      o.textContent = "Google AI 모드에서 같은 질문 열기 ↗";
+      wrap.appendChild(o);
+      showResult(wrap);
+    }catch(err){
+      showResult(div("err", "오류: " + (err && err.message ? err.message : err)));
+    }finally{
+      goBtn.disabled = false; goBtn.textContent = "검색";
+    }
+  }
+
+  /* ---------- 프롬프트 UI ---------- */
+  function autosize(el){ el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }
+  function resetEditor(){
+    editingId = null; ed.value = ""; edLabel.textContent = "프롬프트 추가";
+    edSave.textContent = "추가"; edCancel.hidden = true; autosize(ed);
+  }
+  function renderCurrent(){
+    var a = active();
+    curBody.className = "body" + (a ? "" : " none");
+    curBody.textContent = a ? a.text : "설정된 프롬프트가 없어요. 아래에서 추가해주세요.";
+    $("tipActive").innerHTML = a ? "<b>프롬프트 적용 중</b>" : "프롬프트 없음";
+  }
+  function renderList(){
+    list.innerHTML = "";
+    count.textContent = state.prompts.length ? state.prompts.length + "개" : "";
+    if(!state.prompts.length){ list.appendChild(div("empty", "저장된 프롬프트가 없어요.")); return; }
+    state.prompts.forEach(function(p){
+      var isActive = p.id === state.activeId;
+      var li = document.createElement("li"); if(isActive) li.className = "active";
+      var t = div("txt"); t.textContent = p.text;
+      var acts = div("acts");
+      var badge = document.createElement("span"); badge.className = "badge"; badge.textContent = isActive ? "● 사용 중" : "";
+      acts.appendChild(badge);
+      function mk(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "mini " + cls; b.textContent = label; b.onclick = fn; acts.appendChild(b); }
+      if(!isActive) mk("설정", "set", function(){ state.activeId = p.id; persist(); render(); });
+      mk("수정", "", function(){
+        editingId = p.id; ed.value = p.text; edLabel.textContent = "프롬프트 수정";
+        edSave.textContent = "수정 저장"; edCancel.hidden = false; autosize(ed); ed.focus();
+        ed.scrollIntoView({behavior: "smooth", block: "center"});
+      });
+      mk("삭제", "del", function(){
+        state.prompts = state.prompts.filter(function(x){ return x.id !== p.id; });
+        if(editingId === p.id) resetEditor();
+        state = fix(state); persist(); render();
+      });
+      li.appendChild(t); li.appendChild(acts); list.appendChild(li);
+    });
+  }
+  function render(){ renderCurrent(); renderList(); }
+
+  edSave.addEventListener("click", function(){
+    var v = ed.value.trim(); if(!v) return;
+    if(editingId) state.prompts.forEach(function(p){ if(p.id === editingId) p.text = v; });
+    else state.prompts.unshift({id: uid(), text: v});
+    state = fix(state); persist(); resetEditor(); render();
+  });
+  edCancel.addEventListener("click", resetEditor);
+
+  $("key").value = cfg.key || "";
+  $("model").value = cfg.model || DEFAULT_MODEL;
+  $("mode").value = cfg.mode || DEFAULT_MODE;
+  $("cfgSave").addEventListener("click", function(){
+    cfg = {key: $("key").value.trim(), model: $("model").value.trim() || DEFAULT_MODEL, mode: $("mode").value};
+    try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){}
+    $("settings").open = false;
+  });
+  if(cfg.mode === "api" && !cfg.key) $("settings").open = true;
+
+  $("f").addEventListener("submit", function(ev){ ev.preventDefault(); search(); });
+  q.addEventListener("input", function(){ autosize(q); });
+  ed.addEventListener("input", function(){ autosize(ed); });
+  q.addEventListener("keydown", function(ev){
+    if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); search(); }
+  });
+
+  if("serviceWorker" in navigator && /^https?:$/.test(location.protocol)){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    });
+  }
+
+  persist(); render();
+})();
+</script>
+</body>
+</html>
