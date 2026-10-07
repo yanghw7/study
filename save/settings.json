@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791378033280,
+  "updated": 1791378083534,
   "prompts": [
     {
       "id": "muy47ozog8zfh",
@@ -14,6 +14,6 @@
   "activeId": "muy47ozog8zfh",
   "model": "gemini-2.0-flash",
   "key": "",
-  "cropTop": 500,
+  "cropTop": 80,
   "cropBottom": 100
 }
