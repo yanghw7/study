@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791377968953,
+  "updated": 1791377971201,
   "prompts": [
     {
       "id": "muy0l5un4m570",
@@ -10,6 +10,6 @@
   "activeId": "muy0l5un4m570",
   "model": "gemini-2.0-flash",
   "key": "",
-  "cropTop": 0,
+  "cropTop": 100,
   "cropBottom": 100
 }
