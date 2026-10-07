@@ -463,14 +463,10 @@ a{color:var(--accent)}
       $('saveTok').hidden = true;
       $('delTok').hidden = false;
     }
+    // 관리자 페이지는 초기 로딩 1회만 불러오며, 이후에는 상단 '새로고침/불러오기' 버튼으로 수동 갱신합니다.
     pull();
-    // 다른 기기에서 바뀐 것 감지용 주기적 폴링
-    state.polling = setInterval(function(){
-      if(!state.dirty && !state.cropEdit && document.visibilityState === 'visible') pull().catch(function(){});
-    }, 20000);
     document.addEventListener('visibilitychange', function(){
-      if(document.hidden){ if(state.dirty && state.token) push(); }
-      else if(!state.dirty && !state.cropEdit) pull().catch(function(){});
+      if(document.hidden && state.dirty && state.token) push();
     });
     window.addEventListener('beforeunload', function(e){
       if(state.dirty || state.cropEdit){ e.preventDefault(); e.returnValue = ''; }
