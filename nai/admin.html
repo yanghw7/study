@@ -135,7 +135,7 @@ a{color:var(--accent)}
 
 <script>
 (function(){
-  var API = 'https://api.github.com/repos/yanghw7/study/contents/nai/save/settings.json';
+  var API = 'https://api.github.com/repos/yanghw7/study/contents/save/settings.json';
   var GH = 'aimode_admin_gh_v1';
   var LOCAL_KEY = 'aimode_gemini_key_v1';
   var $ = function(id){ return document.getElementById(id); };
@@ -274,7 +274,7 @@ a{color:var(--accent)}
       }
       var uploadData = cleanForGithub(state.data);
       uploadData.updated = Date.now();
-      var body = {message:'네이버 AI 검색 설정 업데이트', content:b64enc(JSON.stringify(uploadData, null, 2))};
+      var body = {message:'AI 검색 설정 업데이트', content:b64enc(JSON.stringify(uploadData, null, 2))};
       if(state.sha) body.sha = state.sha;
       status('저장 중…');
       var r = await fetch(API, {
