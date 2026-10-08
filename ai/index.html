@@ -373,7 +373,23 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     nt.textContent = "새 탭에서 열기 ↗";
     w.appendChild(nt);
     showResult(w);
+    keepAwake();
   }
+
+  /* ---------- 화면 꺼짐 방지 (Wake Lock) · 검색 후 앱이 켜져 있는 동안 유지 ---------- */
+  var wakeLock = null, wantAwake = false;
+  async function keepAwake(){
+    wantAwake = true;
+    if(!("wakeLock" in navigator) || wakeLock) return;
+    try{
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", function(){ wakeLock = null; });
+    }catch(e){ wakeLock = null; }
+  }
+  // 앱을 나갔다 돌아오면 브라우저가 락을 해제하므로 다시 요청
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "visible" && wantAwake) keepAwake();
+  });
 
   /* ---------- GitHub에서 설정 불러오기 (읽기 전용 · 수동 갱신) ---------- */
   var REPO = (function(){
