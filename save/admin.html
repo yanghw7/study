@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>통합 AI 검색 · 관리자</title>
 <style>
-:root{--bg:#fff;--fg:#1f1f1f;--muted:#6b7280;--card:#f5f0ff;--border:#e2d8f8;--accent:#7c3aed;--accent-soft:#ece3ff;--danger:#e5484d;--ok:#16a34a}
-@media(prefers-color-scheme:dark){:root{--bg:#14121a;--fg:#ececf1;--muted:#a39db3;--card:#1d1a26;--border:#322b45;--accent:#a78bfa;--accent-soft:#2a2347;--danger:#ff6b70;--ok:#4ade80}}
+:root{--bg:#fff;--fg:#111;--muted:#6b6b6b;--card:#f4f4f4;--border:#d9d9d9;--accent:#111;--accent-soft:#e6e6e6;--on-accent:#fff;--danger:#e5484d;--ok:#16a34a}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--fg:#f2f2f2;--muted:#9a9a9a;--card:#141414;--border:#2e2e2e;--accent:#f2f2f2;--accent-soft:#2a2a2a;--on-accent:#000;--danger:#ff6b70;--ok:#4ade80}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;font-size:18px;padding:18px;max-width:820px;margin:0 auto;line-height:1.6}
 h1{font-size:26px;margin:0 0 6px}
@@ -15,7 +15,7 @@ h2{font-size:18px;color:var(--muted);margin:28px 0 10px;font-weight:700;letter-s
 input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;font:inherit;font-size:18px;color:var(--fg);outline:0}
 input:focus,textarea:focus{border-color:var(--accent)}
 textarea{resize:vertical;min-height:90px;font-family:inherit}
-button{font:inherit;font-size:17px;cursor:pointer;border:0;border-radius:10px;padding:11px 18px;background:var(--accent);color:#fff;font-weight:600}
+button{font:inherit;font-size:17px;cursor:pointer;border:0;border-radius:10px;padding:11px 18px;background:var(--accent);color:var(--on-accent);font-weight:600}
 button.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
 button.danger{color:var(--danger);border-color:var(--danger);background:transparent}
 button:disabled{opacity:.5;cursor:default}
@@ -37,6 +37,11 @@ label{display:block;font-size:16px;font-weight:600;color:var(--muted);margin:0 0
 .note{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5}
 a{color:var(--accent)}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+.back{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:0 0 22px}
+.back-btn{display:flex;align-items:center;justify-content:center;min-height:52px;padding:0 16px;text-align:center;text-decoration:none;font-size:15px;font-weight:700;letter-spacing:-.2px;color:var(--fg);background:transparent;border:1.5px solid var(--fg);border-radius:14px;transition:background .18s ease,color .18s ease,transform .12s ease}
+.back-btn:hover{background:var(--fg);color:var(--bg)}
+.back-btn:active{transform:scale(.98)}
+.back-btn:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 </style>
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 </head>
@@ -47,7 +52,11 @@ a{color:var(--accent)}
     <h1>통합 AI 검색 · 관리자</h1>
     <div class="note">여기서 저장한 설정을 GitHub에 올리고, 일반 페이지에서는 <b>갱신</b> 버튼을 눌렀을 때 반영합니다.</div>
   </div>
-  <a href="https://yanghw7.github.io/study/all/" aria-label="홈페이지 복귀" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;text-decoration:none;font:inherit;font-size:16px;font-weight:700;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--fg);">홈페이지 복귀</a>
+  <div class="back">
+    <a href="https://yanghw7.github.io/study/all" class="back-btn">통합 AI검색 복귀</a>
+    <a href="https://yanghw7.github.io/study/ai" class="back-btn">구글 AI검색 복귀</a>
+    <a href="https://yanghw7.github.io/study/nai" class="back-btn">네이버 AI검색 복귀</a>
+  </div>
 </div>
 
 <div class="card">
