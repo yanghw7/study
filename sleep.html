@@ -3857,8 +3857,8 @@ async function renderWeekView(){
         </div>
         <div class="agg-nums">
           총 수면시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 수면 횟수 <b>${weeks[w].pages}회</b><br>
-          평균 수면시간 <b>${weeks[w].calendarDays ? fmtDuration(weeks[w].study / weeks[w].calendarDays) : '-'}</b><br>
-          안 잔날 제외 평균 수면시간 <b>${weeks[w].noSleepDays ? fmtDuration(weeks[w].noSleepTotal / weeks[w].noSleepDays) : '-'}</b><br>
+          평균 수면시간 <b class="study-color">${weeks[w].calendarDays ? fmtDuration(weeks[w].study / weeks[w].calendarDays) : '-'}</b><br>
+          안 잔날 제외 평균 수면시간 <b class="study-color">${weeks[w].noSleepDays ? fmtDuration(weeks[w].noSleepTotal / weeks[w].noSleepDays) : '-'}</b><br>
           가장 긴 수면시간 <b>${fmtDuration(weeks[w].longest)}</b>
         </div>
       </div>
@@ -3883,8 +3883,8 @@ async function renderMonthView(){
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
           총 수면시간 <b class="study-color">${fmtDuration(monthStudy)}</b> · 수면 횟수 <b>${monthPages}회</b><br>
-          평균 수면시간 <b>${monthCalendarDays ? fmtDuration(monthStudy / monthCalendarDays) : '-'}</b><br>
-          안 잔날 제외 평균 수면시간 <b>${monthNoSleepDays ? fmtDuration(monthNoSleepTotal / monthNoSleepDays) : '-'}</b><br>
+          평균 수면시간 <b class="study-color">${monthCalendarDays ? fmtDuration(monthStudy / monthCalendarDays) : '-'}</b><br>
+          안 잔날 제외 평균 수면시간 <b class="study-color">${monthNoSleepDays ? fmtDuration(monthNoSleepTotal / monthNoSleepDays) : '-'}</b><br>
           가장 긴 수면시간 <b>${fmtDuration(monthLongest)}</b>
         </div>
       </div>`;
@@ -3921,7 +3921,7 @@ async function renderYearView(){
     chartPoints.push({label:`${year}`, study, pages, waste, longest, noSleepTotal, noSleepDays});
     if(study===0 && pages===0 && waste===0) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">총 수면시간 <b class="study-color">${fmtDuration(study)}</b> · 수면 횟수 <b>${pages}회</b><br>평균 수면시간 <b>${calendarDays ? fmtDuration(study / calendarDays) : '-'}</b><br>안 잔날 제외 평균 수면시간 <b>${noSleepDays ? fmtDuration(noSleepTotal / noSleepDays) : '-'}</b><br>가장 긴 수면시간 <b>${fmtDuration(longest)}</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">총 수면시간 <b class="study-color">${fmtDuration(study)}</b> · 수면 횟수 <b>${pages}회</b><br>평균 수면시간 <b class="study-color">${calendarDays ? fmtDuration(study / calendarDays) : '-'}</b><br>안 잔날 제외 평균 수면시간 <b class="study-color">${noSleepDays ? fmtDuration(noSleepTotal / noSleepDays) : '-'}</b><br>가장 긴 수면시간 <b>${fmtDuration(longest)}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.', 'longest', '가장 긴 수면시간 추이') +
@@ -5745,3 +5745,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 </body>
 </html>
+
+<style id="sleep-average-theme-color-final">
+#sumAvgSleepExcludingNoSleep{color:var(--study)!important;}
+</style>

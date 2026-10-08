@@ -3627,8 +3627,8 @@ async function renderWeekView(){
         </div>
         <div class="agg-nums">
           총 강의시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b><br>
-          평균 강의시간 <b>${weeks[w].calendarDays ? fmtDuration(weeks[w].study / weeks[w].calendarDays) : '-'}</b><br>
-          쉬는날 제외 평균 강의시간 <b>${weeks[w].activeDays ? fmtDuration(weeks[w].study / weeks[w].activeDays) : '-'}</b><br>
+          평균 강의시간 <b class="study-color">${weeks[w].calendarDays ? fmtDuration(weeks[w].study / weeks[w].calendarDays) : '-'}</b><br>
+          쉬는날 제외 평균 강의시간 <b class="study-color">${weeks[w].activeDays ? fmtDuration(weeks[w].study / weeks[w].activeDays) : '-'}</b><br>
           총 강의 횟수 <b>${weeks[w].pages}회</b>
         </div>
       </div>
@@ -3653,8 +3653,8 @@ async function renderMonthView(){
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
           총 강의시간 <b class="study-color">${fmtDuration(monthStudy)}</b><br>
-          평균 강의시간 <b>${monthCalendarDays ? fmtDuration(monthStudy / monthCalendarDays) : '-'}</b><br>
-          쉬는날 제외 평균 강의시간 <b>${monthActiveDays ? fmtDuration(monthStudy / monthActiveDays) : '-'}</b><br>
+          평균 강의시간 <b class="study-color">${monthCalendarDays ? fmtDuration(monthStudy / monthCalendarDays) : '-'}</b><br>
+          쉬는날 제외 평균 강의시간 <b class="study-color">${monthActiveDays ? fmtDuration(monthStudy / monthActiveDays) : '-'}</b><br>
           총 강의 횟수 <b>${monthPages}회</b>
         </div>
       </div>`;
@@ -3690,7 +3690,7 @@ async function renderYearView(){
     chartPoints.push({label:`${year}`, study, pages, waste});
     if(study===0 && pages===0 && waste===0) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">총 강의시간 <b class="study-color">${fmtDuration(study)}</b><br>평균 강의시간 <b>${calendarDays ? fmtDuration(study / calendarDays) : '-'}</b><br>쉬는날 제외 평균 강의시간 <b>${activeDaysCount ? fmtDuration(study / activeDaysCount) : '-'}</b><br>총 강의 횟수 <b>${pages}회</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">총 강의시간 <b class="study-color">${fmtDuration(study)}</b><br>평균 강의시간 <b class="study-color">${calendarDays ? fmtDuration(study / calendarDays) : '-'}</b><br>쉬는날 제외 평균 강의시간 <b class="study-color">${activeDaysCount ? fmtDuration(study / activeDaysCount) : '-'}</b><br>총 강의 횟수 <b>${pages}회</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +
