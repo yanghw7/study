@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791442468864,
+  "updated": 1791442473869,
   "prompts": [
     {
       "id": "muydmi94pt4q8",
@@ -8,7 +8,7 @@
     }
   ],
   "activeId": "muydmi94pt4q8",
-  "cropTop": 10,
+  "cropTop": 0,
   "cropBottom": 100,
   "cropLeft": 0,
   "cropRight": 0,
