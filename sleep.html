@@ -652,31 +652,30 @@ body{background:#EEF3F8!important}
 }
 </style>
 <style id="sleep-summary-five-metrics">
-.summary-grid.sleep-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.summary-grid.sleep-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
 .summary-grid.sleep-summary-grid .summary-item{min-width:0;text-align:center;transform:none}
-.summary-grid.sleep-summary-grid .summary-item b{font-size:19px;white-space:nowrap}
-.summary-grid.sleep-summary-grid .summary-item span{font-size:11.5px;line-height:1.15;white-space:normal;word-break:keep-all}
-@media(max-width:430px){.summary-grid.sleep-summary-grid{gap:3px}.summary-grid.sleep-summary-grid .summary-item b{font-size:16px}.summary-grid.sleep-summary-grid .summary-item span{font-size:10px}}
+.summary-grid.sleep-summary-grid .summary-item b{font-size:18px;white-space:nowrap}
+.summary-grid.sleep-summary-grid .summary-item span{font-size:10.5px;line-height:1.15;white-space:normal;word-break:keep-all}
+@media(max-width:430px){.summary-grid.sleep-summary-grid{gap:3px}.summary-grid.sleep-summary-grid .summary-item b{font-size:15px}.summary-grid.sleep-summary-grid .summary-item span{font-size:9px;letter-spacing:-.2px}}
 </style>
 
 <style id="sleep-summary-count-compact-final">
 .summary-grid.sleep-summary-grid{
-  grid-template-columns:minmax(0,1.18fr) minmax(0,1.35fr) minmax(0,1fr) 44px!important;
-  column-gap:4px!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  column-gap:3px!important;
 }
-.summary-grid.sleep-summary-grid .summary-item:nth-child(4){
-  width:44px!important;min-width:44px!important;max-width:44px!important;overflow:visible!important;
+.summary-grid.sleep-summary-grid .summary-item{
+  width:auto!important;min-width:0!important;max-width:none!important;overflow:visible!important;
 }
-.summary-grid.sleep-summary-grid .summary-item:nth-child(4) b{
-  width:44px!important;white-space:nowrap!important;font-size:19px!important;
+.summary-grid.sleep-summary-grid .summary-item b{
+  width:auto!important;white-space:nowrap!important;font-size:18px!important;letter-spacing:-.35px!important;
 }
-.summary-grid.sleep-summary-grid .summary-item:nth-child(4) span{
-  width:44px!important;white-space:nowrap!important;font-size:11.5px!important;letter-spacing:-.3px!important;
+.summary-grid.sleep-summary-grid .summary-item span{
+  width:auto!important;white-space:normal!important;font-size:10px!important;line-height:1.15!important;letter-spacing:-.35px!important;
 }
-.summary-grid.sleep-summary-grid .summary-item:nth-child(1) b,
-.summary-grid.sleep-summary-grid .summary-item:nth-child(2) b,
-.summary-grid.sleep-summary-grid .summary-item:nth-child(3) b{
-  font-size:19px!important;letter-spacing:-.35px!important;
+@media(max-width:430px){
+  .summary-grid.sleep-summary-grid .summary-item b{font-size:15px!important}
+  .summary-grid.sleep-summary-grid .summary-item span{font-size:8.8px!important}
 }
 </style>
 <style id="time-field-lock">
@@ -692,7 +691,7 @@ body{background:#EEF3F8!important}
 .summary-grid.sleep-summary-grid .summary-item b,
 .summary-grid.sleep-summary-grid .summary-item.ok b,
 .summary-grid.sleep-summary-grid .summary-item.warn b,
-#sumStudy,#sumLongest,#sumLatestWake,#sumPages{
+#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumAvgSleepExcludingNoSleep{
   color:#202A35!important;
 }
 </style>
@@ -722,7 +721,7 @@ body{background:#EEF3F8!important}
 </style>
 <style id="sleep-summary-value-size-14-final">
 .summary-grid.sleep-summary-grid .summary-item b,
-#sumStudy,#sumLongest,#sumLatestWake,#sumPages{
+#sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumAvgSleepExcludingNoSleep{
   font-size:19px!important;
 }
 </style>
@@ -750,6 +749,7 @@ body{background:#EEF3F8!important}
         <div class="summary-item"><b id="sumLongest">0분</b><span>가장 긴 수면시간</span></div>
         <div class="summary-item"><b id="sumLatestWake">-</b><span>최근 기상</span></div>
         <div class="summary-item"><b id="sumPages">0회</b><span>수면 횟수</span></div>
+        <div class="summary-item"><b id="sumAvgSleepExcludingNoSleep">-</b><span>안 잔날 제외 평균 수면시간</span></div>
       </div>
     </div>
 
@@ -2430,13 +2430,14 @@ function minutesBetween(p){
 }
 
 function periodPages(p){
-  return (p.endPage!==''&&p.startPage!=='' && p.endPage!=null && p.startPage!=null && !isNaN(p.endPage) && !isNaN(p.startPage))
-    ? Math.max(0, Number(p.endPage)-Number(p.startPage)+1) : 0;
+  // 수면 기록에서는 페이지 범위를 사용하지 않습니다.
+  // 각 수면 카드 자체를 1회로 계산해야 주/월/연도 통계와 그래프의 수면 횟수가 정상 표시됩니다.
+  return p ? 1 : 0;
 }
 
 function pagesInvalid(p){
-  return (p.startPage!=='' && p.endPage!=='' && p.startPage!=null && p.endPage!=null &&
-          !isNaN(p.startPage) && !isNaN(p.endPage) && Number(p.endPage) < Number(p.startPage));
+  // 과거 데이터 호환을 위해 함수는 유지하되, 수면 횟수는 페이지 입력값과 무관합니다.
+  return false;
 }
 
 function studyInvalid(p){
@@ -2462,14 +2463,42 @@ function wasteInvalid(periods, idx){
   return (curStart - prevEnd) < 0;
 }
 
+function calcNoSleepExcludedAverage(ym){
+  const month = monthCache[ym] || {};
+  let totalMinutes = 0;
+  let validDays = 0;
+
+  Object.keys(month).forEach(dk => {
+    if(!/^\d{1,2}$/.test(dk)) return;
+    const dayData = month[dk];
+    const periods = Array.isArray(dayData?.periods) ? dayData.periods : [];
+    if(!periods.length) return;
+
+    // 같은 날 여러 번 잔 경우 그 날의 총 수면시간을 먼저 합산합니다.
+    const dayTotal = periods.reduce((sum, p) => sum + minutesBetween(p), 0);
+
+    // 30분 미만만 '안 잔날'로 제외합니다. 정확히 30분은 평균에 포함합니다.
+    if(dayTotal < 30) return;
+
+    totalMinutes += dayTotal;
+    validDays += 1;
+  });
+
+  return validDays ? totalMinutes / validDays : null;
+}
+
 function updateSleepExtraSummary(day){
   const completed = (day?.periods || []).filter(p => periodStartDT(p) && periodEndDT(p));
   const durations = completed.map(p => minutesBetween(p)).filter(v => Number.isFinite(v) && v >= 0);
   const longestEl = $('#sumLongest');
   const latestWakeEl = $('#sumLatestWake');
+  const avgEl = $('#sumAvgSleepExcludingNoSleep');
   if(longestEl) longestEl.textContent = durations.length ? fmtDuration(Math.max(...durations)) : '0분';
   const latest = completed.length ? periodEndDT(completed[completed.length-1]) : null;
   if(latestWakeEl) latestWakeEl.textContent = latest ? `${latest.getHours()}시 ${pad(latest.getMinutes())}분` : '-';
+
+  const avg = calcNoSleepExcludedAverage(ymKey(cur));
+  if(avgEl) avgEl.textContent = avg == null ? '-' : fmtDuration(avg);
 }
 
 function renderPeriods(){
@@ -3655,12 +3684,32 @@ function chartTotalTime(points,key){
   const mins=points.reduce((sum,p)=>sum+(Number(p[key])||0),0);
   return formatAvgTime(mins);
 }
+function chartNoSleepExcludedAverage(points){
+  const valid = points.filter(p => Number(p.study) >= 30);
+  if(!valid.length) return null;
+  return valid.reduce((sum,p)=>sum + Number(p.study || 0), 0) / valid.length;
+}
+function chartAggregatedNoSleepExcludedAverage(points){
+  let total = 0;
+  let days = 0;
+  points.forEach(p => {
+    total += Number(p.noSleepTotal || 0);
+    days += Number(p.noSleepDays || 0);
+  });
+  return days ? total / days : null;
+}
 function chartsHtml(points, averagePoints=points, averageLabel="평균", averageNote="", thirdKey="waste", thirdTitle="기상 후 경과시간 추이"){
   if(!chartsVisible) return '';
   if(!points.length || points.every(p=>!p.study && !p.pages && !p.waste)) return '';
   const avgBase = Array.isArray(averagePoints) ? averagePoints : [];
   const hasAverage = avgBase.length > 0;
   const avgStudy = hasAverage ? formatAvgTime(chartAverage(avgBase,'study')) : '—';
+  const noSleepAvg = hasAverage
+    ? (avgBase.some(p => Number(p.noSleepDays) > 0)
+        ? chartAggregatedNoSleepExcludedAverage(avgBase)
+        : chartNoSleepExcludedAverage(avgBase))
+    : null;
+  const noSleepAvgText = noSleepAvg == null ? '—' : formatAvgTime(noSleepAvg);
   const avgPages = hasAverage ? `${Math.round(chartAverage(avgBase,'pages'))}회` : '—';
   const avgWaste = hasAverage ? formatAvgTime(chartAverage(avgBase,thirdKey)) : '—';
   const totalStudy = chartTotalTime(points,'study');
@@ -3668,7 +3717,7 @@ function chartsHtml(points, averagePoints=points, averageLabel="평균", average
   const totalWaste = thirdKey==='longest' ? formatAvgTime(Math.max(0,...points.map(p=>Number(p[thirdKey])||0))) : chartTotalTime(points,thirdKey);
   const note = averageNote ? `<div class="chart-avg-note">${averageNote}</div>` : '';
   return `<div class="charts-wrap">
-    <div class="chart-card"><div class="chart-head"><div class="chart-title">수면시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy} · 총 ${totalStudy}</div></div>${note}${chartSvg(points,'study','study','분')}</div>
+    <div class="chart-card"><div class="chart-head"><div class="chart-title">수면시간 추이</div><div class="chart-unit">${averageLabel} ${avgStudy}<br>안 잔날 제외 평균 ${noSleepAvgText}<br>총 ${totalStudy}</div></div>${note}${chartSvg(points,'study','study','분')}</div>
     <div class="chart-card"><div class="chart-head"><div class="chart-title">${thirdTitle}</div><div class="chart-unit">${averageLabel} ${avgWaste} · ${thirdKey==='longest'?'최장':'총'} ${totalWaste}</div></div>${note}${chartSvg(points,thirdKey,'waste','분')}</div>
     <div class="chart-card"><div class="chart-head"><div class="chart-title">수면 횟수 추이</div><div class="chart-unit">${averageLabel} ${avgPages} · 총 ${totalPages}회</div></div>${note}${chartSvg(points,'pages','pages','회')}</div>
   </div>`;
@@ -3701,6 +3750,8 @@ async function renderDayCharts(){
     points.push({
       label:`${d.getMonth()+1}/${d.getDate()}(${dayKeys[d.getDay()]})`,
       study, pages, waste,
+      noSleepTotal: study >= 30 ? study : 0,
+      noSleepDays: study >= 30 ? 1 : 0,
       date:new Date(d)
     });
   }
@@ -3743,11 +3794,20 @@ async function computeMonthAgg(ym){
   const daysInMonth = new Date(year, mo, 0).getDate();
   const totalWeeks = weekOfMonth(year, mo, daysInMonth);
   const weeks = {};
+  const today = logicalToday(); today.setHours(0,0,0,0);
   for(let w=1; w<=totalWeeks; w++){
-    weeks[w] = {study:0,pages:0,waste:0,longest:0,days:0, ...weekRange(year, mo, w)};
+    weeks[w] = {study:0,pages:0,waste:0,longest:0,days:0,calendarDays:0,activeDays:0,noSleepTotal:0,noSleepDays:0, ...weekRange(year, mo, w)};
   }
 
-  let monthStudy=0, monthPages=0, monthWaste=0, monthLongest=0;
+  let monthStudy=0, monthPages=0, monthWaste=0, monthLongest=0, monthNoSleepTotal=0, monthNoSleepDays=0, monthCalendarDays=0;
+  for(let dayNum=1; dayNum<=daysInMonth; dayNum++){
+    const date = new Date(year, mo-1, dayNum);
+    if(date <= today){
+      const w = weekOfMonth(year, mo, dayNum);
+      weeks[w].calendarDays += 1;
+      monthCalendarDays += 1;
+    }
+  }
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
     const dayData = m[dk];
@@ -3761,10 +3821,18 @@ async function computeMonthAgg(ym){
       dWaste += wasteBefore(periods, idx);
     });
     const w = weekOfMonth(year, mo, dayNum);
+    const qualifiesAsSleepDay = dStudy >= 30;
+    if(qualifiesAsSleepDay){
+      weeks[w].noSleepTotal += dStudy;
+      weeks[w].noSleepDays += 1;
+      weeks[w].activeDays += 1;
+      monthNoSleepTotal += dStudy;
+      monthNoSleepDays += 1;
+    }
     weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].longest = Math.max(weeks[w].longest, dLongest); weeks[w].days += 1;
     monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste; monthLongest = Math.max(monthLongest, dLongest);
   });
-  return { weeks, monthStudy, monthPages, monthWaste, monthLongest };
+  return { weeks, monthStudy, monthPages, monthWaste, monthLongest, monthNoSleepTotal, monthNoSleepDays, monthCalendarDays };
 }
 
 async function renderWeekView(){
@@ -3778,7 +3846,7 @@ async function renderWeekView(){
     el.innerHTML = `<div class="empty-state">${cur.getMonth()+1}월에는 아직 시작된 주차가 없어요.</div>`;
     return;
   }
-  const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste, longest:weeks[w].longest}));
+  const chartPoints = weekNums.map(w => ({label:`${w}주`, study:weeks[w].study, pages:weeks[w].pages, waste:weeks[w].waste, longest:weeks[w].longest, noSleepTotal:weeks[w].noSleepTotal, noSleepDays:weeks[w].noSleepDays}));
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">${cur.getFullYear()}년 ${cur.getMonth()+1}월 · 주별 정리 (${dayKeys[appSettings.weekStartDay]}요일 시작)</div>` +
     chartsHtml(chartPoints, chartPoints.filter((p, idx) => weeks[weekNums[idx]].end < logicalToday()), '주 평균', '평균은 완료된 전주까지 계산합니다.', 'longest', '가장 긴 수면시간 추이') +
     weekNums.map(w => `
@@ -3788,7 +3856,10 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          수면시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 수면 횟수 <b>${weeks[w].pages}회</b><br>가장 긴 수면시간 <b class="waste-color">${fmtDuration(weeks[w].longest)}</b>
+          총 수면시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b> · 수면 횟수 <b>${weeks[w].pages}회</b><br>
+          평균 수면시간 <b>${weeks[w].calendarDays ? fmtDuration(weeks[w].study / weeks[w].calendarDays) : '-'}</b><br>
+          안 잔날 제외 평균 수면시간 <b>${weeks[w].noSleepDays ? fmtDuration(weeks[w].noSleepTotal / weeks[w].noSleepDays) : '-'}</b><br>
+          가장 긴 수면시간 <b>${fmtDuration(weeks[w].longest)}</b>
         </div>
       </div>
     `).join('');
@@ -3803,15 +3874,18 @@ async function renderMonthView(){
   const chartPoints = [];
   for(let mo=1; mo<=12; mo++){
     const ym = `${year}-${pad(mo)}`;
-    const { monthStudy, monthPages, monthWaste, monthLongest } = await computeMonthAgg(ym);
-    chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste, longest:monthLongest});
+    const { monthStudy, monthPages, monthWaste, monthLongest, monthNoSleepTotal, monthNoSleepDays, monthCalendarDays } = await computeMonthAgg(ym);
+    chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste, longest:monthLongest, noSleepTotal:monthNoSleepTotal, noSleepDays:monthNoSleepDays});
     if(monthStudy===0 && monthPages===0 && monthWaste===0) continue;
     any = true;
     html += `
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          수면시간 <b class="study-color">${fmtDuration(monthStudy)}</b> · 수면 횟수 <b>${monthPages}회</b><br>가장 긴 수면시간 <b class="waste-color">${fmtDuration(monthLongest)}</b>
+          총 수면시간 <b class="study-color">${fmtDuration(monthStudy)}</b> · 수면 횟수 <b>${monthPages}회</b><br>
+          평균 수면시간 <b>${monthCalendarDays ? fmtDuration(monthStudy / monthCalendarDays) : '-'}</b><br>
+          안 잔날 제외 평균 수면시간 <b>${monthNoSleepDays ? fmtDuration(monthNoSleepTotal / monthNoSleepDays) : '-'}</b><br>
+          가장 긴 수면시간 <b>${fmtDuration(monthLongest)}</b>
         </div>
       </div>`;
   }
@@ -3836,15 +3910,18 @@ async function renderYearView(){
   let any = false;
   const chartPoints = [];
   for(const year of sorted){
-    let study=0, pages=0, waste=0, longest=0;
+    let study=0, pages=0, waste=0, longest=0, noSleepTotal=0, noSleepDays=0, calendarDays=0;
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
       study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste; longest = Math.max(longest, a.monthLongest||0);
+      noSleepTotal += a.monthNoSleepTotal || 0;
+      noSleepDays += a.monthNoSleepDays || 0;
+      calendarDays += a.monthCalendarDays || 0;
     }
-    chartPoints.push({label:`${year}`, study, pages, waste, longest});
+    chartPoints.push({label:`${year}`, study, pages, waste, longest, noSleepTotal, noSleepDays});
     if(study===0 && pages===0 && waste===0) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">수면시간 <b class="study-color">${fmtDuration(study)}</b> · 수면 횟수 <b>${pages}회</b><br>가장 긴 수면시간 <b class="waste-color">${fmtDuration(longest)}</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">총 수면시간 <b class="study-color">${fmtDuration(study)}</b> · 수면 횟수 <b>${pages}회</b><br>평균 수면시간 <b>${calendarDays ? fmtDuration(study / calendarDays) : '-'}</b><br>안 잔날 제외 평균 수면시간 <b>${noSleepDays ? fmtDuration(noSleepTotal / noSleepDays) : '-'}</b><br>가장 긴 수면시간 <b>${fmtDuration(longest)}</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.', 'longest', '가장 긴 수면시간 추이') +

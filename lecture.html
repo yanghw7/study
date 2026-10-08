@@ -3570,11 +3570,20 @@ async function computeMonthAgg(ym){
   const daysInMonth = new Date(year, mo, 0).getDate();
   const totalWeeks = weekOfMonth(year, mo, daysInMonth);
   const weeks = {};
+  const today = logicalToday(); today.setHours(0,0,0,0);
   for(let w=1; w<=totalWeeks; w++){
-    weeks[w] = {study:0,pages:0,waste:0,days:0, ...weekRange(year, mo, w)};
+    weeks[w] = {study:0,pages:0,waste:0,days:0,calendarDays:0,activeDays:0, ...weekRange(year, mo, w)};
   }
 
-  let monthStudy=0, monthPages=0, monthWaste=0;
+  let monthStudy=0, monthPages=0, monthWaste=0, monthCalendarDays=0, monthActiveDays=0;
+  for(let dayNum=1; dayNum<=daysInMonth; dayNum++){
+    const date = new Date(year, mo-1, dayNum);
+    if(date <= today){
+      const w = weekOfMonth(year, mo, dayNum);
+      weeks[w].calendarDays += 1;
+      monthCalendarDays += 1;
+    }
+  }
   Object.keys(m).forEach(dk => {
     const dayNum = Number(dk);
     const dayData = m[dk];
@@ -3586,10 +3595,14 @@ async function computeMonthAgg(ym){
       dWaste += wasteBefore(periods, idx);
     });
     const w = weekOfMonth(year, mo, dayNum);
+    if(dStudy > 0){
+      weeks[w].activeDays += 1;
+      monthActiveDays += 1;
+    }
     weeks[w].study += dStudy; weeks[w].pages += dPages; weeks[w].waste += dWaste; weeks[w].days += 1;
     monthStudy += dStudy; monthPages += dPages; monthWaste += dWaste;
   });
-  return { weeks, monthStudy, monthPages, monthWaste };
+  return { weeks, monthStudy, monthPages, monthWaste, monthCalendarDays, monthActiveDays };
 }
 
 async function renderWeekView(){
@@ -3613,7 +3626,10 @@ async function renderWeekView(){
           <div class="agg-sub">${fmtMD(weeks[w].start)} ~ ${fmtMD(weeks[w].end)} · 기록일 ${weeks[w].days}일</div>
         </div>
         <div class="agg-nums">
-          강의시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b><br>강의횟수 <b>${weeks[w].pages}회</b>
+          총 강의시간 <b class="study-color">${fmtDuration(weeks[w].study)}</b><br>
+          평균 강의시간 <b>${weeks[w].calendarDays ? fmtDuration(weeks[w].study / weeks[w].calendarDays) : '-'}</b><br>
+          쉬는날 제외 평균 강의시간 <b>${weeks[w].activeDays ? fmtDuration(weeks[w].study / weeks[w].activeDays) : '-'}</b><br>
+          총 강의 횟수 <b>${weeks[w].pages}회</b>
         </div>
       </div>
     `).join('');
@@ -3628,7 +3644,7 @@ async function renderMonthView(){
   const chartPoints = [];
   for(let mo=1; mo<=12; mo++){
     const ym = `${year}-${pad(mo)}`;
-    const { monthStudy, monthPages, monthWaste } = await computeMonthAgg(ym);
+    const { monthStudy, monthPages, monthWaste, monthCalendarDays, monthActiveDays } = await computeMonthAgg(ym);
     chartPoints.push({label:`${mo}월`, study:monthStudy, pages:monthPages, waste:monthWaste});
     if(monthStudy===0 && monthPages===0 && monthWaste===0) continue;
     any = true;
@@ -3636,7 +3652,10 @@ async function renderMonthView(){
       <div class="agg-row">
         <div class="agg-label">${mo}월</div>
         <div class="agg-nums">
-          강의시간 <b class="study-color">${fmtDuration(monthStudy)}</b><br>강의횟수 <b>${monthPages}회</b>
+          총 강의시간 <b class="study-color">${fmtDuration(monthStudy)}</b><br>
+          평균 강의시간 <b>${monthCalendarDays ? fmtDuration(monthStudy / monthCalendarDays) : '-'}</b><br>
+          쉬는날 제외 평균 강의시간 <b>${monthActiveDays ? fmtDuration(monthStudy / monthActiveDays) : '-'}</b><br>
+          총 강의 횟수 <b>${monthPages}회</b>
         </div>
       </div>`;
   }
@@ -3661,15 +3680,17 @@ async function renderYearView(){
   let any = false;
   const chartPoints = [];
   for(const year of sorted){
-    let study=0, pages=0, waste=0;
+    let study=0, pages=0, waste=0, calendarDays=0, activeDaysCount=0;
     for(let mo=1; mo<=12; mo++){
       const a = await computeMonthAgg(`${year}-${pad(mo)}`);
       study += a.monthStudy; pages += a.monthPages; waste += a.monthWaste;
+      calendarDays += a.monthCalendarDays || 0;
+      activeDaysCount += a.monthActiveDays || 0;
     }
     chartPoints.push({label:`${year}`, study, pages, waste});
     if(study===0 && pages===0 && waste===0) continue;
     any = true;
-    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">강의시간 <b class="study-color">${fmtDuration(study)}</b><br>강의횟수 <b>${pages}회</b></div></div>` + rows;
+    rows = `<div class="agg-row"><div class="agg-label">${year}년</div><div class="agg-nums">총 강의시간 <b class="study-color">${fmtDuration(study)}</b><br>평균 강의시간 <b>${calendarDays ? fmtDuration(study / calendarDays) : '-'}</b><br>쉬는날 제외 평균 강의시간 <b>${activeDaysCount ? fmtDuration(study / activeDaysCount) : '-'}</b><br>총 강의 횟수 <b>${pages}회</b></div></div>` + rows;
   }
   el.innerHTML = `<div class="summary-title" style="margin:4px 0 10px;color:var(--ink-soft);font-size:13px;">연도별 정리</div>` +
     chartsHtml(chartPoints, chartPoints.filter(p => Number(p.label) < currentYear), '연 평균', '평균은 완료된 전년도까지 계산합니다.') +
