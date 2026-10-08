@@ -43,7 +43,7 @@ a{color:var(--accent)}
 .back-btn:active{transform:scale(.98)}
 .back-btn:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 </style>
-<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="icon" href="data:,">
 </head>
 <body>
 
@@ -305,8 +305,11 @@ a{color:var(--accent)}
       status('저장됨 · ' + new Date().toLocaleTimeString(), 'ok');
     }catch(e){ status('⚠ 저장 오류: ' + e.message, 'bad'); }
     finally{
+      // 저장 중에 또 변경이 있었으면(예: 추가 직후 '사용') 끝난 뒤 한 번 더 저장
+      var again = state.again;
       state.pushing = false;
       state.again = false;
+      if(again) push();
     }
   }
   // 변경 사항은 GitHub에 저장할 준비 상태로 표시합니다. 프롬프트 추가/수정은 아래에서 즉시 push합니다.
@@ -367,6 +370,8 @@ a{color:var(--accent)}
       });
       if(!isA) mk('사용', 'ghost', function(){
         state.data.activeId = p.id; saveNow(); render();
+        // '사용'을 누르면 바로 GitHub에 저장해서 index의 기본 설정값이 되게 함
+        if(state.token) push();
       });
       mk('수정', 'ghost', function(){
         state.editing = p.id;
@@ -383,6 +388,7 @@ a{color:var(--accent)}
         if(state.data.activeId === p.id)
           state.data.activeId = state.data.prompts[0] ? state.data.prompts[0].id : null;
         saveNow(); render();
+        if(state.token) push();
       });
       li.appendChild(txt); li.appendChild(acts); list.appendChild(li);
     });
@@ -499,6 +505,14 @@ a{color:var(--accent)}
     });
   })();
 })();
+</script>
+<script>
+// APK 안에서는 복귀 버튼이 앱의 통합 화면으로 돌아가게 함
+if(location.hostname === "appassets.androidplatform.net"){
+  var bs = document.querySelectorAll(".back-btn");
+  if(bs[0]) bs[0].setAttribute("href", "../all/index.html");
+  for(var i = 1; i < bs.length; i++) bs[i].style.display = "none";
+}
 </script>
 </body>
 </html>
