@@ -366,6 +366,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var fill = $(SV[k].pane).querySelector(".fill");
     fill.innerHTML = "";
     if(NATIVE){
+      fill.appendChild(div("ph", "불러오는 중…"));
       loaded[k] = true;
       try{ window.AiaiNative.load(k, url); }catch(e){}
       reportLayout();
@@ -384,16 +385,47 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function throttled(text){
     var now = Date.now();
     if(now - lastSearch.t < 1500) return true;
-    if(text === lastSearch.text && now - lastSearch.t < 4000) return true;
+    if(text === lastSearch.text && now - lastSearch.t < 10000) return true;
     lastSearch = {t: now, text: text};
     return false;
+  }
+  // ---- 트래픽 줄이기 ----
+  // 1) 지금 화면에 보이는 쪽만 검색 (구글 전용이면 네이버는 안 부르고, 나중에 그 화면으로 바꿀 때 한 번만 불러옴)
+  // 2) 서비스별 최소 간격: 간격 안에 또 검색하면 마지막 검색어만 간격이 지난 뒤 실행 (구글 7초 / 네이버 1.5초)
+  var GAP = {g: 7000, n: 1500}, lastRun = {g: 0, n: 0}, timers = {g: null, n: null}, pending = {g: null, n: null};
+  function visibleKey(k){
+    var b = document.body.classList;
+    if(b.contains("layout-google")) return k === "g";
+    if(b.contains("layout-naver")) return k === "n";
+    return true;
+  }
+  function busy(){ $("goBtn").textContent = (timers.g || timers.n) ? "대기…" : "검색"; }
+  function dispatch(k, text){
+    if(timers[k]){ clearTimeout(timers[k]); timers[k] = null; }
+    var wait = lastRun[k] + GAP[k] - Date.now();
+    if(wait > 0){
+      timers[k] = setTimeout(function(){ timers[k] = null; busy(); lastRun[k] = Date.now(); run(k, text); }, wait);
+      busy();
+      return;
+    }
+    lastRun[k] = Date.now(); run(k, text);
+  }
+  function flushPending(){
+    KEYS.forEach(function(k){
+      if(pending[k] && visibleKey(k)){ var t = pending[k]; pending[k] = null; dispatch(k, t); }
+    });
   }
   function search(){
     var text = q.value.trim();
     if(!text) return;
     if(throttled(text)) return;
     document.body.classList.remove("drawer-open");
-    run("g", text); run("n", text);
+    submitted = true;
+    KEYS.forEach(function(k){
+      if(visibleKey(k)){ pending[k] = null; dispatch(k, text); }
+      else { if(timers[k]){ clearTimeout(timers[k]); timers[k] = null; } pending[k] = text; }
+    });
+    busy();
     keepAwake();
   }
   $("goBtn").addEventListener("click", function(){ var had = q.value.trim(); search(); if(had) hideKb(); });
@@ -444,6 +476,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return true;
   };
   q.addEventListener("input", function(){ autosize(q); });
+
+  // 검색 후 다시 입력창을 누르면(또는 새로 타이핑하면) 이전 검색어를 자동으로 지워 바로 새 검색어를 칠 수 있게 함
+  var submitted = false;
+  function clearIfSubmitted(){ if(!submitted) return; submitted = false; q.value = ""; autosize(q); }
+  q.addEventListener("focus", clearIfSubmitted);
+  q.addEventListener("beforeinput", function(ev){
+    if(submitted && (ev.inputType === "insertText" || ev.inputType === "insertFromPaste")) clearIfSubmitted();
+  });
 
   /* ---------- GitHub에서 설정 불러오기 (읽기 전용 · 수동 갱신) ---------- */
   var REPO = (function(){
@@ -591,6 +631,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     MODES.forEach(function(m){ document.body.classList.toggle("layout-" + m, m === l); });
     Array.prototype.forEach.call($("layoutSeg").querySelectorAll("button"), function(b){ b.classList.toggle("on", b.getAttribute("data-l") === l); });
     try{ localStorage.setItem(LKEY, l); }catch(e){}
+    flushPending();
   }
   Array.prototype.forEach.call($("layoutSeg").querySelectorAll("button"), function(b){
     b.addEventListener("click", function(){ setLayout(b.getAttribute("data-l")); });

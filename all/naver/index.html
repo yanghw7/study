@@ -368,16 +368,29 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function throttled(text){
     var now = Date.now();
     if(now - lastSearch.t < 1500) return true;
-    if(text === lastSearch.text && now - lastSearch.t < 4000) return true;
+    if(text === lastSearch.text && now - lastSearch.t < 10000) return true;
     lastSearch = {t: now, text: text};
     return false;
   }
+  // 서비스에 연달아 요청이 가지 않도록 최소 간격을 두고, 간격 안에 또 검색하면 마지막 검색어만 간격이 지난 뒤 실행(버튼에 "대기…" 표시)
+  var GAP = 1500, lastRunAt = 0, runTimer = null;
+  function busy(){ $("goBtn").textContent = runTimer ? "대기…" : "검색"; }
   function search(){
     var text = q.value.trim();
     if(!text) return;
     if(throttled(text)) return;
     document.body.classList.remove("drawer-open");
-
+    submitted = true;
+    if(runTimer){ clearTimeout(runTimer); runTimer = null; }
+    var wait = lastRunAt + GAP - Date.now();
+    if(wait > 0){
+      runTimer = setTimeout(function(){ runTimer = null; busy(); lastRunAt = Date.now(); run(text); }, wait);
+      busy();
+      return;
+    }
+    lastRunAt = Date.now(); run(text);
+  }
+  function run(text){
     var url = naverAiUrl(buildQuery(text));
     var w = div("fill");
     var fr = document.createElement("iframe");
@@ -387,6 +400,11 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     nt.className = "newtab"; nt.target = "_blank"; nt.rel = "noopener noreferrer"; nt.href = url;
     nt.textContent = "새 탭에서 열기 ↗";
     w.appendChild(nt);
+    // 네이버가 가끔 "잘못된 접근"을 내면(웹 화면 안은 바깥에서 읽을 수 없어 자동 감지 불가) 눌러서 다시 불러오기
+    var rt = document.createElement("a");
+    rt.className = "newtab alt"; rt.href = "#"; rt.textContent = "↻ 다시 불러오기";
+    rt.addEventListener("click", function(ev){ ev.preventDefault(); fr.src = "about:blank"; setTimeout(function(){ fr.src = url; }, 800); });
+    w.appendChild(rt);
     showResult(w);
     keepAwake();
   }
@@ -557,6 +575,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("shiftX").addEventListener("input", liveCrop);
   $("goBtn").addEventListener("click", function(){ var had = q.value.trim(); search(); if(had) hideKb(); });
   q.addEventListener("input", function(){ autosize(q); });
+
+  // 검색 후 다시 입력창을 누르면(또는 새로 타이핑하면) 이전 검색어를 자동으로 지워 바로 새 검색어를 칠 수 있게 함
+  var submitted = false;
+  function clearIfSubmitted(){ if(!submitted) return; submitted = false; q.value = ""; autosize(q); }
+  q.addEventListener("focus", clearIfSubmitted);
+  q.addEventListener("beforeinput", function(ev){
+    if(submitted && (ev.inputType === "insertText" || ev.inputType === "insertFromPaste")) clearIfSubmitted();
+  });
   ed.addEventListener("input", function(){
     if(ed.value.length > MAX_PROMPT) ed.value = ed.value.slice(0, MAX_PROMPT);
     autosize(ed); edCount();
