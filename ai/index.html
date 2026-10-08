@@ -206,35 +206,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </div></div></div>
     </div>
 
-    <div class="acc" data-key="set">
-      <button type="button" class="acc-head" aria-expanded="false">
-        <span class="ico">⚙️</span>
-        <span class="ttl">설정<span class="sub" id="subSet"></span></span>
-        <i class="chev"></i>
-      </button>
-      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
-        <div class="field">
-          <div class="label">검색 결과 표시 방식</div>
-          <select id="mode">
-            <option value="frame">구글 AI 모드 화면 그대로 (확장 프로그램 필요)</option>
-            <option value="api">Gemini API 답변 (API 키 필요)</option>
-          </select>
-          <small>화면 그대로 보기는 PC 크롬/엣지에 확장 프로그램을 설치해야 해요. 모바일에서는 Gemini API 방식을 쓰세요.</small>
-        </div>
-        <div class="field">
-          <div class="label">Gemini API 키</div>
-          <form onsubmit="return false" autocomplete="off"><input type="password" id="key" placeholder="AIza..." autocomplete="off"></form>
-          <small>관리자 페이지의 설정은 <b>갱신</b> 버튼을 눌렀을 때만 불러와져요. 여기서 바꾸면 이 기기에만 임시 적용돼요.</small>
-        </div>
-        <div class="field">
-          <div class="label">모델</div>
-          <input type="text" id="model" placeholder="gemini-2.0-flash">
-          <small>모델 이름이 바뀌어 오류가 나면 여기만 최신 이름으로 고치세요.</small>
-        </div>
-        <div class="note">이 기기에서만 임시 적용됩니다. 모든 기기에 반영하려면 관리자 페이지에서 저장하세요.</div>
-      </div></div></div>
-    </div>
-
     <div class="spacer"></div>
 
     <a href="./admin.html" class="acc admin-link">
@@ -259,11 +230,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     "다음 질문에 대해 핵심부터 간결하게, 근거와 함께 한국어로 답해줘.",
     "초등학생도 이해할 수 있게 쉽게 설명해줘."
   ];
-  var DEFAULT_MODEL = "gemini-2.0-flash";
-  var LOCAL_KEY = "aimode_gemini_key_v1";
   var MAX_PROMPT = 3500;
-  var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  var DEFAULT_MODE = IS_MOBILE ? "api" : "frame";
   var mq = window.matchMedia("(max-width:720px)");
 
   var $ = function(id){ return document.getElementById(id); };
@@ -293,10 +260,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return s;
   }
   function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
-  function loadLocalKey(){ try{ return localStorage.getItem(LOCAL_KEY) || ''; }catch(e){ return ''; } }
   function loadCfg(){
-    try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ c.mode = c.mode || DEFAULT_MODE; c.key = loadLocalKey(); if(c.cropTop == null) c.cropTop = 0; if(c.cropBottom == null) c.cropBottom = 100; if(c.cropLeft == null) c.cropLeft = 0; if(c.cropRight == null) c.cropRight = 0; if(c.shiftX == null) c.shiftX = 0; return c; } }catch(e){}
-    return {key: loadLocalKey(), model: DEFAULT_MODEL, mode: DEFAULT_MODE, cropTop: 0, cropBottom: 100, cropLeft: 0, cropRight: 0, shiftX: 0};
+    try{ var c = JSON.parse(localStorage.getItem(CFG)); if(c){ delete c.mode; delete c.key; delete c.model; if(c.cropTop == null) c.cropTop = 0; if(c.cropBottom == null) c.cropBottom = 100; if(c.cropLeft == null) c.cropLeft = 0; if(c.cropRight == null) c.cropRight = 0; if(c.shiftX == null) c.shiftX = 0; return c; } }catch(e){}
+    return {cropTop: 0, cropBottom: 100, cropLeft: 0, cropRight: 0, shiftX: 0};
   }
   function saveCfg(){ try{ localStorage.setItem(CFG, JSON.stringify(cfg)); }catch(e){} }
   function loadUi(){
@@ -392,81 +358,21 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function showResult(node){ result.hidden = false; result.innerHTML = ""; result.appendChild(node); }
   function div(cls, html){ var d = document.createElement("div"); d.className = cls; if(html != null) d.innerHTML = html; return d; }
 
-  async function search(){
+  function search(){
     var text = q.value.trim();
     if(!text) return;
     document.body.classList.remove("drawer-open");
 
-    if(cfg.mode !== "api"){
-      var url = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(buildQuery(text));
-      var w = div("fill");
-      var fr = document.createElement("iframe");
-      fr.className = "frame"; fr.referrerPolicy = "no-referrer"; fr.src = url; fr.title = "Google AI 모드"; applyCrop(fr);
-      w.appendChild(fr);
-      var nt = document.createElement("a");
-      nt.className = "newtab"; nt.target = "_blank"; nt.rel = "noopener noreferrer"; nt.href = url;
-      nt.textContent = "새 탭에서 열기 ↗";
-      w.appendChild(nt);
-      var ab = document.createElement("button");
-      ab.type = "button"; ab.className = "newtab alt"; ab.textContent = "화면이 안 나오면: API로 검색";
-      ab.addEventListener("click", function(){
-        cfg.mode = "api"; saveCfg(); $("mode").value = "api"; renderSet(); search();
-      });
-      w.appendChild(ab);
-      showResult(w);
-      return;
-    }
-
-    if(!cfg.key){
-      showResult(div("err", "아직 Gemini API 키가 없어요. 관리자 페이지에서 설정해 주세요."));
-      return;
-    }
-    var full = buildQuery(text);
-    goBtn.disabled = true; goBtn.textContent = "검색 중…";
-    showResult(div("loading", "검색 중입니다…"));
-    try{
-      var model = (cfg.model || DEFAULT_MODEL).trim();
-      var res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-        method: "POST",
-        headers: {"Content-Type": "application/json", "x-goog-api-key": cfg.key},
-        body: JSON.stringify({contents: [{role: "user", parts: [{text: full}]}], tools: [{google_search: {}}]})
-      });
-      var data = await res.json();
-      if(!res.ok) throw new Error((data.error && data.error.message) || ("요청 실패 (" + res.status + ")"));
-      var cand = data.candidates && data.candidates[0];
-      var parts = (cand && cand.content && cand.content.parts) || [];
-      var answer = parts.filter(function(p){ return p.text && !p.thought; }).map(function(p){ return p.text; }).join("");
-      if(!answer) throw new Error("응답이 비어 있어요. 다른 표현으로 다시 시도해 보세요.");
-
-      var wrap = document.createElement("div");
-      var rq = div("res-q"); rq.textContent = "Q. " + text; wrap.appendChild(rq);
-      wrap.appendChild(div("answer", md(answer)));
-
-      var chunks = (cand.groundingMetadata && cand.groundingMetadata.groundingChunks) || [];
-      var seen = {}, links = [];
-      chunks.forEach(function(c){
-        if(c.web && /^https?:\/\//.test(c.web.uri) && !seen[c.web.uri]){ seen[c.web.uri] = 1; links.push(c.web); }
-      });
-      if(links.length){
-        var src = div("sources"); src.appendChild(div("label", "출처"));
-        links.forEach(function(wl){
-          var a = document.createElement("a");
-          a.href = wl.uri; a.target = "_blank"; a.rel = "noopener noreferrer";
-          a.textContent = wl.title || wl.uri; src.appendChild(a);
-        });
-        wrap.appendChild(src);
-      }
-      var o = document.createElement("a");
-      o.className = "open-link"; o.target = "_blank"; o.rel = "noopener noreferrer";
-      o.href = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(full);
-      o.textContent = "Google AI 모드에서 같은 질문 열기 ↗";
-      wrap.appendChild(o);
-      showResult(wrap);
-    }catch(err){
-      showResult(div("err", "오류: " + (err && err.message ? err.message : err)));
-    }finally{
-      goBtn.disabled = false; goBtn.textContent = "검색";
-    }
+    var url = "https://www.google.com/search?udm=50&q=" + encodeURIComponent(buildQuery(text));
+    var w = div("fill");
+    var fr = document.createElement("iframe");
+    fr.className = "frame"; fr.referrerPolicy = "no-referrer"; fr.src = url; fr.title = "Google AI 모드"; applyCrop(fr);
+    w.appendChild(fr);
+    var nt = document.createElement("a");
+    nt.className = "newtab"; nt.target = "_blank"; nt.rel = "noopener noreferrer"; nt.href = url;
+    nt.textContent = "새 탭에서 열기 ↗";
+    w.appendChild(nt);
+    showResult(w);
   }
 
   /* ---------- GitHub에서 설정 불러오기 (읽기 전용 · 수동 갱신) ---------- */
@@ -497,15 +403,13 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       var ps = d.prompts.filter(function(p){ return p && typeof p.id === "string" && typeof p.text === "string"; });
       state.prompts = ps; state.activeId = d.activeId; state = fix(state); persist();
     }
-    if(d.model) cfg.model = d.model;
-    cfg.key = loadLocalKey();
     if(typeof d.cropTop === "number") cfg.cropTop = d.cropTop;
     if(typeof d.cropBottom === "number") cfg.cropBottom = d.cropBottom;
     if(typeof d.cropLeft === "number") cfg.cropLeft = d.cropLeft;
     if(typeof d.cropRight === "number") cfg.cropRight = d.cropRight;
     if(typeof d.shiftX === "number") cfg.shiftX = d.shiftX;
     saveCfg();
-    $("model").value = cfg.model; $("key").value = cfg.key || ""; $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom; $("cropLeft").value = cfg.cropLeft; $("cropRight").value = cfg.cropRight; $("shiftX").value = cfg.shiftX;
+    $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom; $("cropLeft").value = cfg.cropLeft; $("cropRight").value = cfg.cropRight; $("shiftX").value = cfg.shiftX;
     var f = document.querySelector(".frame"); if(f) applyCrop(f);
     resetEditor(); render();
   }
@@ -535,7 +439,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         syncMsg = "✓ GitHub 동기화 " + new Date().toLocaleTimeString();
         return JSON.parse(b64dec(j.content || ""));
       }
-      if(r.status === 404){ syncMsg = "⚠ save/settings.json 없음 (관리자에서 저장 안 됨)"; return null; }
+      if(r.status === 404){ syncMsg = "⚠ " + (REPO ? REPO.repo + "/" + REPO.path : "save/settings.json") + " 없음 (관리자에서 저장 안 됨)"; return null; }
       why += " / GitHub " + r.status;
       if((r.status === 403 || r.status === 429) && r.headers.get("x-ratelimit-remaining") === "0") why += " 요청 한도 초과";
     }catch(e){ why += " / 네트워크 오류"; }
@@ -596,8 +500,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     });
   }
   function renderCrop(){ $("subCrop").textContent = "위 " + cfg.cropTop + " · 아래 " + cfg.cropBottom + " · 왼쪽 " + cfg.cropLeft + " · 오른쪽 " + cfg.cropRight + " px" + (cfg.shiftX ? " · 이동 " + cfg.shiftX : ""); }
-  function renderSet(){ $("subSet").textContent = cfg.mode === "api" ? "Gemini API 방식" : "구글 화면 그대로"; }
-  function render(){ renderCurrent(); renderList(); renderSet(); renderCrop(); }
+  function render(){ renderCurrent(); renderList(); renderCrop(); }
 
   edSave.addEventListener("click", function(){
     var v = ed.value.trim().slice(0, MAX_PROMPT); if(!v) return;
@@ -607,9 +510,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   });
   edCancel.addEventListener("click", resetEditor);
 
-  $("key").value = cfg.key || "";
-  $("model").value = cfg.model || DEFAULT_MODEL;
-  $("mode").value = cfg.mode || DEFAULT_MODE;
   $("cropTop").value = cfg.cropTop; $("cropBottom").value = cfg.cropBottom; $("cropLeft").value = cfg.cropLeft; $("cropRight").value = cfg.cropRight; $("shiftX").value = cfg.shiftX;
   function liveCrop(){
     cfg.cropTop = num($("cropTop")); cfg.cropBottom = num($("cropBottom"));
@@ -624,10 +524,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("cropLeft").addEventListener("input", liveCrop);
   $("cropRight").addEventListener("input", liveCrop);
   $("shiftX").addEventListener("input", liveCrop);
-
-  $("key").addEventListener("change", function(){ cfg.key = $("key").value.trim(); saveCfg(); });
-  $("model").addEventListener("change", function(){ cfg.model = $("model").value.trim() || DEFAULT_MODEL; saveCfg(); });
-  $("mode").addEventListener("change", function(){ cfg.mode = $("mode").value; saveCfg(); renderSet(); });
 
   $("f").addEventListener("submit", function(ev){ ev.preventDefault(); search(); });
   q.addEventListener("input", function(){ autosize(q); });
