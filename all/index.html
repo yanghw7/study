@@ -99,16 +99,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
 /* ===== 보기 방식 (탭 / 상하 / 좌우) ===== */
 .tools{flex:none;display:flex;align-items:center;padding:0 0 8px}
-.seg{display:inline-flex;gap:8px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
 .seg button{padding:6px 16px;font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--border)}
 .seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
-#tabs{flex:none;display:none;gap:6px;padding-bottom:8px}
-.layout-tab #tabs{display:flex}
-#tabs button{flex:1;padding:8px 0;font-size:14px;font-weight:600;background:var(--card);color:var(--muted);border:1px solid var(--border)}
-#tabs button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 
-#panes{flex:1;min-height:0;position:relative}
+#panes{flex:1;min-height:0;position:relative;display:grid;grid-template-rows:1fr;grid-template-columns:1fr;gap:8px}
 .pane{display:flex;flex-direction:column;min-height:0;min-width:0}
 .phead{flex:none;font-size:12px;font-weight:600;color:var(--muted);padding:0 4px 4px}
 .fill{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--border);border-radius:12px;background:var(--card)}
@@ -118,15 +114,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .newtab:hover{opacity:1;border-color:var(--accent)}
 
 /* 탭: 두 패널을 겹쳐 두고 하나만 보이게 (둘 다 계속 로딩됨) */
-.layout-tab .phead{display:none}
-.layout-tab .pane{position:absolute;inset:0;visibility:hidden;pointer-events:none}
-.layout-tab .pane.on{visibility:visible;pointer-events:auto}
-/* 분할: 상하 / 좌우 */
-.layout-split #panes{display:grid;grid-template-rows:1fr 1fr;gap:8px}
-.layout-side #panes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* 전용: 한쪽만 전체 화면 · 분할: 상하 / 좌우 */
+.layout-google #paneN,.layout-naver #paneG{display:none}
+.layout-google .phead,.layout-naver .phead{display:none}
+.layout-split #panes{grid-template-rows:1fr 1fr}
+.layout-side #panes{grid-template-columns:1fr 1fr}
 </style>
 </head>
-<body class="layout-tab">
+<body class="layout-split">
 
 <!-- 상단 검색창 -->
 <div class="topbar">
@@ -221,17 +216,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   <main>
     <div class="tools">
       <div class="seg" id="layoutSeg">
-        <button type="button" data-l="tab">탭</button>
-        <button type="button" data-l="split">상하</button>
-        <button type="button" data-l="side">좌우</button>
+        <button type="button" data-l="google">구글 전용</button>
+        <button type="button" data-l="naver">네이버 전용</button>
+        <button type="button" data-l="side">좌우 분할</button>
+        <button type="button" data-l="split">상하 분할</button>
       </div>
     </div>
-    <div id="tabs">
-      <button type="button" data-t="g" class="on">구글 AI</button>
-      <button type="button" data-t="n">네이버 AI</button>
-    </div>
     <div id="panes">
-      <div class="pane on" id="paneG"><div class="phead">구글 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
+      <div class="pane" id="paneG"><div class="phead">구글 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
       <div class="pane" id="paneN"><div class="phead">네이버 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
     </div>
   </main>
@@ -527,31 +519,20 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     autosize(ed); edCount();
   });
 
-  /* ---------- 보기 방식: 탭 / 상하 / 좌우 ---------- */
-  var curTab = "g";
-  function setTab(t){
-    curTab = t;
-    $("paneG").classList.toggle("on", t === "g");
-    $("paneN").classList.toggle("on", t === "n");
-    Array.prototype.forEach.call($("tabs").querySelectorAll("button"), function(b){ b.classList.toggle("on", b.getAttribute("data-t") === t); });
-  }
+  /* ---------- 보기 방식: 구글 전용 / 네이버 전용 / 상하 분할 / 좌우 분할 ---------- */
+  var MODES = ["google", "naver", "split", "side"];
   function setLayout(l){
-    document.body.classList.toggle("layout-tab", l === "tab");
-    document.body.classList.toggle("layout-split", l === "split");
-    document.body.classList.toggle("layout-side", l === "side");
+    if(MODES.indexOf(l) < 0) l = "split";
+    MODES.forEach(function(m){ document.body.classList.toggle("layout-" + m, m === l); });
     Array.prototype.forEach.call($("layoutSeg").querySelectorAll("button"), function(b){ b.classList.toggle("on", b.getAttribute("data-l") === l); });
-    if(l !== "tab"){ $("paneG").classList.add("on"); $("paneN").classList.add("on"); }
-    else setTab(curTab);
     try{ localStorage.setItem(LKEY, l); }catch(e){}
   }
   Array.prototype.forEach.call($("layoutSeg").querySelectorAll("button"), function(b){
     b.addEventListener("click", function(){ setLayout(b.getAttribute("data-l")); });
   });
-  Array.prototype.forEach.call($("tabs").querySelectorAll("button"), function(b){
-    b.addEventListener("click", function(){ setTab(b.getAttribute("data-t")); });
-  });
   var savedL = null; try{ savedL = localStorage.getItem(LKEY); }catch(e){}
-  setLayout(savedL === "split" || savedL === "side" ? savedL : "tab");
+  if(savedL === "tab") savedL = "google";          // 예전 저장값 호환
+  setLayout(MODES.indexOf(savedL) >= 0 ? savedL : "split");
 
   /* ---------- 화면 꺼짐 방지 (Wake Lock) ---------- */
   var wakeLock = null, wantAwake = false;
