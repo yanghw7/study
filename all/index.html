@@ -34,6 +34,7 @@ a{color:var(--accent)}
 #f{flex:1;min-width:0;display:flex;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:3px 4px 3px 16px;align-items:flex-start}
 #f:focus-within{border-color:var(--accent)}
 .go{flex:none;background:var(--accent);color:#fff;font-weight:600;font-size:15px;padding:9px 18px;margin-top:2px}
+.nl{flex:none;background:#fff;color:#555;border:1px solid #d0d0d8;font-weight:600;font-size:14px;line-height:1.2;padding:9px 16px;margin-top:2px;white-space:nowrap}
 
 /* ===== 레이아웃 ===== */
 .layout{flex:1;min-height:0;display:flex;position:relative}
@@ -130,10 +131,11 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 <div class="topbar">
   <button type="button" class="menu-btn" id="menuBtn" aria-label="메뉴 열기/닫기" title="메뉴 열기/닫기">☰</button>
   <button type="button" class="sync-btn" id="syncBtn" aria-label="GitHub 설정 갱신" title="GitHub에서 프롬프트와 설정 다시 받아오기">갱신</button>
-  <form id="f">
-    <textarea id="q" rows="1" placeholder="검색할 내용을 입력하세요 (구글·네이버 동시 검색 · Enter: 검색 / Shift+Enter: 줄바꿈)" autofocus></textarea>
-    <button type="submit" class="go" id="goBtn">검색</button>
-  </form>
+  <div id="f">
+    <textarea id="q" rows="1" autofocus></textarea>
+    <button type="button" class="nl" id="nlBtn" aria-label="줄바꿈" title="줄바꿈">줄바꿈</button>
+    <button type="button" class="go" id="goBtn">검색</button>
+  </div>
 </div>
 
 <div class="layout">
@@ -377,22 +379,70 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     a.className = "newtab"; a.target = "_blank"; a.rel = "noopener noreferrer"; a.href = url; a.textContent = "새 탭에서 열기 ↗";
     fill.appendChild(a);
   }
+  // 같은 검색이 순식간에 여러 번 나가면 구글이 "비정상 트래픽"으로 보고 캡차를 띄우므로, 연타·중복 검색은 걸러 줌
+  var lastSearch = {t: 0, text: ""};
+  function throttled(text){
+    var now = Date.now();
+    if(now - lastSearch.t < 1500) return true;
+    if(text === lastSearch.text && now - lastSearch.t < 4000) return true;
+    lastSearch = {t: now, text: text};
+    return false;
+  }
   function search(){
     var text = q.value.trim();
     if(!text) return;
+    if(throttled(text)) return;
     document.body.classList.remove("drawer-open");
     run("g", text); run("n", text);
     keepAwake();
   }
-  $("f").addEventListener("submit", function(ev){ ev.preventDefault(); var had = q.value.trim(); search(); if(had) hideKb(); });
+  $("goBtn").addEventListener("click", function(){ var had = q.value.trim(); search(); if(had) hideKb(); });
   // 엔터(Shift+Enter 제외)로 검색했을 때만 모바일 키보드를 내림
   function hideKb(){
     try{ q.blur(); }catch(e){}
     if(window.AiaiNative){ try{ window.AiaiNative.hideKeyboard(); }catch(e){} }
   }
+  // ---- 줄바꿈(Shift+Enter) / 검색(Enter) ----
+  // 안드로이드 소프트 키보드(삼성 등)는 Shift 상태를 keydown의 shiftKey로 알려주지 않는 경우가 많아서
+  // keydown · keyup · beforeinput(insertLineBreak) 세 경로를 모두 처리하고, 확실한 ↵ 버튼도 따로 둡니다.
+  var shiftHeld = false;
+  function insertNL(){
+    var s = q.selectionStart, e = q.selectionEnd;
+    if(s == null){ s = e = q.value.length; }
+    q.setRangeText("\n", s, e, "end");
+    q.dispatchEvent(new Event("input", {bubbles:true}));
+  }
+  function enterSearch(){ var had = q.value.trim(); search(); if(had) hideKb(); }
+  function isShift(ev){ return !!(ev.shiftKey || shiftHeld || (ev.getModifierState && ev.getModifierState("Shift"))); }
   q.addEventListener("keydown", function(ev){
-    if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); var had = q.value.trim(); search(); if(had) hideKb(); }
+    if(ev.key === "Shift" || ev.keyCode === 16){ shiftHeld = true; return; }
+    if(!(ev.key === "Enter" || ev.keyCode === 13)) return;
+    if(isShift(ev)){ ev.preventDefault(); insertNL(); return; }
+    if(ev.isComposing) return;
+    ev.preventDefault(); enterSearch();
   });
+  q.addEventListener("keyup", function(ev){ if(ev.key === "Shift" || ev.keyCode === 16) shiftHeld = false; });
+  q.addEventListener("blur", function(){ shiftHeld = false; });
+  // 키보드가 keydown 없이 "줄바꿈 입력"만 보내는 경우(삼성 키보드 등)
+  q.addEventListener("beforeinput", function(ev){
+    if(ev.inputType !== "insertLineBreak" && ev.inputType !== "insertParagraph") return;
+    ev.preventDefault();
+    if(shiftHeld) insertNL(); else enterSearch();
+  });
+  // 줄바꿈 버튼: 키보드 Shift 상태와 상관없이 항상 줄바꿈
+  var nlBtn = $("nlBtn");
+  nlBtn.addEventListener("pointerdown", function(ev){ ev.preventDefault(); }); // 키보드가 내려가지 않게
+  nlBtn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+  nlBtn.addEventListener("click", function(){ q.focus(); insertNL(); autosize(q); });
+  // APK 앱이 Shift+Enter를 감지했을 때 부르는 함수 (아무 입력칸에서나 줄바꿈)
+  window.__aiaiNewline = function(){
+    var e = document.activeElement;
+    if(!e || e.tagName !== "TEXTAREA") return false;
+    var s = e.selectionStart, t = e.selectionEnd;
+    e.setRangeText("\n", s, t, "end");
+    e.dispatchEvent(new Event("input", {bubbles:true}));
+    return true;
+  };
   q.addEventListener("input", function(){ autosize(q); });
 
   /* ---------- GitHub에서 설정 불러오기 (읽기 전용 · 수동 갱신) ---------- */
