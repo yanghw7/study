@@ -1,7 +1,11 @@
 {
   "v": 1,
-  "updated": 1791454168565,
+  "updated": 1791456004032,
   "prompts": [
+    {
+      "id": "muzenfeldbecs",
+      "text": "돼"
+    },
     {
       "id": "muzaj367bxmd9",
       "text": "보험관련 알기쉽게 설명해줘"
