@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "AI 모드 프레임 허용 (개인용)",
+  "version": "1.5",
+  "description": "AI 모드 프레임 허용(Google·네이버) 및 Google AI Mode의 특정 버튼 숨김",
+  "permissions": [
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://*.google.com/*",
+    "https://*.google.co.kr/*",
+    "https://*.naver.com/*",
+    "https://yanghw7.github.io/*",
+    "file:///*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.google.com/*",
+        "https://www.google.co.kr/*"
+      ],
+      "js": [
+        "hide_contents.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

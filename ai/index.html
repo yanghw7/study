@@ -208,7 +208,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
     <div class="spacer"></div>
 
-    <a href="https://yanghw7.github.io/study/save/admin" class="acc admin-link">
+    <a href="./admin.html" class="acc admin-link">
       <span class="ico">🛠️</span>
       <span class="ttl">관리자 페이지<span class="sub">모든 기기에 설정 반영</span></span>
     </a>
@@ -434,7 +434,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var why = "";
     // 1) 같은 사이트(GitHub Pages)의 save/settings.json: 사용자가 [갱신]을 눌렀을 때만 확인합니다.
     try{
-      var r2 = await fetch(new URL("/study/save/settings.json", location.origin).href + "?t=" + Date.now(), {cache: "no-store"});
+      var r2 = await fetch(new URL("./save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
       if(r2.ok){
         var d2 = await r2.json();
         syncMsg = "✓ 동기화 " + new Date().toLocaleTimeString();
@@ -541,14 +541,19 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("cropRight").addEventListener("input", liveCrop);
   $("shiftX").addEventListener("input", liveCrop);
 
-  $("f").addEventListener("submit", function(ev){ ev.preventDefault(); search(); });
+  $("f").addEventListener("submit", function(ev){ ev.preventDefault(); var had = q.value.trim(); search(); if(had) hideKb(); });
   q.addEventListener("input", function(){ autosize(q); });
   ed.addEventListener("input", function(){
     if(ed.value.length > MAX_PROMPT) ed.value = ed.value.slice(0, MAX_PROMPT);
     autosize(ed); edCount();
   });
+  // 엔터(Shift+Enter 제외)로 검색했을 때만 모바일 키보드를 내림
+  function hideKb(){
+    try{ q.blur(); }catch(e){}
+    if(window.AiaiNative){ try{ window.AiaiNative.hideKeyboard(); }catch(e){} }
+  }
   q.addEventListener("keydown", function(ev){
-    if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); search(); }
+    if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); var had = q.value.trim(); search(); if(had) hideKb(); }
   });
 
   edCount();

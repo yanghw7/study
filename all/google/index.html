@@ -541,14 +541,19 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   $("cropRight").addEventListener("input", liveCrop);
   $("shiftX").addEventListener("input", liveCrop);
 
-  $("f").addEventListener("submit", function(ev){ ev.preventDefault(); search(); });
+  $("f").addEventListener("submit", function(ev){ ev.preventDefault(); var had = q.value.trim(); search(); if(had) hideKb(); });
   q.addEventListener("input", function(){ autosize(q); });
   ed.addEventListener("input", function(){
     if(ed.value.length > MAX_PROMPT) ed.value = ed.value.slice(0, MAX_PROMPT);
     autosize(ed); edCount();
   });
+  // 엔터(Shift+Enter 제외)로 검색했을 때만 모바일 키보드를 내림
+  function hideKb(){
+    try{ q.blur(); }catch(e){}
+    if(window.AiaiNative){ try{ window.AiaiNative.hideKeyboard(); }catch(e){} }
+  }
   q.addEventListener("keydown", function(ev){
-    if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); search(); }
+    if(ev.key === "Enter" && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); var had = q.value.trim(); search(); if(had) hideKb(); }
   });
 
   edCount();
