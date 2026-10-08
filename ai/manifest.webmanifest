@@ -1,7 +1,7 @@
 {
-  "name": "AI 검색",
-  "short_name": "AI 검색",
-  "description": "프롬프트를 자동으로 붙여 검색하는 AI 검색 앱",
+  "name": "구글 AI 검색",
+  "short_name": "구글 AI 검색",
+  "description": "프롬프트를 자동으로 붙여 검색하는 구글 AI 검색 앱",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
