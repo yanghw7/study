@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791393815273,
+  "updated": 1791428389731,
   "prompts": [
     {
       "id": "muydmi94pt4q8",
@@ -11,7 +11,7 @@
   "model": "gemini-2.0-flash",
   "cropTop": 0,
   "cropBottom": 100,
-  "cropLeft": 20,
+  "cropLeft": 0,
   "cropRight": 0,
   "shiftX": 0
 }
