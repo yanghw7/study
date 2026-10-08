@@ -4546,7 +4546,7 @@ document.addEventListener('visibilitychange',()=>{
  const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
  const write=v=>localStorage.setItem(KEY,JSON.stringify(v)); const pad=n=>String(n).padStart(2,'0');
  function stopRing(){clearInterval(vibeTimer);vibeTimer=null;try{navigator.vibrate?.(0)}catch(e){};releaseWake();try{swReg&&swReg.getNotifications({tag:'record-journal-alarm'}).then(ns=>ns.forEach(n=>n.close()))}catch(e){};const b=$('#alarmStop');if(b){b.classList.remove('show');b.hidden=true;b.style.display='none'}}
- function resetAlarm(){clearTimeout(timer);clearInterval(watch);timer=null;watch=null;stopRing();write({enabled:false,ringing:false,due:null});try{native()?.cancelQuiet?.()}catch(e){};$('#alarmHours').value='0';$('#alarmMinutes').value='0';$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='';}
+ function resetAlarm(){clearTimeout(timer);clearInterval(watch);timer=null;watch=null;stopRing();write({enabled:false,ringing:false,due:null});try{native()?.cancelQuiet?.()}catch(e){};$('#alarmHours').value='';$('#alarmMinutes').value='';$('#alarmStart').textContent='시작';$('#alarmStatus').textContent='';}
  function fmt(t){const d=new Date(t),ap=d.getHours()<12?'오전':'오후',h=d.getHours()%12||12;return `${ap} ${h}시 ${pad(d.getMinutes())}분`}
  function fmtSet(t){return `⏰️ ${fmt(t)} 알람이 울릴 예정입니다 !`}
  function ui(a){if(!a?.ringing){const b=$('#alarmStop');b.classList.remove('show');b.hidden=true;b.style.display='none';}if(a?.enabled){$('#alarmStart').textContent='알람 중';$('#alarmStatus').textContent=fmtSet(a.due)}else{$('#alarmStart').textContent='시작';updatePreview()}}
