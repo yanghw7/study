@@ -124,14 +124,13 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .sources{margin-top:12px}
 .sources a{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border:1px solid var(--border);border-radius:999px;font-size:13px;text-decoration:none;color:var(--fg);background:var(--bg)}
 .open-link{display:inline-block;margin-top:6px;font-size:13px}
-/* 왼쪽 메뉴는 통합검색(부모) 페이지에서 관리 */
-aside,.backdrop{display:none !important}
 </style>
 </head>
 <body>
 
 <!-- 상단 검색창 -->
 <div class="topbar">
+  <button type="button" class="menu-btn" id="menuBtn" aria-label="메뉴 열기/닫기" title="메뉴 열기/닫기">☰</button>
   <button type="button" class="sync-btn" id="syncBtn" aria-label="GitHub 설정 갱신" title="GitHub에서 프롬프트와 설정 다시 받아오기">갱신</button>
   <form id="f">
     <textarea id="q" rows="1" placeholder="검색할 내용을 입력하세요 (Enter: 검색 / Shift+Enter: 줄바꿈)" autofocus></textarea>
@@ -292,8 +291,7 @@ aside,.backdrop{display:none !important}
     });
   });
   function applySide(){ document.body.classList.toggle("side-hidden", !ui.side); }
-  var menuBtn = $("menuBtn");  // 메뉴(☰)는 통합검색 페이지로 이동 — 여기서는 제거됨
-  if(menuBtn) menuBtn.addEventListener("click", function(){
+  $("menuBtn").addEventListener("click", function(){
     if(mq.matches) document.body.classList.toggle("drawer-open");
     else { ui.side = !ui.side; saveUi(); applySide(); }
   });
@@ -403,7 +401,7 @@ aside,.backdrop{display:none !important}
     if(/\.github\.io$/i.test(host)){
       var owner = host.split(".")[0], repo = host;
       if(parts.length){ repo = parts[0]; }
-      return {owner: owner, repo: "study", path: "save/settings.json"}; // 설정은 study 저장소 save/ 에 있음
+      return {owner: owner, repo: repo, path: "save/settings.json"};
     }
     // 로컬 개발 (localhost / 127.0.0.1 / file://)
     if(host === "localhost" || host === "127.0.0.1" || location.protocol === "file:"){
@@ -439,7 +437,7 @@ aside,.backdrop{display:none !important}
     var why = "";
     // 1) 같은 사이트(GitHub Pages)의 ai/save/settings.json (ai 앱과 설정 공유): 사용자가 [갱신]을 눌렀을 때만 확인합니다.
     try{
-      var r2 = await fetch(new URL("/study/save/settings.json", location.origin).href + "?t=" + Date.now(), {cache: "no-store"});
+      var r2 = await fetch(new URL("../ai/save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
       if(r2.ok){
         var d2 = await r2.json();
         syncMsg = "✓ 동기화 " + new Date().toLocaleTimeString();
