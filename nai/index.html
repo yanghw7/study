@@ -208,7 +208,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
     <div class="spacer"></div>
 
-    <a href="./admin.html" class="acc admin-link">
+    <a href="https://yanghw7.github.io/study/save/admin" class="acc admin-link">
       <span class="ico">🛠️</span>
       <span class="ttl">관리자 페이지<span class="sub">모든 기기에 설정 반영</span></span>
     </a>
@@ -437,7 +437,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var why = "";
     // 1) 같은 사이트(GitHub Pages)의 ai/save/settings.json (ai 앱과 설정 공유): 사용자가 [갱신]을 눌렀을 때만 확인합니다.
     try{
-      var r2 = await fetch(new URL("../ai/save/settings.json", location.href).href + "?t=" + Date.now(), {cache: "no-store"});
+      var r2 = await fetch(new URL("/study/save/settings.json", location.origin).href + "?t=" + Date.now(), {cache: "no-store"});
       if(r2.ok){
         var d2 = await r2.json();
         syncMsg = "✓ 동기화 " + new Date().toLocaleTimeString();
