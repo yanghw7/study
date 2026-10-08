@@ -427,15 +427,7 @@ a{color:var(--accent)}
 
   var MAX_PROMPT = 3500;
   function edCount(){ $('edCount').textContent = $('ed').value.length + ' / ' + MAX_PROMPT + '자 (공백 포함)'; }
-  // 프롬프트 추가/수정 입력창에서는 '/' 문자를 입력할 수 없게 함
-  $('ed').addEventListener('keydown', function(e){
-    if(e.key === '/') e.preventDefault();
-  });
-  $('ed').addEventListener('beforeinput', function(e){
-    if(typeof e.data === 'string' && e.data.indexOf('/') !== -1) e.preventDefault();
-  });
   $('ed').addEventListener('input', function(){
-    this.value = this.value.replace(/\//g, '');
     if(this.value.length > MAX_PROMPT) this.value = this.value.slice(0, MAX_PROMPT);
     edCount();
   });
