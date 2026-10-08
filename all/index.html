@@ -231,6 +231,10 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
 <script>
 (function(){
+  // APK(안드로이드 앱) 안에서는 구글·네이버 화면을 iframe 대신 앱의 진짜 웹뷰로 띄웁니다. (iframe 차단 오류 방지)
+  var NATIVE = !!window.AiaiNative;
+  var loaded = {g: false, n: false};
+  var SITE_SETTINGS = /\.github\.io$/i.test(location.hostname) ? new URL("/study/save/settings.json", location.origin).href : "https://yanghw7.github.io/study/save/settings.json";
   var NAVER = "https://m.search.naver.com/search.naver?ssc=tab.m_ait.all&sm=mtb_jum&dtm_source=search&dtm_medium=tab";
   var MAX_PROMPT = 3500;
   var UIKEY = "uni_ui_v1", LKEY = "uni_layout_v1", ETAG_KEY = "uni_etag_v1";
@@ -342,7 +346,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var sxv = parseInt($("shiftX").value, 10); c.shiftX = isNaN(sxv) ? 0 : Math.max(-500, Math.min(500, sxv));
     saveCfg(cur);
     KEYS.forEach(function(k){ var f = $(SV[k].pane).querySelector(".frame"); if(f) applyCrop(f, c); });
-    renderCrop();
+    renderCrop(); reportLayout();
   }
   ["cropTop", "cropBottom", "cropLeft", "cropRight", "shiftX"].forEach(function(id){ $(id).addEventListener("input", liveCrop); });
 
@@ -356,6 +360,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var url = SV[k].url(buildQuery(text, k));
     var fill = $(SV[k].pane).querySelector(".fill");
     fill.innerHTML = "";
+    if(NATIVE){
+      loaded[k] = true;
+      try{ window.AiaiNative.load(k, url); }catch(e){}
+      reportLayout();
+      return;
+    }
     var fr = document.createElement("iframe");
     fr.className = "frame"; fr.referrerPolicy = "no-referrer"; fr.src = url; fr.title = SV[k].name;
     applyCrop(fr, SV[k].cfg);
@@ -379,16 +389,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
   /* ---------- GitHub에서 설정 불러오기 (읽기 전용 · 수동 갱신) ---------- */
   var REPO = (function(){
-    var host = location.hostname, parts = location.pathname.split("/").filter(Boolean);
-    if(/\.github\.io$/i.test(host)){
-      var owner = host.split(".")[0], repo = host;
-      if(parts.length){ repo = parts[0]; }
-      return {owner: owner, repo: "study", path: "save/settings.json"}; // 설정은 study 저장소 save/ 에 있음
-    }
-    if(host === "localhost" || host === "127.0.0.1" || location.protocol === "file:"){
-      return {owner: "yanghw7", repo: "study", path: "save/settings.json"};
-    }
-    return null;
+    var owner = "yanghw7";
+    if(/\.github\.io$/i.test(location.hostname)) owner = location.hostname.split(".")[0];
+    return {owner: owner, repo: "study", path: "save/settings.json"}; // 설정은 study 저장소 save/ 에 있음
   })();
   function b64dec(b64){
     var bin = atob(b64.replace(/\s/g, "")), bytes = new Uint8Array(bin.length);
@@ -417,36 +420,40 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
   async function fetchSettings(){
     var why = "";
-    // 1) 같은 사이트(GitHub Pages)의 save/settings.json
+    // 1) GitHub API 로 저장소의 최신 파일을 바로 읽음 (GitHub Pages 는 반영이 몇 분 늦어서 예전 값이 올 수 있음)
+    //    갱신 버튼을 누를 때만 호출되므로 요청 한도(시간당 60회)는 충분합니다.
     try{
-      var r2 = await fetch(new URL("/study/save/settings.json", location.origin).href + "?t=" + Date.now(), {cache: "no-store"});
-      if(r2.ok){
-        var d2 = await r2.json();
-        syncMsg = "✓ 동기화 " + new Date().toLocaleTimeString();
-        return d2;
-      }
-      why = "페이지 파일 " + r2.status;
-    }catch(e){ why = "페이지 파일 오류"; }
-    // 2) 실패하면 GitHub API (한도 있음, 바뀐 게 없으면 304라 한도에 포함 안 됨)
-    try{
-      var h = {"Accept": "application/vnd.github+json"};
-      var et = null; try{ et = localStorage.getItem(ETAG_KEY); }catch(e){}
-      if(et && localStorage.getItem(SV.g.pk)) h["If-None-Match"] = et;
-      var r = await fetch(apiUrl() + "?t=" + Date.now(), {headers: h, cache: "no-store"});
-      if(r.status === 304){ syncMsg = "✓ 최신 상태 " + new Date().toLocaleTimeString(); return {__same: true}; }
+      var r = await fetch(apiUrl() + "?t=" + Date.now(), {headers: {"Accept": "application/vnd.github+json"}, cache: "no-store"});
       if(r.ok){
         var j = await r.json();
-        var tag = r.headers.get("ETag"); if(tag){ try{ localStorage.setItem(ETAG_KEY, tag); }catch(e){} }
-        syncMsg = "✓ GitHub 동기화 " + new Date().toLocaleTimeString();
-        return JSON.parse(b64dec(j.content || ""));
+        var d1 = JSON.parse(b64dec(j.content || ""));
+        syncMsg = "✓ 최신 설정 받음 " + new Date().toLocaleTimeString();
+        return d1;
       }
-      if(r.status === 404){ syncMsg = "⚠ " + (REPO ? REPO.repo + "/" + REPO.path : "save/settings.json") + " 없음 (관리자에서 저장 안 됨)"; return null; }
-      why += " / GitHub " + r.status;
+      why = "GitHub " + r.status;
       if((r.status === 403 || r.status === 429) && r.headers.get("x-ratelimit-remaining") === "0") why += " 요청 한도 초과";
-    }catch(e){ why += " / 네트워크 오류"; }
+    }catch(e){ why = "GitHub 연결 오류"; }
+    // 2) 실패하면 GitHub Pages 의 save/settings.json (최대 몇 분 전 내용일 수 있음)
+    try{
+      var r2 = await fetch(SITE_SETTINGS + "?t=" + Date.now(), {cache: "no-store"});
+      if(r2.ok){
+        var d2 = await r2.json();
+        syncMsg = "✓ 페이지 파일에서 받음(방금 저장한 내용은 몇 분 뒤 반영) " + new Date().toLocaleTimeString();
+        return d2;
+      }
+      why += " / 페이지 파일 " + r2.status;
+    }catch(e){ why += " / 페이지 파일 오류"; }
+    // 3) 앱 안에 들어 있는 기본 설정 (저장된 프롬프트가 하나도 없을 때만 사용)
+    if(NATIVE && !SV.g.st.prompts.length){
+      try{
+        var r3 = await fetch(new URL("../save/settings.json", location.href).href);
+        if(r3.ok){ var d3 = await r3.json(); syncMsg = "✓ 앱 기본 설정 사용 " + new Date().toLocaleTimeString(); return d3; }
+      }catch(e){}
+    }
     syncMsg = "⚠ 불러오기 실패 (" + why + ") · 이전 값 표시 중";
     return undefined;
   }
+
   async function pullRemote(){
     if(!REPO){ syncMsg = "⚠ GitHub 저장소 정보를 찾을 수 없음"; render(); return; }
     var d = await fetchSettings();
@@ -504,7 +511,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       li.appendChild(t); li.appendChild(acts); list.appendChild(li);
     });
   }
-  function render(){ renderCurrent(); renderList(); renderCrop(); }
+  function render(){ renderCurrent(); renderList(); renderCrop(); reportLayout(); }
 
   edSave.addEventListener("click", function(){
     var v = ed.value.trim().slice(0, MAX_PROMPT); if(!v) return;
@@ -538,6 +545,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   var wakeLock = null, wantAwake = false;
   async function keepAwake(){
     wantAwake = true;
+    if(NATIVE){ try{ window.AiaiNative.keepAwake(true); }catch(e){} return; }
     if(!("wakeLock" in navigator) || wakeLock) return;
     try{
       wakeLock = await navigator.wakeLock.request("screen");
@@ -551,8 +559,38 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     if(editingId === null && !ed.value){ loadAll(); setCropInputs(); render(); }
   });
 
+  /* ---------- APK: 앱의 웹뷰 위치 알려주기 ---------- */
+  var lastLayout = "";
+  function reportLayout(){
+    if(!NATIVE) return;
+    var drawer = document.body.classList.contains("drawer-open");
+    var out = {};
+    KEYS.forEach(function(k){
+      var fill = $(SV[k].pane).querySelector(".fill");
+      var r = fill.getBoundingClientRect(), c = SV[k].cfg;
+      var vis = !!loaded[k] && !drawer && r.width > 6 && r.height > 6;
+      out[k] = {x: Math.round(r.left + 1), y: Math.round(r.top + 1), w: Math.round(r.width - 2), h: Math.round(r.height - 2), vis: vis,
+        t: Math.max(130, c.cropTop || 0), b: c.cropBottom || 0, l: c.cropLeft || 0, r: c.cropRight || 0, s: c.shiftX || 0};
+    });
+    var js = JSON.stringify(out);
+    if(js === lastLayout) return;
+    lastLayout = js;
+    try{ window.AiaiNative.layout(js); }catch(e){}
+  }
+  if(NATIVE){
+    if(window.ResizeObserver){
+      var ro = new ResizeObserver(function(){ reportLayout(); });
+      ro.observe($("panes")); ro.observe($("paneG")); ro.observe($("paneN"));
+    }
+    new MutationObserver(function(){ reportLayout(); }).observe(document.body, {attributes: true, attributeFilter: ["class"]});
+    window.addEventListener("resize", reportLayout);
+    var al = document.querySelector(".admin-link"); if(al) al.setAttribute("href", "../save/admin.html");
+  }
+
   /* ---------- 시작 ---------- */
   edCount(); applyAcc(); applySide(); setCropInputs(); render();
+  // 처음 설치해서 저장된 프롬프트가 없으면 한 번만 자동으로 설정을 받아옴
+  if(!SV.g.st.prompts.length) pullRemote();
 })();
 </script>
 </body>
