@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4b6bfb">
+<meta name="theme-color" content="#7c3aed">
 <title>통합 AI 검색</title>
 <style>
 :root{
-  --bg:#ffffff;--fg:#1f1f1f;--muted:#6b7280;--card:#f3f4f8;--border:#e1e3ea;--accent:#4b6bfb;--accent-soft:#e8ecff;--danger:#e5484d;
+  --bg:#ffffff;--fg:#1f1f1f;--muted:#6b7280;--card:#f3f4f8;--border:#e1e3ea;--accent:#7c3aed;--accent-soft:#efe7ff;--danger:#e5484d;
 }
 @media (prefers-color-scheme:dark){
-  :root{--bg:#121317;--fg:#ececf1;--muted:#9aa0ad;--card:#1d1f26;--border:#2c2f39;--accent:#7b93ff;--accent-soft:#232a4a;--danger:#ff6b70;}
+  :root{--bg:#121317;--fg:#ececf1;--muted:#9aa0ad;--card:#1d1f26;--border:#2c2f39;--accent:#a78bfa;--accent-soft:#2a2347;--danger:#ff6b70;}
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -142,11 +142,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   <!-- 왼쪽 메뉴 -->
   <aside id="side">
 
-    <div class="svc" id="svcSw">
-      <button type="button" data-s="g">구글 AI</button>
-      <button type="button" data-s="n">네이버 AI</button>
-    </div>
-
     <div class="acc" data-key="cur">
       <button type="button" class="acc-head" aria-expanded="false">
         <span class="ico">📌</span>
@@ -155,7 +150,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="cur-body" id="curBody"></div>
-        <div class="note">검색할 때 이 프롬프트가 입력 내용 뒤에 자동으로 붙어요. (위에서 고른 서비스 기준)</div>
+        <div class="note">검색할 때 이 프롬프트가 입력 내용 뒤에 자동으로 붙어요. 구글·네이버에 똑같이 적용돼요.</div>
       </div></div></div>
     </div>
 
@@ -197,7 +192,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="field">
-          <div class="label" id="cropLabel">화면 잘라내기 (px)</div>
+          <div class="label" id="cropLabel">화면 잘라내기 (px) · 구글·네이버 공통</div>
           <div class="crop">
             <div><small>위쪽</small><input type="number" id="cropTop" min="0" max="500" step="10"></div>
             <div><small>아래쪽</small><input type="number" id="cropBottom" min="0" max="500" step="10"></div>
@@ -205,7 +200,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
             <div><small>오른쪽</small><input type="number" id="cropRight" min="0" max="500" step="10"></div>
             <div style="flex-basis:100%"><small>가로 이동 (+ 오른쪽 / − 왼쪽)</small><input type="number" id="shiftX" min="-500" max="500" step="10"></div>
           </div>
-          <small>AI 화면 안의 입력창이 가려지도록 위/아래/왼쪽/오른쪽을 잘라내요. 숫자를 바꾸면 바로 적용돼요. (위에서 고른 서비스 기준)</small>
+          <small>AI 화면 안의 입력창이 가려지도록 위/아래/왼쪽/오른쪽을 잘라내요. 숫자를 바꾸면 구글·네이버 화면에 바로 적용돼요.</small>
         </div>
         <div class="note">관리자에서 저장한 설정은 <b>갱신</b> 버튼을 눌렀을 때 구글·네이버 모두에 적용돼요. 여기서 바꾸면 이 기기에만 임시 적용됩니다.</div>
       </div></div></div>
@@ -286,9 +281,10 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     function n(v, d){ return typeof v === "number" ? v : d; }
     return {cropTop: n(c.cropTop, 0), cropBottom: n(c.cropBottom, 100), cropLeft: n(c.cropLeft, 0), cropRight: n(c.cropRight, 0), shiftX: n(c.shiftX, 0)};
   }
-  function persist(k){ try{ localStorage.setItem(SV[k].pk, JSON.stringify(SV[k].st)); }catch(e){} }
-  function saveCfg(k){ try{ localStorage.setItem(SV[k].ck, JSON.stringify(SV[k].cfg)); }catch(e){} }
-  function loadAll(){ KEYS.forEach(function(k){ SV[k].st = loadSt(k); SV[k].cfg = loadCfg(k); }); }
+  // 구글·네이버 구분 없이 하나의 값으로 통일: 구글 저장값을 기준으로 쓰고, 저장할 때 네이버 앱 쪽에도 똑같이 기록
+  function persist(){ KEYS.forEach(function(k){ try{ localStorage.setItem(SV[k].pk, JSON.stringify(SV.g.st)); }catch(e){} }); }
+  function saveCfg(){ KEYS.forEach(function(k){ try{ localStorage.setItem(SV[k].ck, JSON.stringify(SV.g.cfg)); }catch(e){} }); }
+  function loadAll(){ SV.g.st = loadSt("g"); SV.g.cfg = loadCfg("g"); SV.n.st = SV.g.st; SV.n.cfg = SV.g.cfg; }
   function loadUi(){
     try{ var u = JSON.parse(localStorage.getItem(UIKEY)); if(u && u.open) return u; }catch(e){}
     return {open: {}, side: true, svc: "g"};
@@ -296,7 +292,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   function saveUi(){ try{ localStorage.setItem(UIKEY, JSON.stringify(ui)); }catch(e){} }
 
   loadAll();
-  var ui = loadUi(), cur = (ui.svc === "n") ? "n" : "g", editingId = null, syncMsg = "";
+  var ui = loadUi(), cur = "g", editingId = null, syncMsg = "";
   function S(){ return SV[cur].st; }
   function C(){ return SV[cur].cfg; }
   function active(k){
@@ -327,21 +323,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   });
   $("backdrop").addEventListener("click", function(){ document.body.classList.remove("drawer-open"); });
 
-  /* ---------- 서비스 선택 (사이드바 상단) ---------- */
-  function applySvc(){
-    Array.prototype.forEach.call($("svcSw").querySelectorAll("button"), function(b){
-      b.classList.toggle("on", b.getAttribute("data-s") === cur);
-    });
-    $("cropLabel").textContent = SV[cur].name + " 화면 잘라내기 (px)";
-  }
-  Array.prototype.forEach.call($("svcSw").querySelectorAll("button"), function(b){
-    b.addEventListener("click", function(){
-      cur = b.getAttribute("data-s") === "n" ? "n" : "g";
-      ui.svc = cur; saveUi();
-      applySvc(); resetEditor(); setCropInputs(); render();
-    });
-  });
-
   /* ---------- 자르기 ---------- */
   function num(el){ var n = parseInt(el.value, 10); return isNaN(n) ? 0 : Math.max(0, Math.min(500, n)); }
   function applyCrop(fr, cfg){
@@ -360,7 +341,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
   function renderCrop(){
     var c = C();
-    $("subCrop").textContent = SV[cur].name + " · 위 " + c.cropTop + " · 아래 " + c.cropBottom + " · 왼쪽 " + c.cropLeft + " · 오른쪽 " + c.cropRight + " px" + (c.shiftX ? " · 이동 " + c.shiftX : "");
+    $("subCrop").textContent = "위 " + c.cropTop + " · 아래 " + c.cropBottom + " · 왼쪽 " + c.cropLeft + " · 오른쪽 " + c.cropRight + " px" + (c.shiftX ? " · 이동 " + c.shiftX : "");
   }
   function liveCrop(){
     var c = C();
@@ -368,7 +349,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     c.cropLeft = num($("cropLeft")); c.cropRight = num($("cropRight"));
     var sxv = parseInt($("shiftX").value, 10); c.shiftX = isNaN(sxv) ? 0 : Math.max(-500, Math.min(500, sxv));
     saveCfg(cur);
-    var f = $(SV[cur].pane).querySelector(".frame"); if(f) applyCrop(f, c);
+    KEYS.forEach(function(k){ var f = $(SV[k].pane).querySelector(".frame"); if(f) applyCrop(f, c); });
     renderCrop();
   }
   ["cropTop", "cropBottom", "cropLeft", "cropRight", "shiftX"].forEach(function(id){ $(id).addEventListener("input", liveCrop); });
@@ -501,12 +482,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var a = active(cur);
     curBody.className = "cur-body" + (a ? "" : " none");
     curBody.textContent = a ? a.text : "설정된 프롬프트가 없어요. 관리자 페이지에서 만들어 주세요.";
-    $("subCur").textContent = SV[cur].name + " · " + (a ? short(a.text, 36) : "없음");
+    $("subCur").textContent = a ? short(a.text, 40) : "없음";
   }
   function renderList(){
     var st = S();
     list.innerHTML = "";
-    count.textContent = SV[cur].name + " · " + st.prompts.length + "개" + (syncMsg ? " · " + syncMsg : "");
+    count.textContent = st.prompts.length + "개" + (syncMsg ? " · " + syncMsg : "");
     if(!st.prompts.length){ list.appendChild(div("empty", "저장된 프롬프트가 없어요.")); return; }
     st.prompts.forEach(function(p){
       var isActive = p.id === st.activeId;
@@ -590,7 +571,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   });
 
   /* ---------- 시작 ---------- */
-  edCount(); applyAcc(); applySide(); applySvc(); setCropInputs(); render();
+  edCount(); applyAcc(); applySide(); setCropInputs(); render();
 })();
 </script>
 </body>
