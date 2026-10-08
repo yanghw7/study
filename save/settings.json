@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791456004032,
+  "updated": 1791456006194,
   "prompts": [
     {
       "id": "muzenfeldbecs",
@@ -15,7 +15,7 @@
       "text": "관련 이미지나 사진 보여주고\n\n1. 정의\n2. 증상\n3. 위험인자 (취약한 신체 부위, 취약한 사람, 호발부위)\n4. 진단 (검사방법)\n5. 치료\n6. 부작용\n\n주관식 서술형 시험 답안으로 하게 요약 해줘"
     }
   ],
-  "activeId": "muydmi94pt4q8",
+  "activeId": "muzenfeldbecs",
   "cropTop": 0,
   "cropBottom": 100,
   "cropLeft": 0,
