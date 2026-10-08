@@ -228,6 +228,7 @@ a{color:var(--accent)}
       catch(e){ state.data = emptyData(); }
       var d = state.data;
       // Gemini는 더 이상 쓰지 않으므로 예전 key/model 값은 지웁니다. 다음 저장 시 settings.json에서도 정리됩니다.
+      var hadRemoteKey = !!(d.key || d.model); // 원격에 예전 키가 남아 있었는지 기록
       delete d.key; delete d.model;
       if(!Array.isArray(d.prompts)) d.prompts = [];
       var hadRemoteMemo = !!d.tokenMemo;
@@ -235,7 +236,7 @@ a{color:var(--accent)}
         if(!loadMemo().value) saveMemo(d.tokenMemo);
         delete d.tokenMemo; memoRender();
       }
-      if(remoteKey || hadRemoteMemo){
+      if(hadRemoteKey || hadRemoteMemo){
         // 원격에 남아 있던 비밀정보는 메모리에서 제거합니다. 다음 저장 시 정리된 값으로 업로드됩니다.
         state.dirty = true;
       }
