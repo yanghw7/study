@@ -120,24 +120,11 @@ a{color:var(--accent)}
   <div class="note" id="cropInfo"></div>
 </div>
 
-<h2>설정</h2>
-<div class="card">
-  <div class="field">
-    <label>Gemini API 키</label>
-    <form onsubmit="return false" autocomplete="off"><input type="password" id="key" placeholder="AIza..." autocomplete="off"></form>
-    <div class="note">aistudio.google.com/apikey 에서 무료 발급. <b>이 키는 GitHub에 저장하지 않고 이 브라우저에만 저장</b>합니다. 프롬프트와 화면 설정만 GitHub에 동기화됩니다.</div>
-  </div>
-  <div class="field">
-    <label>모델</label>
-    <input type="text" id="model" placeholder="gemini-2.0-flash">
-  </div>
-</div>
 
 <script>
 (function(){
   var API = 'https://api.github.com/repos/yanghw7/study/contents/save/settings.json';
   var GH = 'aimode_admin_gh_v1';
-  var LOCAL_KEY = 'aimode_gemini_key_v1';
   var $ = function(id){ return document.getElementById(id); };
   var state = {token:'', sha:null, data:null, dirty:false, cropEdit:false, savedCrop:null, editing:null, open:{}, q:''};
 
@@ -147,7 +134,7 @@ a{color:var(--accent)}
   }
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   function emptyData(){
-    return {v:1, updated:0, prompts:[], activeId:null, model:'gemini-2.0-flash', cropTop:0, cropBottom:100, cropLeft:0, cropRight:0, shiftX:0};
+    return {v:1, updated:0, prompts:[], activeId:null, cropTop:0, cropBottom:100, cropLeft:0, cropRight:0, shiftX:0};
   }
   function b64enc(s){
     var b = new TextEncoder().encode(s), bin = '';
@@ -161,8 +148,6 @@ a{color:var(--accent)}
   }
   function loadToken(){ try{ return (JSON.parse(localStorage.getItem(GH))||{}).token||''; }catch(e){ return ''; } }
   function saveToken(t){ try{ localStorage.setItem(GH, JSON.stringify({token:t})); }catch(e){} }
-  function loadLocalKey(){ try{ return localStorage.getItem(LOCAL_KEY) || ''; }catch(e){ return ''; } }
-  function saveLocalKey(v){ try{ if(v) localStorage.setItem(LOCAL_KEY, v); else localStorage.removeItem(LOCAL_KEY); }catch(e){} }
 
   // GitHub에 보내기 전에 저장 데이터 전체를 점검합니다.
   // 비밀처럼 보이는 문자열이 있으면 업로드하지 않고 위치를 알려줍니다.
@@ -233,11 +218,8 @@ a{color:var(--accent)}
       try{ state.data = JSON.parse(b64dec(j.content||'')); }
       catch(e){ state.data = emptyData(); }
       var d = state.data;
-      // 과거 버전이 GitHub에 올린 Gemini 키가 있으면 로컬로 옮긴 뒤 이후 저장 시 원격에서 제거합니다.
-      var remoteKey = typeof d.key === 'string' ? d.key : '';
-      if(remoteKey && !loadLocalKey()) saveLocalKey(remoteKey);
-      delete d.key;
-      if(!d.model) d.model = 'gemini-2.0-flash';
+      // Gemini는 더 이상 쓰지 않으므로 예전 key/model 값은 지웁니다. 다음 저장 시 settings.json에서도 정리됩니다.
+      delete d.key; delete d.model;
       if(!Array.isArray(d.prompts)) d.prompts = [];
       var hadRemoteMemo = !!d.tokenMemo;
       if(d.tokenMemo){ // 예전에 GitHub에 저장된 메모 → 이 브라우저로 옮기고 원격에서는 제거
@@ -327,8 +309,6 @@ a{color:var(--accent)}
   function touch(){ saveNow(); }
 
   function render(){
-    $('model').value = state.data.model || '';
-    $('key').value = loadLocalKey();
     if(!state.cropEdit){
       $('cropTop').value = state.data.cropTop;
       $('cropBottom').value = state.data.cropBottom;
@@ -474,8 +454,6 @@ a{color:var(--accent)}
   };
   $('colAll').onclick = function(){ state.open = {}; render(); };
 
-  $('model').addEventListener('input', function(){ state.data.model = $('model').value; touch(); });
-  $('key').addEventListener('input', function(){ saveLocalKey($('key').value.trim()); status('Gemini 키는 이 브라우저에만 저장됩니다.', 'ok'); });
   ['cropTop','cropBottom','cropLeft','cropRight','shiftX'].forEach(function(id){
     $(id).addEventListener('input', function(){ state.cropEdit = true; });
   });
