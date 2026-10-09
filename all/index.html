@@ -119,6 +119,13 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
 
+/* 폰(좁은 화면): 보기 버튼을 2줄로 — 1줄 구글·API·네이버 전용 / 2줄 좌우·상하 분할·순서 바꾸기 */
+.brk{display:none}
+@media (max-width:720px){
+  .seg{display:contents}
+  .brk{display:block;flex:0 0 100%;height:0;margin:-8px 0 0}
+  .seg button,#swapBtn{padding:6px 12px}
+}
 #panes{flex:1;min-height:0;position:relative;display:grid;grid-template-rows:1fr;grid-template-columns:1fr;gap:8px}
 .pane{display:flex;flex-direction:column;min-height:0;min-width:0}
 .phead{flex:none;font-size:12px;font-weight:600;color:var(--muted);padding:0 4px 4px}
@@ -321,6 +328,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         <button type="button" data-l="google">구글 전용</button>
         <button type="button" data-l="api">API 전용</button>
         <button type="button" data-l="naver">네이버 전용</button>
+        <i class="brk" aria-hidden="true"></i>
         <button type="button" data-l="side">좌우 분할</button>
         <button type="button" data-l="split">상하 분할</button>
       </div>
@@ -346,7 +354,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   // APK(안드로이드 앱) 안에서는 구글 화면을 iframe 대신 앱의 진짜 웹뷰로 띄웁니다. (iframe 차단 오류 방지)
   // API 칸은 웹뷰가 아니라 이 화면 안에서 직접 그리므로 앱/브라우저 모두 똑같이 동작합니다.
   var NATIVE = !!window.AiaiNative;
-  var loaded = {g: false};
+  var loaded = {g: false, n: false};
   var SITE_SETTINGS = /\.github\.io$/i.test(location.hostname) ? new URL("/study/save/settings.json", location.origin).href : "https://yanghw7.github.io/study/save/settings.json";
   var MAX_PROMPT = 5000;
   var UIKEY = "uni_ui_v1", LKEY = "uni_layout_v1", ETAG_KEY = "uni_etag_v1";
@@ -364,7 +372,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   var KEYS = ["g", "a"];   // 프롬프트·설정을 저장하는 칸
   var SKEYS = ["g", "a", "n"];   // 검색을 보내는 칸 (n = 네이버 전용, 화면에 보일 때만 검색)
   var FKEYS = ["g", "a", "n"];   // 화면 자르기를 적용할 칸
-  var NKEYS = ["g"];       // 앱의 웹뷰가 필요한 칸 (구글만)
+  var NKEYS = ["g", "n"];  // 앱의 웹뷰가 필요한 칸 (구글 · 네이버: 네이버는 iframe 으로 열면 "잘못된 접근"으로 막히므로 앱에서는 진짜 웹뷰 사용)
 
   var $ = function(id){ return document.getElementById(id); };
   var q = $("q"), ed = $("ed"), edSave = $("edSave"), edCancel = $("edCancel"), edTitle = $("edTitle");
@@ -546,7 +554,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     }
     var fill = $(SV[k].pane).querySelector(".fill");
     fill.innerHTML = "";
-    if(NATIVE && k === "g"){
+    if(NATIVE){
       fill.appendChild(div("ph", "불러오는 중…"));
       loaded[k] = true;
       try{ window.AiaiNative.load(k, url); }catch(e){}
@@ -1067,7 +1075,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   if(NATIVE){
     if(window.ResizeObserver){
       var ro = new ResizeObserver(function(){ reportLayout(); });
-      ro.observe($("panes")); ro.observe($("paneG")); ro.observe($("paneA"));
+      ro.observe($("panes")); ro.observe($("paneG")); ro.observe($("paneA")); ro.observe($("paneN"));
     }
     new MutationObserver(function(){ reportLayout(); }).observe(document.body, {attributes: true, attributeFilter: ["class"]});
     window.addEventListener("resize", reportLayout);
