@@ -55,7 +55,9 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 .apibox .sub{display:none}
 .apibox.on .sub{display:block}
 .keyst{font-size:15px;color:var(--muted);margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
-.mvs{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.cardacts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.apibox.clone{border-style:dashed}
+.mvs{margin-left:auto;display:flex;gap:6px}
 .mvs button{min-width:44px}
 .grp{font-size:18px;font-weight:700;margin:18px 0 10px}
 .grp small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:2px}
@@ -118,8 +120,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   <div class="note" style="margin:0 0 12px">
     통합 검색의 <b>API 칸</b>에서 쓸 AI를 고르세요. 무료 서비스 위주로 준비했고, ChatGPT·Claude 같은 유료 API는 아래 <b>직접 추가</b> 칸에서 설정해요. 여러 개를 고르면 검색할 때 모두에게 동시에 물어보고 탭으로 나눠 보여줘요. 각 칸의 <b>▲▼</b>로 표시 순서를 바꾸고 [API 선택 저장]을 누르면 탭·목록 순서에 반영돼요.<br>
     <b>사용 여부·모델 이름</b>은 [저장]을 누르면 GitHub 설정에 올라가 모든 기기에 반영되지만(각 페이지에서 [갱신]),
-    <b>API 키는 이 기기의 브라우저/앱에만 저장</b>되고 GitHub에는 절대 올라가지 않아요. 키는 쓰는 기기마다 한 번씩 입력해야 해요.<br>
-    <b>[카드 복사]</b>를 누르면 설정과 이 기기의 키를 복사한 별도 API가 생겨요. 원본 서비스명 뒤에 번호가 붙어 인덱스에서 각각 검색할 수 있어요. 복사한 카드도 원본의 무료/유료 분류를 유지해요. 복사 카드는 [카드 삭제]로 없앨 수 있고, 다른 기기에 반영하려면 아래 [API 선택 저장]을 누르세요.
+    <b>API 키는 이 기기의 브라우저/앱에만 저장</b>되고 GitHub에는 절대 올라가지 않아요. 키는 쓰는 기기마다 한 번씩만 입력하면 계속 유지돼요.<br>
+    각 카드의 <b>[카드 복사]</b>를 누르면 같은 양식의 카드가 하나 더 생겨요. (예: Grok 카드를 복사하면 통합 검색에서 <b>Grok 1</b>, <b>Grok 2</b>로 나뉘어 동시에 검색돼요.) 복사본은 <b>원본 카드의 API 키를 함께 쓰므로 키는 한 번만 저장</b>하면 되고, 모델 이름만 다르게 바꿔 쓸 수 있어요. 복사본은 <b>[복사본 삭제]</b>로 지울 수 있고, 기본 카드는 지울 수 없어요.
   </div>
   <div id="apiList"></div>
   <div class="row"><button id="apiSave" type="button">API 선택 저장</button></div>
@@ -163,7 +165,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 </div>
 
 
-<script src="../all/api-core.js?v=1.16.3"></script>
+<script src="../all/api-core.js?v=1.16.0"></script>
 <script>
 (function(){
   var API = 'https://api.github.com/repos/yanghw7/study/contents/save/settings.json';
@@ -475,23 +477,23 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   function apiBuild(){
     var box = $('apiList'); box.innerHTML = '';
     AiaiApi.getCfg().forEach(function(c){
-      var p = AiaiApi.provider(c.id, c);
+      var p = AiaiApi.provider(c.id);
       var el = document.createElement('div');
       el.className = 'apibox' + (c.on ? ' on' : '');
       el.dataset.id = c.id;
-      el.dataset.templateId = AiaiApi.templateOf(c);
-      el.dataset.savedName = c.name || '';
-      el.dataset.group = AiaiApi.groupOf(c);
-      el.dataset.vendor = AiaiApi.vendorOf(c);
-      var title = (el.dataset.group === 'free' ? '🆓 ' : '💳 ') + AiaiApi.displayName(c);
+      var clone = AiaiApi.isClone(c.id);
+      var title = (clone ? '📑 ' : (p.group === 'free' ? '🆓 ' : '💳 ')) + AiaiApi.displayName(c);
+      var vendTxt = clone ? '복사본 · 원본 카드의 키를 함께 써요' : ((p.custom && c.name) ? p.label : (p.vendor || ''));
+      el.classList.toggle('clone', clone);
       var h = '<div class="hd"><label class="chk"><input type="checkbox" class="f-on"' + (c.on ? ' checked' : '') + '> ' +
-        '<span class="api-card-title">' + escHtml(title) + '</span></label><span class="vend">' + escHtml(el.dataset.vendor || p.vendor || '') + '</span>' +
-        '<span class="mvs"><button type="button" class="mini ghost b-copy">카드 복사</button><button type="button" class="mini ghost b-card-del"' + (/^copy_[a-z0-9]+$/i.test(c.id) ? '' : ' disabled title="복사한 카드만 삭제할 수 있어요"') + '>카드 삭제</button><button type="button" class="mini ghost b-up" aria-label="위로 이동">▲</button><button type="button" class="mini ghost b-dn" aria-label="아래로 이동">▼</button></span></div><div class="sub">';
+        escHtml(title) + '</label><span class="vend">' + escHtml(vendTxt) + '</span>' +
+        '<span class="mvs"><button type="button" class="mini ghost b-up" aria-label="위로 이동">▲</button><button type="button" class="mini ghost b-dn" aria-label="아래로 이동">▼</button></span></div>' +
+        '<div class="cardacts"><button type="button" class="mini ghost b-copy">＋ 카드 복사</button>' +
+        (clone ? '<button type="button" class="mini danger b-rm">🗑 복사본 삭제</button>' : '') + '</div><div class="sub">';
       if(p.note) h += '<div class="note" style="margin:0 0 10px">' + escHtml(p.note) + '</div>';
       if(p.custom){
         h += '<div class="field"><label>프리셋 (고르면 아래 칸이 채워져요)</label><select class="f-preset"></select></div>' +
-             '<div class="field"><label>표시 이름</label><input type="text" class="f-name" placeholder="예: Grok 1" autocomplete="off"></div>' +
-             '<div class="field"><label>카드 분류</label><select class="f-group"><option value="free">무료 모델/무료 한도</option><option value="paid">유료·기타</option></select><div class="note">분류 표시는 API 주소·모델을 바꾸지 않습니다. 실제 요금은 연결한 서비스와 모델 정책을 따릅니다.</div></div>' +
+             '<div class="field"><label>표시 이름</label><input type="text" class="f-name" placeholder="예: ChatGPT" autocomplete="off"></div>' +
              '<div class="field"><label>연결 방식</label><select class="f-format"></select></div>' +
              '<div class="field f-basebox"><label>기본 주소 (Base URL)</label><input type="text" class="f-base" placeholder="https://api.example.com/v1" autocomplete="off" inputmode="url">' +
              '<div class="note">주소 뒤에 /chat/completions 가 붙어서 호출돼요.</div></div>';
@@ -507,7 +509,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
            '<div class="note">모델 이름은 자주 바뀌어요. 키를 저장한 뒤 [사용 가능한 모델 불러오기]를 누르면 이 키로 쓸 수 있는 모델이 나와요. 입력칸을 눌러 고르세요.</div></div>';
       h += '<div class="field f-webbox"><label class="chk"><input type="checkbox" class="f-web"> <span class="f-weblabel"></span></label>' +
            '<div class="note">켜면 최신 정보를 웹에서 찾아 답하고 출처를 보여줘요. (서비스·모델에 따라 추가 요금이 있거나 지원되지 않을 수 있어요)</div></div>';
-      h += '<div class="field"><label>API 키 (이 기기에만 저장)</label><form onsubmit="return false" autocomplete="off">' +
+      h += '<div class="field"><label>' + (clone ? 'API 키 — 비워두면 원본 카드의 키를 써요 (이 복사본만 다른 키를 쓸 때만 입력)' : 'API 키 (이 기기에만 저장)') + '</label><form onsubmit="return false" autocomplete="off">' +
            '<input type="text" class="f-key" name="apikey-' + c.id + '-x" style="-webkit-text-security:disc" placeholder="' + escHtml(p.keyHint || '키를 붙여넣으세요') + '" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"></form>' +
            '<div class="keyst"></div>' +
            (p.keyUrl ? '<div class="note keylink"><a href="' + escHtml(p.keyUrl) + '" target="_blank" rel="noopener noreferrer">키 발급받기 ↗</a></div>' : '<div class="note keylink"></div>') +
@@ -531,8 +533,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       if(p.custom){
         q('.f-name').value = c.name;
         q('.f-base').value = c.baseUrl;
-        q('.f-group').value = AiaiApi.groupOf(c);
-        q('.f-group').onchange = function(){ el.dataset.group = this.value; var t = el.querySelector('.api-card-title'); if(t) t.textContent = (this.value === 'free' ? '🆓 ' : '💳 ') + AiaiApi.displayName(apiRead(el, c.id)); };
         AiaiApi.FORMATS.forEach(function(f){ var o = document.createElement('option'); o.value = f.id; o.textContent = f.label; fmtSel.appendChild(o); });
         fmtSel.value = c.format;
         AiaiApi.PRESETS.forEach(function(pr){ var o = document.createElement('option'); o.value = pr.id; o.textContent = pr.label; presetSel.appendChild(o); });
@@ -540,9 +540,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
           var pr = null; AiaiApi.PRESETS.forEach(function(x){ if(x.id === presetSel.value) pr = x; });
           if(!pr || !pr.id) return;
           q('.f-name').value = pr.name; fmtSel.value = pr.format; q('.f-base').value = pr.baseUrl;
-          // 프리셋은 직접 추가(유료·기타) 항목이므로 복사 카드의 분류도 함께 갱신합니다.
-          el.dataset.group = 'paid'; el.dataset.vendor = pr.name || '직접 추가 API';
-          if(q('.f-group')) { q('.f-group').value = 'paid'; var t = el.querySelector('.api-card-title'); if(t) t.textContent = '💳 ' + (q('.f-name').value || AiaiApi.displayName(c)); }
           q('.f-model').value = '';                       // 모델은 키를 저장한 뒤 목록에서 고르게 비워 둠
           var kl = q('.keylink'); kl.innerHTML = pr.keyUrl ? '<a href="' + escHtml(pr.keyUrl) + '" target="_blank" rel="noopener noreferrer">키 발급받기 ↗</a>' : '';
           refreshFormat();
@@ -552,10 +549,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       refreshFormat();
       var st = q('.keyst');
       function keyInfo(msg, kind){
-        var k = AiaiApi.getKey(c.id);
-        st.textContent = msg || maskKey(k);
-        st.className = 'keyst' + (kind ? ' ' + kind : (k ? ' ok' : ''));
+        var own = AiaiApi.ownKey(c.id), eff = AiaiApi.getKey(c.id), txt;
+        if(msg) txt = msg;
+        else if(clone) txt = own ? '이 복사본 전용 키 ' + maskKey(own) : (eff ? '원본 카드의 키를 함께 쓰는 중 ' + maskKey(eff) : '키 없음 — 원본 카드에 키를 저장하세요');
+        else txt = maskKey(eff);
+        st.textContent = txt;
+        st.className = 'keyst' + (kind ? ' ' + kind : (eff ? ' ok' : ''));
       }
+      el._keyInfo = keyInfo;
       keyInfo();
       var mst = q('.modelst');
       async function loadModels(){
@@ -584,20 +585,22 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
           return ids;
         }catch(e){ mst.textContent = '✗ ' + e.message; mst.style.color = 'var(--danger)'; return null; }
       }
+      q('.b-copy').onclick = function(){ copyCard(c.id); };
+      if(clone) q('.b-rm').onclick = function(){ removeApiCard(c.id); };
       q('.b-up').onclick = function(){ moveBox(el, -1); };
       q('.b-dn').onclick = function(){ moveBox(el, 1); };
-      q('.b-copy').onclick = function(){ copyApiCard(el, c); };
-      q('.b-card-del').onclick = function(){ deleteApiCard(el, c); };
       q('.b-models').onclick = loadModels;
       q('.f-on').onchange = function(){ el.classList.toggle('on', this.checked); };
       q('.b-key').onclick = function(){
         var inp = q('.f-key'), v = inp.value.trim();
         if(!v){ keyInfo('키를 먼저 붙여넣으세요', 'bad'); return; }
-        AiaiApi.setKey(c.id, v); inp.value = ''; keyInfo();
+        AiaiApi.setKey(c.id, v);
+        if(AiaiApi.ownKey(c.id) !== v){ keyInfo('✗ 이 기기에서 키를 저장하지 못했어요. 브라우저의 사이트 데이터 저장 설정을 확인하세요.', 'bad'); return; }
+        inp.value = ''; keyInfo();
       };
       q('.b-del').onclick = function(){
-        if(!AiaiApi.getKey(c.id)){ keyInfo(); return; }
-        if(!confirm(AiaiApi.displayName(apiRead(el, c.id)) + ' 키를 이 기기에서 삭제할까요?')) return;
+        if(!AiaiApi.ownKey(c.id)){ keyInfo(); return; }
+        if(!confirm(AiaiApi.displayName(apiRead(el, c.id)) + (clone ? ' 전용 키를 삭제할까요? (원본 카드의 키는 그대로 남아요)' : ' 키를 이 기기에서 삭제할까요?'))) return;
         AiaiApi.setKey(c.id, ''); keyInfo();
       };
       q('.b-test').onclick = async function(){
@@ -618,6 +621,44 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     });
     refreshMoveBtns();
     guardKeyInputs();
+  }
+  // 화면의 모든 카드 값을 읽어 목록으로 (복사·삭제 전에 입력 중인 값이 사라지지 않게)
+  function collectApis(){
+    var list = [];
+    Array.prototype.forEach.call($('apiList').querySelectorAll('.apibox'), function(el){ list.push(apiRead(el, el.dataset.id)); });
+    return list;
+  }
+  function flushTypedKeys(){
+    Array.prototype.forEach.call($('apiList').querySelectorAll('.apibox'), function(el){
+      var inp = el.querySelector('.f-key'), v = inp.value.trim();
+      if(v){ AiaiApi.setKey(el.dataset.id, v); inp.value = ''; }
+    });
+  }
+  function copyCard(id){
+    var list = collectApis(); flushTypedKeys();
+    var r = AiaiApi.cloneCard(list, id);
+    if(!r){ apiStatus('이 서비스는 카드를 최대 ' + AiaiApi.MAX_CARDS + '개까지만 만들 수 있어요.', 'bad'); return; }
+    var saved = AiaiApi.setCfg(r.list); AiaiApi.stampOrder();
+    if(state.data) state.data.apis = saved;
+    apiBuild();
+    var made = saved.filter(function(c){ return c.id === r.id; })[0];
+    var nb = $('apiList').querySelector('.apibox[data-id="' + r.id + '"]');
+    if(nb){ try{ nb.scrollIntoView({block: 'center', behavior: 'smooth'}); }catch(e){} }
+    saveNow();
+    apiStatus('✓ ' + AiaiApi.displayName(made, saved) + ' 카드가 추가됐어요 · 모델 이름 등을 고친 뒤 맨 아래 [API 선택 저장]을 누르면 모든 기기에 반영돼요', 'ok');
+  }
+  function removeApiCard(id){
+    if(!AiaiApi.isClone(id)){ apiStatus('기본 카드는 삭제할 수 없어요.', 'bad'); return; }
+    var list = collectApis();
+    var nm = AiaiApi.displayName(list.filter(function(c){ return c.id === id; })[0] || {id: id}, list);
+    if(!confirm(nm + ' 카드를 삭제할까요?\n(원본 카드와 원본 카드의 API 키는 그대로 남아요)')) return;
+    flushTypedKeys();
+    AiaiApi.setKey(id, '');                            // 복사본 전용 키가 있었다면 함께 정리
+    var saved = AiaiApi.setCfg(AiaiApi.removeCard(list, id)); AiaiApi.stampOrder();
+    if(state.data) state.data.apis = saved;
+    apiBuild();
+    saveNow();
+    apiStatus('🗑 ' + nm + ' 카드를 삭제했어요 · 맨 아래 [API 선택 저장]을 누르면 모든 기기에 반영돼요', 'ok');
   }
   // 비밀번호 자동완성이 키 입력칸에 엉뚱한 값을 넣으면 [연결 테스트]가 그 값으로 저장된 키를 덮어쓰므로, 사용자가 직접 입력하기 전의 값은 비움
   function guardKeyInputs(){
@@ -651,95 +692,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function apiRead(el, id){
     var q = function(c){ return el.querySelector(c); };
-    var result = {
+    return {
       id: id, on: q('.f-on').checked, model: q('.f-model').value.trim(),
       web: q('.f-web') ? q('.f-web').checked : false,
       baseUrl: q('.f-base') ? q('.f-base').value.trim() : '',
-      name: q('.f-name') ? q('.f-name').value.trim() : (el.dataset.savedName || ''),
+      name: q('.f-name') ? q('.f-name').value.trim() : '',
       format: q('.f-format') ? q('.f-format').value : 'compat',
-      account: q('.f-account') ? q('.f-account').value.trim() : '',
-      group: q('.f-group') ? q('.f-group').value : (el.dataset.group || 'paid'),
-      vendor: el.dataset.vendor || ''
+      account: q('.f-account') ? q('.f-account').value.trim() : ''
     };
-    if(/^copy_[a-z0-9]+$/i.test(id)) result.templateId = el.dataset.templateId || 'custom1';
-    return result;
-  }
-  function apiListFromDom(skipEl){
-    var list = [];
-    Array.prototype.forEach.call($('apiList').querySelectorAll('.apibox'), function(el){
-      if(el === skipEl) return;
-      list.push(apiRead(el, el.dataset.id));
-    });
-    return list;
-  }
-  function apiFamilyName(name){ return String(name || '').trim().replace(/\s+\d+$/, '').trim(); }
-  function nextApiFamilyNumber(base, names){
-    var max = 0;
-    names.forEach(function(name){
-      name = String(name || '').trim();
-      var m = name.match(/^(.*)\s+(\d+)$/);
-      if(m && m[1] === base) max = Math.max(max, parseInt(m[2], 10) || 0);
-    });
-    return max + 1;
-  }
-  function copyApiCard(el, originalCfg){
-    var id = 'copy_' + uid();
-    var list = apiListFromDom();
-    var idx = -1;
-    for(var i = 0; i < list.length; i++) if(list[i].id === el.dataset.id){ idx = i; break; }
-    if(idx < 0) return;
-
-    // 화면에 현재 보이는 값을 원본 설정으로 사용합니다(저장 전 수정 내용도 포함).
-    var src = list[idx];
-    var srcProvider = AiaiApi.provider(src.id, src);
-    var keyInput = el.querySelector('.f-key'), keyValue = keyInput ? keyInput.value.trim() : '';
-    if(keyValue){ AiaiApi.setKey(src.id, keyValue); keyInput.value = ''; }
-    var existingKey = AiaiApi.getKey(src.id);
-
-    var sourceName = src.name || AiaiApi.displayName(src);
-    var baseName = apiFamilyName(sourceName) || '복사한 API';
-    var names = list.map(function(x){ return x.name || AiaiApi.displayName(x); });
-    var firstNumber;
-    if(!/\s\d+$/.test(sourceName)){
-      var hasNumbered = names.some(function(n){ return n !== baseName && apiFamilyName(n) === baseName && /\s\d+$/.test(n); });
-      if(!hasNumbered){ src.name = baseName + ' 1'; firstNumber = 2; }
-      else { firstNumber = nextApiFamilyNumber(baseName, names); src.name = baseName + ' ' + firstNumber; firstNumber += 1; }
-    }else{
-      firstNumber = nextApiFamilyNumber(baseName, names);
-    }
-    var newName = baseName + ' ' + firstNumber;
-
-    // 설정을 통째로 복제합니다. endpoint/model/format/web/account/group/vendor는 바꾸지 않고,
-    // 기본 provider의 generic 'paid' 값도 끌어오지 않습니다. 새 ID와 이름만 다릅니다.
-    var cloned = Object.assign({}, src, {
-      id: id,
-      name: newName,
-      baseUrl: src.baseUrl || (!(srcProvider && srcProvider.custom) ? AiaiApi.baseOf(src) : ''),
-      format: (srcProvider && srcProvider.custom) ? src.format : AiaiApi.formatOf(src),
-      account: src.account || '',
-      templateId: src.templateId || AiaiApi.templateOf(src),
-      group: AiaiApi.groupOf(src),
-      vendor: AiaiApi.vendorOf(src)
-    });
-    list.splice(idx + 1, 0, cloned);
-    AiaiApi.setCfg(list);
-    AiaiApi.stampOrder();
-    if(existingKey) AiaiApi.setKey(id, existingKey);
-    apiBuild();
-    apiStatus('원본 설정을 그대로 복사했어요: 모델·주소·연결 방식·웹 검색·계정 ID·분류 [' + newName + ']. 다른 기기에도 반영하려면 설정을 저장하세요.', 'ok');
-    var created = $('apiList').querySelector('[data-id="' + id + '"]');
-    if(created) try{ created.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(e){}
-  }
-  function deleteApiCard(el, cfg){
-    if(!/^copy_[a-z0-9]+$/i.test(cfg.id)) return;
-    var name = AiaiApi.displayName(apiRead(el, cfg.id));
-    if(!confirm('복사한 [' + name + '] 카드를 삭제할까요?\n이 카드의 이 기기 API 키도 삭제됩니다.')) return;
-    var list = apiListFromDom(el);
-    AiaiApi.setKey(cfg.id, '');
-    AiaiApi.setCfg(list);
-    AiaiApi.stampOrder();
-    apiBuild();
-    apiStatus(name + ' 카드를 삭제했어요. 다른 기기에도 반영하려면 [API 선택 저장]을 누르세요.', 'ok');
   }
   $('apiSave').onclick = function(){
     var list = [];
@@ -771,6 +731,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     });
   };
   apiBuild();
+  // 브라우저 저장소가 비워져 백업에서 키가 복구되면 키 상태 표시만 새로 고침
+  window.addEventListener('aiai-keys-restored', function(){
+    Array.prototype.forEach.call($('apiList').querySelectorAll('.apibox'), function(el){ if(el._keyInfo) el._keyInfo(); });
+  });
   $('apiVer').textContent = '(api-core v' + (AiaiApi.VERSION || '?') + ')';
 
   function cropSnap(d){ return {top:d.cropTop, bottom:d.cropBottom, left:d.cropLeft, right:d.cropRight, sx:d.shiftX}; }
