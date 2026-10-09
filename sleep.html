@@ -661,7 +661,7 @@ body{background:#EEF3F8!important}
 
 <style id="sleep-summary-count-compact-final">
 .summary-grid.sleep-summary-grid{
-  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  grid-template-columns:1.3fr 1.3fr 1.3fr .7fr!important;
   column-gap:3px!important;
 }
 .summary-grid.sleep-summary-grid .summary-item{
@@ -722,7 +722,7 @@ body{background:#EEF3F8!important}
 <style id="sleep-summary-value-size-14-final">
 .summary-grid.sleep-summary-grid .summary-item b,
 #sumStudy,#sumLongest,#sumLatestWake,#sumPages,#sumAvgSleepExcludingNoSleep{
-  font-size:19px!important;
+  font-size:clamp(13px,3.9vw,19px)!important;
 }
 </style>
 
@@ -749,7 +749,6 @@ body{background:#EEF3F8!important}
         <div class="summary-item"><b id="sumLongest">0분</b><span>가장 긴 수면시간</span></div>
         <div class="summary-item"><b id="sumLatestWake">-</b><span>최근 기상</span></div>
         <div class="summary-item"><b id="sumPages">0회</b><span>수면 횟수</span></div>
-        <div class="summary-item"><b id="sumAvgSleepExcludingNoSleep">-</b><span>안 잔날 제외 평균 수면시간</span></div>
       </div>
     </div>
 
@@ -2501,6 +2500,14 @@ function updateSleepExtraSummary(day){
   if(avgEl) avgEl.textContent = avg == null ? '-' : fmtDuration(avg);
 }
 
+function isPastRecordDay(){
+  try{ return ymd(cur) !== ymd(logicalToday()); }catch(_){ return false; }
+}
+function lockPastDayActionButtons(){
+  if(!isPastRecordDay()) return;
+  document.querySelectorAll('#periodList button[data-lecture-action]').forEach(b => { if(!b.disabled) b.disabled = true; });
+}
+
 function renderPeriods(){
   const day = getDayData();
   const list = $('#periodList');
@@ -2552,7 +2559,7 @@ function renderPeriods(){
     if(hasStart){
       startAction = 'cancel-start';
       startLabel = '수면 취소';
-      startDisabled = !isLatestSleepCard;
+      startDisabled = !isCurrentLectureDay || !isLatestSleepCard;
       startClass = 'start cancel-start';
     }
 
@@ -2562,7 +2569,7 @@ function renderPeriods(){
     if(hasEnd){
       endAction = 'cancel-end';
       endLabel = '깨어남 취소';
-      endDisabled = !isLatestSleepCard;
+      endDisabled = !isCurrentLectureDay || !isLatestSleepCard;
       endClass = 'end cancel-end';
     }
 
@@ -3431,6 +3438,7 @@ $('#periodList').addEventListener('pointerdown', (e) => {
 $('#periodList').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-lecture-action]');
   if(!btn || btn.disabled) return;
+  if(isPastRecordDay()){ lockPastDayActionButtons(); return; }
   userActionCount++;
   const origLabel = btn.textContent;
   btn.disabled = true;
@@ -3595,12 +3603,21 @@ $('#periodList').addEventListener('click', async (e) => {
   } finally {
     userActionCount--;
     if(btn.isConnected){
-      btn.disabled = false;
+      btn.disabled = isPastRecordDay();
       btn.textContent = origLabel;
     }
     await flushPendingRender();
   }
 });
+
+
+/* 과거일자 잠금: 현재 일자가 아니면 시작/종료/취소 버튼은 어떤 경로로도 활성화되지 않게 유지 */
+(function(){
+  const list = document.getElementById('periodList');
+  if(!list || typeof MutationObserver === 'undefined') return;
+  new MutationObserver(() => { try{ lockPastDayActionButtons(); }catch(_){} })
+    .observe(list, {subtree:true, childList:true, attributes:true, attributeFilter:['disabled']});
+})();
 
 $('#periodList').addEventListener('focusout', (e) => {
   if(!periodRenderPending) return;
