@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791533405394,
+  "updated": 1791533870729,
   "prompts": [
     {
       "id": "muydmi94pt4q8",
@@ -16,7 +16,7 @@
   "apis": [
     {
       "id": "gemini",
-      "on": false,
+      "on": true,
       "model": "gemini-3.8-flash",
       "web": false,
       "baseUrl": "",
