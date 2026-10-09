@@ -502,7 +502,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       h += '<div class="field f-webbox"><label class="chk"><input type="checkbox" class="f-web"> <span class="f-weblabel"></span></label>' +
            '<div class="note">켜면 최신 정보를 웹에서 찾아 답하고 출처를 보여줘요. (서비스·모델에 따라 추가 요금이 있거나 지원되지 않을 수 있어요)</div></div>';
       h += '<div class="field"><label>API 키 (이 기기에만 저장)</label><form onsubmit="return false" autocomplete="off">' +
-           '<input type="password" class="f-key" placeholder="' + escHtml(p.keyHint || '키를 붙여넣으세요') + '" autocomplete="off"></form>' +
+           '<input type="text" class="f-key" name="apikey-' + c.id + '-x" style="-webkit-text-security:disc" placeholder="' + escHtml(p.keyHint || '키를 붙여넣으세요') + '" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"></form>' +
            '<div class="keyst"></div>' +
            (p.keyUrl ? '<div class="note keylink"><a href="' + escHtml(p.keyUrl) + '" target="_blank" rel="noopener noreferrer">키 발급받기 ↗</a></div>' : '<div class="note keylink"></div>') +
            '</div>' +
@@ -596,7 +596,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
           await AiaiApi.run(cur, '다른 말 없이 "연결 성공" 이라고만 답해 주세요.', {idleMs: 40000, onText: function(d){ out += d; }, onSource: function(){}});
           keyInfo('✓ 연결 성공 · 응답: ' + (out.trim().slice(0, 40) || '(빈 응답)'), 'ok');
         }catch(e){
-          keyInfo('✗ ' + e.message, 'bad');
+          keyInfo('✗ ' + e.message + ' · 사용한 키: ' + maskKey(AiaiApi.getKey(c.id)), 'bad');
           if(/❓|모델 이름|응답이 없/.test(e.message) && AiaiApi.getKey(c.id) && !p.account) loadModels();   // 모델 문제로 보이면 사용 가능한 모델을 바로 보여줌
         }
         btn.disabled = false;
@@ -604,6 +604,20 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       box.appendChild(el);
     });
     refreshMoveBtns();
+    guardKeyInputs();
+  }
+  // 비밀번호 자동완성이 키 입력칸에 엉뚱한 값을 넣으면 [연결 테스트]가 그 값으로 저장된 키를 덮어쓰므로, 사용자가 직접 입력하기 전의 값은 비움
+  function guardKeyInputs(){
+    Array.prototype.forEach.call(document.querySelectorAll('.f-key'), function(inp){
+      inp.value = '';
+      inp.addEventListener('paste', function(){ inp.dataset.user = '1'; });
+      inp.addEventListener('keydown', function(){ inp.dataset.user = '1'; });
+    });
+    [300, 1200, 2500].forEach(function(ms){
+      setTimeout(function(){
+        Array.prototype.forEach.call(document.querySelectorAll('.f-key'), function(inp){ if(!inp.dataset.user) inp.value = ''; });
+      }, ms);
+    });
   }
   function refreshMoveBtns(){
     var boxes = $('apiList').querySelectorAll('.apibox');
