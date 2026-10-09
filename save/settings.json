@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791442473869,
+  "updated": 1791534209444,
   "prompts": [
     {
       "id": "muydmi94pt4q8",
@@ -13,5 +13,76 @@
   "cropLeft": 0,
   "cropRight": 0,
   "shiftX": 0,
-  "apis": []
+  "apis": [
+    {
+      "id": "gemini",
+      "on": true,
+      "model": "gemini-3.8-flash",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "groq",
+      "on": true,
+      "model": "openai/gpt-oss-120b",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "openrouter",
+      "on": false,
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "cloudflare",
+      "on": false,
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "custom1",
+      "on": false,
+      "model": "",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "custom2",
+      "on": false,
+      "model": "",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "custom3",
+      "on": false,
+      "model": "",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    }
+  ]
 }
