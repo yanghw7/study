@@ -102,7 +102,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .admin-link .sub{font-size:12px;font-weight:400;color:var(--muted)}
 
 /* ===== 보기 방식 (탭 / 상하 / 좌우) ===== */
-.tools{flex:none;display:flex;align-items:center;padding:0 0 8px}
+.tools{flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 0 8px}
 .seg{display:flex;flex-wrap:wrap;gap:8px}
 .seg button{padding:6px 16px;font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--border)}
 .seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -123,6 +123,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .layout-google .phead,.layout-api .phead{display:none}
 .layout-split #panes{grid-template-rows:1fr 1fr}
 .layout-side #panes{grid-template-columns:1fr 1fr}
+/* 분할 순서 바꾸기: 구글 ↔ API 위치 교체 (상하: 위/아래, 좌우: 왼쪽/오른쪽) */
+.swap #paneG{order:2}
+.swap #paneA{order:1}
+#swapBtn{padding:6px 14px;font-size:13px;color:var(--fg);background:var(--card);border:1px solid var(--border)}
+#swapBtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.layout-google #swapBtn,.layout-api #swapBtn{display:none}
 
 /* ===== API 칸 ===== */
 .apiwrap{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
@@ -279,6 +285,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         <button type="button" data-l="side">좌우 분할</button>
         <button type="button" data-l="split">상하 분할</button>
       </div>
+      <button type="button" id="swapBtn" title="구글 AI와 API의 위치를 서로 바꿔요">⇅ 순서 바꾸기</button>
     </div>
     <div id="panes">
       <div class="pane" id="paneG"><div class="phead">구글 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
@@ -838,6 +845,18 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   if(savedL === "naver") savedL = "api";
   setLayout(MODES.indexOf(savedL) >= 0 ? savedL : "split");
 
+  /* 분할 순서 바꾸기 (구글 ↔ API) */
+  var SWKEY = "uni_swap_v1";
+  function setSwap(on, report){
+    document.body.classList.toggle("swap", !!on);
+    $("swapBtn").classList.toggle("on", !!on);
+    try{ localStorage.setItem(SWKEY, on ? "1" : "0"); }catch(e){}
+    if(report) reportLayout();
+  }
+  $("swapBtn").addEventListener("click", function(){ setSwap(!document.body.classList.contains("swap"), true); });
+  var savedSw = null; try{ savedSw = localStorage.getItem(SWKEY); }catch(e){}
+  setSwap(savedSw === "1");
+
   /* ---------- 화면 꺼짐 방지 (Wake Lock) ---------- */
   var wakeLock = null, wantAwake = false;
   async function keepAwake(){
@@ -887,7 +906,17 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   /* ---------- 시작 ---------- */
   edCount(); applyAcc(); applySide(); setCropInputs(); render(); paintApi();
   // 처음 설치해서 저장된 프롬프트가 없으면 한 번만 자동으로 설정을 받아옴
-  if(!SV.g.st.prompts.length) pullRemote();
+  // 관리자에서 방금 저장했다면 돌아왔을 때 자동으로 최신 설정을 받아 옴 (없으면, 저장된 프롬프트가 없을 때만 받음)
+  function adminSaved(){
+    try{
+      if(localStorage.getItem("uni_admin_saved_v1")){ localStorage.removeItem("uni_admin_saved_v1"); return true; }
+    }catch(e){}
+    return false;
+  }
+  if(adminSaved() || !SV.g.st.prompts.length) pullRemote();
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "visible" && editingId === null && !ed.value && adminSaved()) pullRemote();
+  });
 })();
 </script>
 </body>

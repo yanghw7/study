@@ -97,9 +97,19 @@
     try{ raw = JSON.parse(localStorage.getItem(CFG_KEY)); }catch(e){}
     return normCfg(raw);
   }
-  function setCfg(arr){
+  // 이 기기에서 API 선택을 마지막으로 바꾼 시각. GitHub 의 설정이 이보다 오래됐으면 이 기기 선택을 덮어쓰지 않음
+  var CT_KEY = "uni_api_cfg_t_v1";
+  function cfgTime(){ try{ return +localStorage.getItem(CT_KEY) || 0; }catch(e){ return 0; } }
+  function stampCfg(t){ try{ localStorage.setItem(CT_KEY, String(t || Date.now())); }catch(e){} }
+  function storeCfg(arr){
     var n = normCfg(arr);
     try{ localStorage.setItem(CFG_KEY, JSON.stringify(n)); }catch(e){}
+    return n;
+  }
+  // 사용자가 직접 바꾼 값 저장 (변경 시각 기록)
+  function setCfg(arr){
+    var n = storeCfg(arr);
+    stampCfg();
     return n;
   }
 
@@ -128,10 +138,24 @@
   }
   // GitHub 설정을 받아 반영. 이 기기에서 순서를 더 최근에 바꿨다면 그 순서는 유지
   function applyRemoteCfg(arr, updated){
-    var prev = getCfg().map(function(c){ return c.id; }), t = orderTime();
-    var n = setCfg(arr);
-    if(t > (+updated || 0)) n = setOrder(prev);
+    var remoteT = +updated || 0, localT = cfgTime(), cur = getCfg();
+    var localOn = cur.some(function(c){ return c.on; });
+    var remoteOn = (Array.isArray(arr) ? arr : []).some(function(c){ return c && c.on === true; });
+    // 이 기기의 선택이 GitHub 값보다 최근이거나, (예전 저장값이라 시각이 없는데) 이 기기엔 선택이 있고 GitHub 엔 선택이 하나도 없으면 → 이 기기 선택을 지키지 않고 덮어쓰면 "사용 중 API 가 전부 사라지는" 문제가 생김
+    if(localT > remoteT || (!localT && localOn && !remoteOn)) return cur;
+    var prev = cur.map(function(c){ return c.id; }), t = orderTime();
+    var n = storeCfg(arr);
+    stampCfg(remoteT || Date.now());
+    if(t > remoteT){ n = storeCfg(setOrderList(prev)); }
     return n;
+  }
+  // setOrder 와 같지만 저장은 하지 않고 정렬된 목록만 돌려줌
+  function setOrderList(ids){
+    var pos = {}, arr = getCfg().map(function(c, i){ return {c: c, i: i}; });
+    (ids || []).forEach(function(id, i){ pos[id] = i; });
+    function rank(x){ return pos.hasOwnProperty(x.c.id) ? pos[x.c.id] : 1e6 + x.i; }
+    arr.sort(function(a, b){ return rank(a) - rank(b); });
+    return arr.map(function(x){ return x.c; });
   }
 
   function readKeys(){

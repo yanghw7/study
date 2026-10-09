@@ -96,7 +96,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   <div class="note" id="edCount" style="text-align:right;margin:4px 0 0">0 / 3500자 (공백 포함)</div>
   <div class="row" style="margin-top:10px;justify-content:flex-end">
     <button class="ghost" id="edCancel" hidden>취소</button>
-    <button id="edSave">추가</button>
+    <button id="edSave">추가 및 저장</button>
   </div>
 </div>
 
@@ -297,6 +297,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
         status('⚠ 저장 중단: 비밀정보로 보이는 값이 발견됨 → '+hitText+' · 해당 내용을 지운 뒤 다시 저장하세요.', 'bad');
         return;
       }
+      try{ state.data.apis = AiaiApi.getCfg(); }catch(e){}   // 이 기기의 최신 API 선택을 같이 올림
       var uploadData = cleanForGithub(state.data);
       uploadData.updated = Date.now();
       var body = {message:'AI 검색 설정 업데이트', content:b64enc(JSON.stringify(uploadData, null, 2))};
@@ -336,6 +337,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       state.dirty = false;
       state.savedCrop = cropSnap(state.data); cropInfo();
       status('저장됨 · ' + new Date().toLocaleTimeString(), 'ok');
+      // 통합 검색 화면으로 돌아가면 방금 저장한 내용을 자동으로 받아가게 표시
+      try{ localStorage.setItem('uni_admin_saved_v1', String(Date.now())); }catch(e){}
     }catch(e){ status('⚠ 저장 오류: ' + e.message, 'bad'); }
     finally{
       // 저장 중에 또 변경이 있었으면(예: 추가 직후 '사용') 끝난 뒤 한 번 더 저장
@@ -353,6 +356,15 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   }
 
   function touch(){ saveNow(); }
+
+  // 프롬프트 변경을 GitHub 에 실제로 저장. 토큰이 없으면 저장되지 않았다고 분명히 알림
+  function commit(){
+    if(!state.token){
+      status('⚠ 저장 안 됨: GitHub 토큰이 연결되지 않았어요. 위에서 토큰을 연결한 뒤 다시 눌러 주세요.', 'bad');
+      return Promise.resolve();
+    }
+    return push();
+  }
 
   function render(){
     if(!state.cropEdit){
@@ -401,27 +413,27 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       if(isLong && !q) mk(isOpen ? '접기' : '펼치기', 'ghost', function(){
         state.open[p.id] = !state.open[p.id]; render();
       });
-      if(!isA) mk('사용', 'ghost', function(){
+      if(!isA) mk('사용 및 저장', 'ghost', function(){
         state.data.activeId = p.id; saveNow(); render();
-        // '사용'을 누르면 바로 GitHub에 저장해서 index의 기본 설정값이 되게 함
-        if(state.token) push();
+        // '사용 및 저장'을 누르면 바로 GitHub에 저장해서 index의 기본 설정값이 되게 함
+        commit();
       });
-      mk('수정', 'ghost', function(){
+      mk('수정 및 저장', 'ghost', function(){
         state.editing = p.id;
         $('ed').value = p.text; edCount();
         $('edLabel').textContent = '프롬프트 수정';
-        $('edSave').textContent = '수정 저장';
+        $('edSave').textContent = '수정 및 저장';
         $('edCancel').hidden = false;
         $('ed').focus();
       });
-      mk('삭제', 'danger', function(){
+      mk('삭제 및 저장', 'danger', function(){
         if(!confirm('삭제할까요?')) return;
         state.data.prompts = state.data.prompts.filter(function(x){ return x.id !== p.id; });
         if(state.editing === p.id) resetEditor();
         if(state.data.activeId === p.id)
           state.data.activeId = state.data.prompts[0] ? state.data.prompts[0].id : null;
         saveNow(); render();
-        if(state.token) push();
+        commit();
       });
       li.appendChild(txt); li.appendChild(acts); list.appendChild(li);
     });
@@ -654,7 +666,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     state.editing = null;
     $('ed').value = ''; edCount();
     $('edLabel').textContent = '새 프롬프트 추가';
-    $('edSave').textContent = '추가';
+    $('edSave').textContent = '추가 및 저장';
     $('edCancel').hidden = true;
   }
 
@@ -671,7 +683,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     saveNow();
     render();
     // 프롬프트 추가/수정은 연결된 GitHub 토큰으로 즉시 저장합니다.
-    if(state.token) push();
+    commit();
   };
   $('edCancel').onclick = resetEditor;
 
