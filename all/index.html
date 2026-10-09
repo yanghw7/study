@@ -985,12 +985,45 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
   function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
-  // 검색 답변에서 표 셀 등에 문자 그대로 출력된 &lt;br&gt;를 실제 줄바꿈으로 표시.
-  // 코드 블록/인라인 코드는 예시 문자열일 수 있으므로 변환하지 않음.
+  // AI 답변에 줄바꿈용 태그가 문자 그대로 섞여 보이는 경우를 보정.
+  // 예: <br>, <br/>, <br />, &lt;br&gt;, &amp;lt;br&amp;gt;, 숫자형 HTML 엔티티.
+  // HTML 문자열 전체를 정규식으로 바꾸지 않고 텍스트 노드만 검사하므로 표 구조/속성은 건드리지 않음.
+  // 코드 예시(<pre>, <code>, <samp>, <kbd>) 안의 문자열은 실제 코드일 수 있어 보존함.
   function formatResultHtml(html){
-    return String(html).replace(/(<pre\b[^>]*>[\s\S]*?<\/pre>|<code\b[^>]*>[\s\S]*?<\/code>)|&lt;br\s*\/?\s*&gt;/gi, function(match, codeBlock){
-      return codeBlock || "<br>";
-    });
+    var template = document.createElement("template");
+    template.innerHTML = String(html == null ? "" : html);
+    var breakToken = /<\s*br\b[^>]*>|&(?:amp;)*(?:lt;|#0*60;|#x0*3c;)\s*br\b[^<]*?&(?:amp;)*(?:gt;|#0*62;|#x0*3e;)/gi;
+    var codeTags = {PRE:1, CODE:1, SAMP:1, KBD:1};
+
+    function walk(parent){
+      var node = parent.firstChild;
+      while(node){
+        var next = node.nextSibling;
+        if(node.nodeType === 1){
+          if(!codeTags[node.tagName]) walk(node);
+        }else if(node.nodeType === 3){
+          var value = node.nodeValue || "";
+          breakToken.lastIndex = 0;
+          if(breakToken.test(value)){
+            breakToken.lastIndex = 0;
+            var fragment = document.createDocumentFragment(), last = 0, match;
+            while((match = breakToken.exec(value))){
+              if(match.index > last) fragment.appendChild(document.createTextNode(value.slice(last, match.index)));
+              fragment.appendChild(document.createElement("br"));
+              last = breakToken.lastIndex;
+            }
+            if(last < value.length) fragment.appendChild(document.createTextNode(value.slice(last)));
+            node.parentNode.replaceChild(fragment, node);
+          }
+        }else if(node.firstChild){
+          walk(node);
+        }
+        node = next;
+      }
+    }
+
+    walk(template.content);
+    return template.innerHTML;
   }
 
   var apiSent = null;   // 마지막으로 API 에 실제로 보낸 내용 (검색어 + 프롬프트)
