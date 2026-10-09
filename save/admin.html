@@ -51,6 +51,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 .apibox .sub{display:none}
 .apibox.on .sub{display:block}
 .keyst{font-size:15px;color:var(--muted);margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
+.mvs{margin-left:auto;display:flex;gap:6px}
+.mvs button{min-width:44px}
 .grp{font-size:18px;font-weight:700;margin:18px 0 10px}
 .grp small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:2px}
 .modelst{white-space:pre-wrap;word-break:break-word}
@@ -111,7 +113,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 <h2>🔌 API 선택 <span id="apiVer" style="font-weight:400;font-size:14px"></span></h2>
 <div class="card" id="apiCard">
   <div class="note" style="margin:0 0 12px">
-    통합 검색의 <b>API 칸</b>에서 쓸 AI를 고르세요. 무료 서비스 위주로 준비했고, ChatGPT·Claude 같은 유료 API는 아래 <b>직접 추가</b> 칸에서 설정해요. 여러 개를 고르면 검색할 때 모두에게 동시에 물어보고 탭으로 나눠 보여줘요.<br>
+    통합 검색의 <b>API 칸</b>에서 쓸 AI를 고르세요. 무료 서비스 위주로 준비했고, ChatGPT·Claude 같은 유료 API는 아래 <b>직접 추가</b> 칸에서 설정해요. 여러 개를 고르면 검색할 때 모두에게 동시에 물어보고 탭으로 나눠 보여줘요. 각 칸의 <b>▲▼</b>로 표시 순서를 바꾸고 [API 선택 저장]을 누르면 탭·목록 순서에 반영돼요.<br>
     <b>사용 여부·모델 이름</b>은 [저장]을 누르면 GitHub 설정에 올라가 모든 기기에 반영되지만(각 페이지에서 [갱신]),
     <b>API 키는 이 기기의 브라우저/앱에만 저장</b>되고 GitHub에는 절대 올라가지 않아요. 키는 쓰는 기기마다 한 번씩 입력해야 해요.
   </div>
@@ -276,7 +278,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       if(d.shiftX == null) d.shiftX = 0;
       delete d.centerWidth;
       // API 선택: GitHub 값이 있으면 이 기기에도 반영(키는 건드리지 않음), 없으면 이 기기 값을 사용
-      if(Array.isArray(d.apis) && d.apis.length) d.apis = AiaiApi.setCfg(d.apis);
+      if(Array.isArray(d.apis) && d.apis.length) d.apis = AiaiApi.applyRemoteCfg(d.apis, d.updated);
       else d.apis = AiaiApi.getCfg();
       apiBuild();
       status('불러옴 · ' + new Date().toLocaleTimeString(), 'ok');
@@ -435,24 +437,15 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   function maskKey(k){ return k ? '저장됨 (' + (k.length > 8 ? '…' + k.slice(-4) : '●●●●') + ')' : '키 없음'; }
   function apiBuild(){
     var box = $('apiList'); box.innerHTML = '';
-    var lastGroup = '';
     AiaiApi.getCfg().forEach(function(c){
       var p = AiaiApi.provider(c.id);
-      if(p.group !== lastGroup){
-        lastGroup = p.group;
-        var gh = document.createElement('div');
-        gh.className = 'grp';
-        gh.innerHTML = p.group === 'free'
-          ? '🆓 무료로 시작하기 <small>무료 한도가 있는 서비스예요</small>'
-          : '💳 유료 · 기타 (직접 추가) <small>ChatGPT · Claude 등 유료 API나 그 밖의 서비스는 여기서 설정해요</small>';
-        box.appendChild(gh);
-      }
       var el = document.createElement('div');
       el.className = 'apibox' + (c.on ? ' on' : '');
       el.dataset.id = c.id;
-      var title = p.custom ? p.label : p.label;
+      var title = (p.group === 'free' ? '🆓 ' : '💳 ') + p.label;
       var h = '<div class="hd"><label class="chk"><input type="checkbox" class="f-on"' + (c.on ? ' checked' : '') + '> ' +
-        escHtml(title) + '</label><span class="vend">' + escHtml(p.vendor || '') + '</span></div><div class="sub">';
+        escHtml(title) + '</label><span class="vend">' + escHtml(p.vendor || '') + '</span>' +
+        '<span class="mvs"><button type="button" class="mini ghost b-up" aria-label="위로 이동">▲</button><button type="button" class="mini ghost b-dn" aria-label="아래로 이동">▼</button></span></div><div class="sub">';
       if(p.note) h += '<div class="note" style="margin:0 0 10px">' + escHtml(p.note) + '</div>';
       if(p.custom){
         h += '<div class="field"><label>프리셋 (고르면 아래 칸이 채워져요)</label><select class="f-preset"></select></div>' +
@@ -530,6 +523,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
           return ids;
         }catch(e){ mst.textContent = '✗ ' + e.message; mst.style.color = 'var(--danger)'; return null; }
       }
+      q('.b-up').onclick = function(){ moveBox(el, -1); };
+      q('.b-dn').onclick = function(){ moveBox(el, 1); };
       q('.b-models').onclick = loadModels;
       q('.f-on').onchange = function(){ el.classList.toggle('on', this.checked); };
       q('.b-key').onclick = function(){
@@ -558,6 +553,23 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       };
       box.appendChild(el);
     });
+    refreshMoveBtns();
+  }
+  function refreshMoveBtns(){
+    var boxes = $('apiList').querySelectorAll('.apibox');
+    Array.prototype.forEach.call(boxes, function(b, i){
+      b.querySelector('.b-up').disabled = (i === 0);
+      b.querySelector('.b-dn').disabled = (i === boxes.length - 1);
+    });
+  }
+  function moveBox(el, dir){
+    var box = $('apiList');
+    if(dir < 0 && el.previousElementSibling) box.insertBefore(el, el.previousElementSibling);
+    else if(dir > 0 && el.nextElementSibling) box.insertBefore(el.nextElementSibling, el);
+    else return;
+    refreshMoveBtns();
+    apiStatus('순서가 바뀌었어요 · 맨 아래 [API 선택 저장]을 눌러야 저장돼요', '');
+    try{ el.scrollIntoView({block: 'nearest'}); }catch(e){}
   }
   function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function apiRead(el, id){
@@ -574,7 +586,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   $('apiSave').onclick = function(){
     var list = [];
     Array.prototype.forEach.call($('apiList').querySelectorAll('.apibox'), function(el){ list.push(apiRead(el, el.dataset.id)); });
-    list = AiaiApi.setCfg(list);                       // 이 기기(통합 검색)에는 바로 반영
+    list = AiaiApi.setCfg(list);                       // 이 기기(통합 검색)에는 바로 반영 (목록 순서 = 표시 순서)
+    AiaiApi.stampOrder();
     // 입력해 둔 키가 있는데 [키 저장]을 안 눌렀다면 같이 저장
     Array.prototype.forEach.call($('apiList').querySelectorAll('.apibox'), function(el){
       var inp = el.querySelector('.f-key'), v = inp.value.trim();

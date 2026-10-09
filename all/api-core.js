@@ -9,7 +9,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.14.5";
+  var VERSION = "1.15.0";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -71,11 +71,15 @@
   /* ---------- 설정 / 키 저장 ---------- */
   // 어떤 입력이 와도 항상 PROVIDERS 순서의 완전한 목록으로 정리 (예전 저장값의 모르는 id 는 버림)
   function normCfg(arr){
-    var by = {};
-    (Array.isArray(arr) ? arr : []).forEach(function(c){ if(c && typeof c.id === "string") by[c.id] = c; });
-    return PROVIDERS.map(function(p){
-      var c = by[p.id] || {};
-      function str(v){ return typeof v === "string" ? v.trim() : ""; }
+    // 입력된 순서를 그대로 유지하고(= 사용자가 정한 표시 순서), 빠진 항목만 기본 순서대로 뒤에 붙임
+    var by = {}, order = [];
+    (Array.isArray(arr) ? arr : []).forEach(function(c){
+      if(c && typeof c.id === "string" && provider(c.id) && !by.hasOwnProperty(c.id)){ by[c.id] = c; order.push(c.id); }
+    });
+    PROVIDERS.forEach(function(p){ if(!by.hasOwnProperty(p.id)) order.push(p.id); });
+    function str(v){ return typeof v === "string" ? v.trim() : ""; }
+    return order.map(function(id){
+      var p = provider(id), c = by[id] || {};
       return {
         id: p.id,
         on: c.on === true,
@@ -98,6 +102,38 @@
     try{ localStorage.setItem(CFG_KEY, JSON.stringify(n)); }catch(e){}
     return n;
   }
+
+  /* ---------- 표시 순서 ---------- */
+  var ORD_KEY = "uni_api_order_t_v1";   // 이 기기에서 순서를 마지막으로 바꾼 시각
+  function orderTime(){ try{ return +localStorage.getItem(ORD_KEY) || 0; }catch(e){ return 0; } }
+  function stampOrder(){ try{ localStorage.setItem(ORD_KEY, String(Date.now())); }catch(e){} }
+  // ids 순서대로 정렬해 저장 (목록에 없는 항목은 뒤로)
+  function setOrder(ids){
+    var pos = {}, arr = getCfg().map(function(c, i){ return {c: c, i: i}; });
+    (ids || []).forEach(function(id, i){ pos[id] = i; });
+    function rank(x){ return pos.hasOwnProperty(x.c.id) ? pos[x.c.id] : 1e6 + x.i; }
+    arr.sort(function(a, b){ return rank(a) - rank(b); });
+    return setCfg(arr.map(function(x){ return x.c; }));
+  }
+  // id 항목을 위(-1)/아래(+1)로 한 칸 이동. onlyOn=true 면 "사용 중" 항목끼리만 자리를 바꿈
+  function move(id, dir, onlyOn){
+    var arr = getCfg(), idxs = [], k = -1;
+    arr.forEach(function(c, i){ if(!onlyOn || c.on) idxs.push(i); });
+    idxs.forEach(function(ix, j){ if(arr[ix].id === id) k = j; });
+    var t = k + dir;
+    if(k < 0 || t < 0 || t >= idxs.length) return false;
+    var a = idxs[k], b = idxs[t], tmp = arr[a]; arr[a] = arr[b]; arr[b] = tmp;
+    setCfg(arr); stampOrder();
+    return true;
+  }
+  // GitHub 설정을 받아 반영. 이 기기에서 순서를 더 최근에 바꿨다면 그 순서는 유지
+  function applyRemoteCfg(arr, updated){
+    var prev = getCfg().map(function(c){ return c.id; }), t = orderTime();
+    var n = setCfg(arr);
+    if(t > (+updated || 0)) n = setOrder(prev);
+    return n;
+  }
+
   function readKeys(){
     try{ var k = JSON.parse(localStorage.getItem(KEY_KEY)); if(k && typeof k === "object") return k; }catch(e){}
     return {};
@@ -475,6 +511,7 @@
     VERSION: VERSION, PROVIDERS: PROVIDERS, PRESETS: PRESETS, FORMATS: FORMATS,
     provider: provider, displayName: displayName, formatOf: formatOf, baseOf: baseOf, webLabelOf: webLabelOf, missing: missing,
     normCfg: normCfg, getCfg: getCfg, setCfg: setCfg,
+    move: move, setOrder: setOrder, stampOrder: stampOrder, orderTime: orderTime, applyRemoteCfg: applyRemoteCfg,
     getKey: getKey, setKey: setKey,
     run: run, listModels: listModels, renderMd: renderMd, explain: explain
   };

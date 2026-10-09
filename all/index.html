@@ -159,6 +159,11 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .md th{background:var(--card)}
 .apisum{font-size:13px;line-height:1.7}
 .apisum .off{color:var(--muted)}
+.apisum>div{display:flex;align-items:center;gap:8px}
+.apisum .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.apisum .mv{flex:none;display:flex;gap:4px}
+.apisum .mv button{padding:2px 10px;font-size:12px;line-height:1.6;color:var(--muted);background:var(--card);border:1px solid var(--border)}
+.apisum .mv button:disabled{opacity:.35;cursor:default}
 </style>
 </head>
 <body class="layout-split">
@@ -565,7 +570,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       saveCfg(k);
       var f = $(sv.pane).querySelector(".frame"); if(f) applyCrop(f, sv.cfg);
     });
-    if(Array.isArray(d.apis) && d.apis.length) AiaiApi.setCfg(d.apis);   // 관리자가 고른 API 목록 (키는 포함되지 않음)
+    if(Array.isArray(d.apis) && d.apis.length) AiaiApi.applyRemoteCfg(d.apis, d.updated);   // 관리자가 고른 API 목록·순서 (키는 포함되지 않음)
     setCropInputs(); resetEditor(); render();
   }
   async function fetchSettings(){
@@ -690,11 +695,23 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       $("subApi").textContent = "없음";
       return;
     }
-    on.forEach(function(c){
+    on.forEach(function(c, i){
       var has = !!AiaiApi.getKey(c.id);
-      var row = div("", null);
-      row.textContent = (has ? "✓ " : "⚠ ") + AiaiApi.displayName(c) + " · " + c.model + (c.web ? " · 웹검색" : "") + (has ? "" : " · 키 없음");
-      if(!has) row.className = "off";
+      var row = div(has ? "" : "off", null), tx = document.createElement("span");
+      tx.className = "t";
+      tx.textContent = (has ? "✓ " : "⚠ ") + AiaiApi.displayName(c) + " · " + c.model + (c.web ? " · 웹검색" : "") + (has ? "" : " · 키 없음");
+      row.appendChild(tx);
+      if(on.length > 1){
+        var mv = document.createElement("span"); mv.className = "mv";
+        [["▲", -1, "위로"], ["▼", 1, "아래로"]].forEach(function(m){
+          var b = document.createElement("button"); b.type = "button"; b.textContent = m[0];
+          b.setAttribute("aria-label", AiaiApi.displayName(c) + " " + m[2] + " 이동");
+          b.disabled = (m[1] < 0 && i === 0) || (m[1] > 0 && i === on.length - 1);
+          b.onclick = function(e){ e.stopPropagation(); if(AiaiApi.move(c.id, m[1], true)) render(); };
+          mv.appendChild(b);
+        });
+        row.appendChild(mv);
+      }
       box.appendChild(row);
     });
     $("subApi").textContent = on.map(AiaiApi.displayName).join(" · ");
@@ -709,6 +726,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     paintApi();
   }
 
+  // 결과 탭 순서 = 설정(표시 순서) 순서, 설정에서 빠졌지만 아직 진행 중인 것은 뒤에
+  function resIds(){
+    var out = [];
+    AiaiApi.getCfg().forEach(function(c){ if(apiRes.hasOwnProperty(c.id)) out.push(c.id); });
+    Object.keys(apiRes).forEach(function(k){ if(out.indexOf(k) < 0) out.push(k); });
+    return out;
+  }
+
   function schedulePaint(){
     if(apiPaintQueued) return;
     apiPaintQueued = true;
@@ -718,7 +743,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   // soft=true: 스트리밍 중 갱신 → 스크롤 위치와 탭 버튼은 그대로 두고 본문만 바꿈
   function paintApi(soft){
     var fill = apiFill();
-    var ids = Object.keys(apiRes);
+    var ids = resIds();
     if(!apiAsked || !ids.length){
       var on = apiOn();
       fill.innerHTML = "";
