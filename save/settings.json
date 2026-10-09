@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791570695902,
+  "updated": 1791570788884,
   "prompts": [
     {
       "id": "mv0x39byjcnrk",
@@ -27,7 +27,7 @@
     {
       "id": "groq_c2",
       "on": true,
-      "model": "qwen/qwen3.8-27b",
+      "model": "openai/gpt-oss-120b",
       "web": false,
       "baseUrl": "",
       "name": "",
