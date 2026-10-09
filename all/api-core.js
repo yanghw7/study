@@ -9,7 +9,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.16.2";
+  var VERSION = "1.16.3";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -83,6 +83,29 @@
     if(/grok/.test(name) || /grok/.test(model)) return "Grok";
     return "복사한 카드";
   }
+  function knownProvider(id){
+    for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].id === id) return PROVIDERS[i];
+    return null;
+  }
+  // 복사 카드는 표시 이름만 새로 만들고 원본의 카드 유형(양식/요청 방식)은 templateId로 유지합니다.
+  // 이전 버전의 복사 카드에는 templateId가 없으므로 주소/모델로 가능한 경우 원본 유형을 추정합니다.
+  function templateOf(cfg){
+    if(!cfg || typeof cfg !== "object") return "custom1";
+    var id = String(cfg.id || "");
+    if(!/^copy_[a-z0-9]+$/i.test(id)) return knownProvider(id) ? id : "custom1";
+    var saved = String(cfg.templateId || cfg.sourceProviderId || "");
+    if(knownProvider(saved)) return saved;
+    var base = String(cfg.baseUrl || "").toLowerCase().replace(/\/+$/, "");
+    var vendor = String(cfg.vendor || "").toLowerCase();
+    var model = String(cfg.model || "").toLowerCase();
+    var fmt = String(cfg.format || "").toLowerCase();
+    if(base.indexOf("api.groq.com/openai/v1") >= 0 || vendor === "groq") return "groq";
+    if(base.indexOf("openrouter.ai/api/v1") >= 0 || vendor === "openrouter") return "openrouter";
+    if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0 || /cloudflare workers ai|^cloudflare$/.test(vendor)) return "cloudflare";
+    if(fmt === "gemini" && (/^gemini[-.]/.test(model) || /^models\/gemini/.test(model)) && /google ai studio/.test(vendor)) return "gemini";
+    // 직접 추가된 주소(예: xAI Grok)는 직접 추가 카드의 편집 양식을 유지해야 합니다.
+    return "custom1";
+  }
   function provider(id, cfg){
     for(var i = 0; i < PROVIDERS.length; i++){
       if(PROVIDERS[i].id === id){
@@ -96,8 +119,20 @@
         return baseProvider;
       }
     }
-    // 복사한 카드는 원본 설정을 유지하는 별도 사용자 지정 API입니다.
+    // 복사 카드도 원본과 같은 provider 정의를 사용합니다.
+    // 이 때문에 Groq 복사본은 Groq 전용 양식(키 힌트, 키 링크, 설명, 호출 방식 등)으로 렌더링됩니다.
     if(typeof id === "string" && /^copy_[a-z0-9]+$/i.test(id)){
+      var template = knownProvider(templateOf(cfg));
+      if(template){
+        if(template.custom){
+          return Object.assign({}, template, {
+            id: id,
+            group: inferGroup(cfg, template.group),
+            vendor: copiedVendor(cfg) !== "복사한 카드" ? copiedVendor(cfg) : template.vendor
+          });
+        }
+        return Object.assign({}, template, {id: id});
+      }
       return {
         id: id,
         group: copiedGroup(cfg),
@@ -152,9 +187,11 @@
         name: str(c.name),
         format: (["openai", "claude", "gemini"].indexOf(c.format) >= 0) ? c.format : "compat",
         account: str(c.account),
+        // 복사본의 UI 양식까지 원본과 같도록 provider template ID를 저장합니다.
+        templateId: /^copy_[a-z0-9]+$/i.test(id) ? templateOf(c) : undefined,
         // 직접 추가/복사 카드 모두 원래 분류·공급자 설정을 보존합니다.
         group: p.custom ? inferGroup(c, p.group) : p.group,
-        vendor: p.custom ? vendorOf({id:id, name:str(c.name), model:str(c.model), baseUrl:str(c.baseUrl), format:(c.format || "compat"), group:c.group, vendor:str(c.vendor)}) : str(p.vendor)
+        vendor: p.custom ? vendorOf({id:id, templateId:templateOf(c), name:str(c.name), model:str(c.model), baseUrl:str(c.baseUrl), format:(c.format || "compat"), group:c.group, vendor:str(c.vendor)}) : str(p.vendor)
       };
     });
   }
@@ -651,7 +688,7 @@
 
   root.AiaiApi = {
     VERSION: VERSION, PROVIDERS: PROVIDERS, PRESETS: PRESETS, FORMATS: FORMATS,
-    provider: provider, displayName: displayName, formatOf: formatOf, baseOf: baseOf, groupOf: groupOf, vendorOf: vendorOf, webLabelOf: webLabelOf, missing: missing,
+    provider: provider, templateOf: templateOf, displayName: displayName, formatOf: formatOf, baseOf: baseOf, groupOf: groupOf, vendorOf: vendorOf, webLabelOf: webLabelOf, missing: missing,
     normCfg: normCfg, getCfg: getCfg, setCfg: setCfg,
     move: move, setOrder: setOrder, stampOrder: stampOrder, orderTime: orderTime, applyRemoteCfg: applyRemoteCfg,
     getKey: getKey, setKey: setKey,

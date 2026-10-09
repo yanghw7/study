@@ -163,7 +163,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 </div>
 
 
-<script src="../all/api-core.js?v=1.16.2"></script>
+<script src="../all/api-core.js?v=1.16.3"></script>
 <script>
 (function(){
   var API = 'https://api.github.com/repos/yanghw7/study/contents/save/settings.json';
@@ -479,6 +479,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       var el = document.createElement('div');
       el.className = 'apibox' + (c.on ? ' on' : '');
       el.dataset.id = c.id;
+      el.dataset.templateId = AiaiApi.templateOf(c);
       el.dataset.savedName = c.name || '';
       el.dataset.group = AiaiApi.groupOf(c);
       el.dataset.vendor = AiaiApi.vendorOf(c);
@@ -650,7 +651,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function apiRead(el, id){
     var q = function(c){ return el.querySelector(c); };
-    return {
+    var result = {
       id: id, on: q('.f-on').checked, model: q('.f-model').value.trim(),
       web: q('.f-web') ? q('.f-web').checked : false,
       baseUrl: q('.f-base') ? q('.f-base').value.trim() : '',
@@ -660,6 +661,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       group: q('.f-group') ? q('.f-group').value : (el.dataset.group || 'paid'),
       vendor: el.dataset.vendor || ''
     };
+    if(/^copy_[a-z0-9]+$/i.test(id)) result.templateId = el.dataset.templateId || 'custom1';
+    return result;
   }
   function apiListFromDom(skipEl){
     var list = [];
@@ -714,6 +717,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       baseUrl: src.baseUrl || (!(srcProvider && srcProvider.custom) ? AiaiApi.baseOf(src) : ''),
       format: (srcProvider && srcProvider.custom) ? src.format : AiaiApi.formatOf(src),
       account: src.account || '',
+      templateId: src.templateId || AiaiApi.templateOf(src),
       group: AiaiApi.groupOf(src),
       vendor: AiaiApi.vendorOf(src)
     });
