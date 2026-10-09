@@ -34,6 +34,7 @@ label{display:block;font-size:16px;font-weight:600;color:var(--muted);margin:0 0
 .modellist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .modellist:empty{display:none}
 .mchip{font:inherit;font-size:14px;line-height:1.3;padding:6px 10px;border-radius:999px;border:1px solid var(--fg);background:transparent;color:var(--fg);cursor:pointer;word-break:break-all;text-align:left}
+.mgrp{flex-basis:100%;font-size:14px;font-weight:700;color:var(--muted);margin-top:6px}
 .mchip.sel{background:var(--fg);color:var(--bg)}
 .status{font-size:16px;color:var(--muted);margin-top:10px;min-height:18px}
 .status.bad{color:var(--danger)}
@@ -74,7 +75,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     <div class="note">여기서 저장한 설정을 GitHub에 올리고, 일반 페이지에서는 <b>갱신</b> 버튼을 눌렀을 때 반영합니다.</div>
   </div>
   <div class="back">
-    <a href="https://yanghw7.github.io/study/all" class="back-btn">통합 AI검색 복귀</a>
+    <a href="../all/" class="back-btn">통합 AI검색 복귀</a>
   </div>
 </div>
 
@@ -554,21 +555,25 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
         try{
           var cur = apiRead(el, c.id);
           var ids = await AiaiApi.listModels(cur);
-          // OpenRouter 는 이름 끝이 ':free' 인 무료 모델만 보여줌
-          var isOR = /openrouter/i.test([c.id, cur.id, cur.baseUrl, cur.name, p.label, p.vendor, p.baseUrl].join(' '));
-          if(isOR) ids = ids.filter(function(id){ return /:free$/i.test(id); });
           var dl = q('datalist'); dl.innerHTML = '';
           ids.forEach(function(id){ var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
-          mst.textContent = ids.length ? ('✓ ' + (isOR ? '무료(:free) ' : '') + ids.length + '개 — 아래 목록에서 눌러 선택하세요') : '사용 가능한 모델이 없어요.';
+          mst.textContent = ids.length ? ('✓ ' + ids.length + '개 — 아래 목록에서 눌러 선택하세요') : '사용 가능한 모델이 없어요.';
           var ml = q('.modellist'); ml.innerHTML = '';
-          ids.forEach(function(id){
-            var b = document.createElement('button'); b.type = 'button'; b.className = 'mchip'; b.textContent = id;
-            b.onclick = function(){
-              q('.f-model').value = id;
-              Array.prototype.forEach.call(ml.children, function(x){ x.classList.toggle('sel', x === b); });
-            };
-            if(id === q('.f-model').value) b.classList.add('sel');
-            ml.appendChild(b);
+          var groups = ids.groups || [{label: '', ids: ids}];   // OpenRouter 는 :free / 가격 0 으로 나뉘어 옴
+          groups.forEach(function(g){
+            if(g.label){
+              var h = document.createElement('div'); h.className = 'mgrp';
+              h.textContent = g.label + ' · ' + g.ids.length + '개'; ml.appendChild(h);
+            }
+            g.ids.forEach(function(id){
+              var b = document.createElement('button'); b.type = 'button'; b.className = 'mchip'; b.textContent = id;
+              b.onclick = function(){
+                q('.f-model').value = id;
+                Array.prototype.forEach.call(ml.querySelectorAll('.mchip'), function(x){ x.classList.toggle('sel', x === b); });
+              };
+              if(id === q('.f-model').value) b.classList.add('sel');
+              ml.appendChild(b);
+            });
           });
           return ids;
         }catch(e){ mst.textContent = '✗ ' + e.message; mst.style.color = 'var(--danger)'; return null; }
