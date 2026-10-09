@@ -94,6 +94,15 @@
   }
   function parse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
 
+  // 스트림 중간에 온 오류 이벤트에서 사람이 읽을 수 있는 문장을 뽑음 (없으면 원문 일부를 그대로 보여줌)
+  function errText(j, fallback){
+    var e = j && (j.error || (j.response && (j.response.error || j.response.incomplete_details)) || j);
+    var m = e && (e.message || e.reason || e.code || e.type);
+    var raw = "";
+    try{ raw = JSON.stringify(j).slice(0, 300); }catch(x){}
+    return (fallback || "오류") + (m ? ": " + m : "") + (raw ? "  [" + raw + "]" : "");
+  }
+
   async function failFrom(resp){
     var txt = "";
     try{ txt = await resp.text(); }catch(e){}
@@ -128,8 +137,8 @@
         var j = parse(data); if(!j) return;
         if(j.type === "response.output_text.delta" && j.delta) h.onText(j.delta);
         else if(j.type === "response.output_text.annotation.added" && j.annotation && j.annotation.url) h.onSource({url: j.annotation.url, title: j.annotation.title});
-        else if(j.type === "response.failed") throw new Error((j.response && j.response.error && j.response.error.message) || "응답 실패");
-        else if(j.type === "error") throw new Error(j.message || "오류");
+        else if(j.type === "response.failed" || j.type === "response.incomplete") throw new Error(errText(j, "응답 실패"));
+        else if(j.type === "error") throw new Error(errText(j, "오류 이벤트"));
       });
     },
 
@@ -146,7 +155,7 @@
       if(!resp.ok) await failFrom(resp);
       await readSSE(resp, function(ev, data){
         var j = parse(data); if(!j) return;
-        if(j.error) throw new Error(j.error.message || "오류");
+        if(j.error) throw new Error(errText(j, "오류"));
         if(j.promptFeedback && j.promptFeedback.blockReason) throw new Error("요청이 차단됐어요 (" + j.promptFeedback.blockReason + ")");
         var cand = j.candidates && j.candidates[0]; if(!cand) return;
         if(cand.content && cand.content.parts) cand.content.parts.forEach(function(p){ if(p.text && !p.thought) h.onText(p.text); });
@@ -176,7 +185,7 @@
         } else if(j.type === "content_block_start" && j.content_block && j.content_block.type === "web_search_tool_result" && Array.isArray(j.content_block.content)){
           j.content_block.content.forEach(function(r){ if(r && r.url) h.onSource({url: r.url, title: r.title}); });
         } else if(j.type === "error"){
-          throw new Error((j.error && j.error.message) || "오류");
+          throw new Error(errText(j, "오류"));
         }
       });
     },
@@ -194,7 +203,7 @@
       await readSSE(resp, function(ev, data){
         if(data.trim() === "[DONE]") return;
         var j = parse(data); if(!j) return;
-        if(j.error) throw new Error(j.error.message || "오류");
+        if(j.error) throw new Error(errText(j, "오류"));
         var d = j.choices && j.choices[0] && j.choices[0].delta;
         if(d && typeof d.content === "string" && d.content) h.onText(d.content);
         if(Array.isArray(j.citations)) j.citations.forEach(function(u){ if(typeof u === "string") h.onSource({url: u}); });
