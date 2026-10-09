@@ -119,10 +119,46 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
 /* 탭: 두 패널을 겹쳐 두고 하나만 보이게 (둘 다 계속 로딩됨) */
 /* 전용: 한쪽만 전체 화면 · 분할: 상하 / 좌우 */
-.layout-google #paneN,.layout-naver #paneG{display:none}
-.layout-google .phead,.layout-naver .phead{display:none}
+.layout-google #paneA,.layout-api #paneG{display:none}
+.layout-google .phead,.layout-api .phead{display:none}
 .layout-split #panes{grid-template-rows:1fr 1fr}
 .layout-side #panes{grid-template-columns:1fr 1fr}
+
+/* ===== API 칸 ===== */
+.apiwrap{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+.apitabs{flex:none;display:flex;gap:6px;overflow-x:auto;padding:8px;border-bottom:1px solid var(--border);background:var(--card)}
+.apitabs button{flex:none;display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);background:var(--bg);border:1px solid var(--border);white-space:nowrap}
+.apitabs button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.run{background:#f59e0b;animation:pulse 1s infinite}
+.dot.done{background:#22c55e}
+.dot.err{background:var(--danger)}
+@keyframes pulse{50%{opacity:.35}}
+.apibody{flex:1;min-height:0;overflow-y:auto;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));font-size:15px;line-height:1.65;word-break:break-word;-webkit-user-select:text;user-select:text}
+.apimeta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:8px}
+.apimeta .sp{flex:1}
+.apimeta button{font-size:12px;padding:3px 10px;border:1px solid var(--border);color:var(--muted)}
+.apierr{color:var(--danger);font-size:14px;line-height:1.5;background:transparent;border:1px solid var(--danger);border-radius:10px;padding:10px 12px;margin:8px 0}
+.srcs{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-size:13px}
+.srcs b{display:block;color:var(--muted);margin-bottom:4px}
+.srcs a{display:block;margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.md>:first-child{margin-top:0}
+.md p{margin:.55em 0}
+.md h2,.md h3,.md h4,.md h5{margin:1em 0 .4em;line-height:1.35}
+.md h2{font-size:18px}.md h3{font-size:16.5px}.md h4,.md h5{font-size:15.5px}
+.md ul,.md ol{margin:.4em 0;padding-left:1.4em}
+.md li{margin:.15em 0}
+.md code{background:var(--accent-soft);border-radius:5px;padding:1px 5px;font-size:.9em;font-family:ui-monospace,Menlo,Consolas,monospace}
+.md pre{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;overflow-x:auto}
+.md pre code{background:none;padding:0}
+.md blockquote{margin:.6em 0;padding:2px 12px;border-left:3px solid var(--accent);color:var(--muted)}
+.md hr{border:0;border-top:1px solid var(--border);margin:1em 0}
+.md .tbl{overflow-x:auto;margin:.6em 0}
+.md table{border-collapse:collapse;font-size:14px}
+.md th,.md td{border:1px solid var(--border);padding:5px 9px;text-align:left}
+.md th{background:var(--card)}
+.apisum{font-size:13px;line-height:1.7}
+.apisum .off{color:var(--muted)}
 </style>
 </head>
 <body class="layout-split">
@@ -150,7 +186,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="cur-body" id="curBody"></div>
-        <div class="note">검색할 때 이 프롬프트가 입력 내용 뒤에 자동으로 붙어요. 구글·네이버에 똑같이 적용돼요.</div>
+        <div class="note">검색할 때 이 프롬프트가 입력 내용 뒤에 자동으로 붙어요. 구글·API에 똑같이 적용돼요.</div>
       </div></div></div>
     </div>
 
@@ -192,7 +228,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="field">
-          <div class="label" id="cropLabel">화면 잘라내기 (px) · 구글·네이버 공통</div>
+          <div class="label" id="cropLabel">화면 잘라내기 (px) · 구글 화면</div>
           <div class="crop">
             <div><small>위쪽</small><input type="number" id="cropTop" min="0" max="500" step="10"></div>
             <div><small>아래쪽</small><input type="number" id="cropBottom" min="0" max="500" step="10"></div>
@@ -200,9 +236,21 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
             <div><small>오른쪽</small><input type="number" id="cropRight" min="0" max="500" step="10"></div>
             <div style="flex-basis:100%"><small>가로 이동 (+ 오른쪽 / − 왼쪽)</small><input type="number" id="shiftX" min="-500" max="500" step="10"></div>
           </div>
-          <small>AI 화면 안의 입력창이 가려지도록 위/아래/왼쪽/오른쪽을 잘라내요. 숫자를 바꾸면 구글·네이버 화면에 바로 적용돼요.</small>
+          <small>AI 화면 안의 입력창이 가려지도록 위/아래/왼쪽/오른쪽을 잘라내요. 숫자를 바꾸면 구글 화면에 바로 적용돼요.</small>
         </div>
-        <div class="note">관리자에서 저장한 설정은 <b>갱신</b> 버튼을 눌렀을 때 구글·네이버 모두에 적용돼요. 여기서 바꾸면 이 기기에만 임시 적용됩니다.</div>
+        <div class="note">관리자에서 저장한 설정은 <b>갱신</b> 버튼을 눌렀을 때 적용돼요. 여기서 바꾸면 이 기기에만 임시 적용됩니다.</div>
+      </div></div></div>
+    </div>
+
+    <div class="acc" data-key="api">
+      <button type="button" class="acc-head" aria-expanded="false">
+        <span class="ico">🔌</span>
+        <span class="ttl">사용 중인 API<span class="sub" id="subApi"></span></span>
+        <i class="chev"></i>
+      </button>
+      <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
+        <div class="apisum" id="apiSum"></div>
+        <div class="note">사용할 API와 키는 관리자 페이지에서 정해요. 키는 이 기기에만 저장되고 GitHub에는 올라가지 않아요.</div>
       </div></div></div>
     </div>
 
@@ -222,36 +270,38 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     <div class="tools">
       <div class="seg" id="layoutSeg">
         <button type="button" data-l="google">구글 전용</button>
-        <button type="button" data-l="naver">네이버 전용</button>
+        <button type="button" data-l="api">API 전용</button>
         <button type="button" data-l="side">좌우 분할</button>
         <button type="button" data-l="split">상하 분할</button>
       </div>
     </div>
     <div id="panes">
       <div class="pane" id="paneG"><div class="phead">구글 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
-      <div class="pane" id="paneN"><div class="phead">네이버 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
+      <div class="pane" id="paneA"><div class="phead">API</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
     </div>
   </main>
 </div>
 
+<script src="api-core.js"></script>
 <script>
 (function(){
-  // APK(안드로이드 앱) 안에서는 구글·네이버 화면을 iframe 대신 앱의 진짜 웹뷰로 띄웁니다. (iframe 차단 오류 방지)
+  // APK(안드로이드 앱) 안에서는 구글 화면을 iframe 대신 앱의 진짜 웹뷰로 띄웁니다. (iframe 차단 오류 방지)
+  // API 칸은 웹뷰가 아니라 이 화면 안에서 직접 그리므로 앱/브라우저 모두 똑같이 동작합니다.
   var NATIVE = !!window.AiaiNative;
-  var loaded = {g: false, n: false};
+  var loaded = {g: false};
   var SITE_SETTINGS = /\.github\.io$/i.test(location.hostname) ? new URL("/study/save/settings.json", location.origin).href : "https://yanghw7.github.io/study/save/settings.json";
-  var NAVER = "https://m.search.naver.com/search.naver?ssc=tab.m_ait.all&sm=mtb_jum&dtm_source=search&dtm_medium=tab";
   var MAX_PROMPT = 3500;
   var UIKEY = "uni_ui_v1", LKEY = "uni_layout_v1", ETAG_KEY = "uni_etag_v1";
   var mq = window.matchMedia("(max-width:720px)");
-  // 구글/네이버 앱과 같은 저장 키를 써서, 여기서 바꾼 프롬프트·자르기 설정이 각 앱에도 그대로 보입니다.
+  // 구글/네이버 단독 앱과 같은 저장 키를 써서, 여기서 바꾼 프롬프트·자르기 설정이 각 앱에도 그대로 보입니다.
+  // (API 칸은 프롬프트를 구글과 똑같이 쓰기 때문에, 예전 네이버 칸이 쓰던 저장 키를 그대로 이어서 씁니다.)
   var SV = {
     g: {name: "구글 AI",  pk: "aimode_prompts_v2",  ck: "aimode_cfg_v1",  pane: "paneG", st: null, cfg: null,
         url: function(t){ return "https://www.google.com/search?udm=50&q=" + encodeURIComponent(t); }},
-    n: {name: "네이버 AI", pk: "naimode_prompts_v2", ck: "naimode_cfg_v1", pane: "paneN", st: null, cfg: null,
-        url: function(t){ return NAVER + "&query=" + encodeURIComponent(t); }}
+    a: {name: "API", pk: "naimode_prompts_v2", ck: "naimode_cfg_v1", pane: "paneA", st: null, cfg: null}
   };
-  var KEYS = ["g", "n"];
+  var KEYS = ["g", "a"];   // 검색을 보내는 칸
+  var NKEYS = ["g"];       // 앱의 웹뷰가 필요한 칸 (구글만)
 
   var $ = function(id){ return document.getElementById(id); };
   var q = $("q"), ed = $("ed"), edSave = $("edSave"), edCancel = $("edCancel"), edTitle = $("edTitle");
@@ -282,10 +332,10 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     function n(v, d){ return typeof v === "number" ? v : d; }
     return {cropTop: n(c.cropTop, 0), cropBottom: n(c.cropBottom, 100), cropLeft: n(c.cropLeft, 0), cropRight: n(c.cropRight, 0), shiftX: n(c.shiftX, 0)};
   }
-  // 구글·네이버 구분 없이 하나의 값으로 통일: 구글 저장값을 기준으로 쓰고, 저장할 때 네이버 앱 쪽에도 똑같이 기록
+  // 구글·API 구분 없이 하나의 값으로 통일: 구글 저장값을 기준으로 쓰고, 저장할 때 네이버 단독 앱 쪽에도 똑같이 기록
   function persist(){ KEYS.forEach(function(k){ try{ localStorage.setItem(SV[k].pk, JSON.stringify(SV.g.st)); }catch(e){} }); }
   function saveCfg(){ KEYS.forEach(function(k){ try{ localStorage.setItem(SV[k].ck, JSON.stringify(SV.g.cfg)); }catch(e){} }); }
-  function loadAll(){ SV.g.st = loadSt("g"); SV.g.cfg = loadCfg("g"); SV.n.st = SV.g.st; SV.n.cfg = SV.g.cfg; }
+  function loadAll(){ SV.g.st = loadSt("g"); SV.g.cfg = loadCfg("g"); SV.a.st = SV.g.st; SV.a.cfg = SV.g.cfg; }
   function loadUi(){
     try{ var u = JSON.parse(localStorage.getItem(UIKEY)); if(u && u.open) return u; }catch(e){}
     return {open: {}, side: true, svc: "g"};
@@ -362,6 +412,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return text.replace(/\s+$/, "") + "\n\n\n" + a.text; // 검색어 → 빈 줄 2개 → 프롬프트
   }
   function run(k, text){
+    if(k === "a"){ runApi(buildQuery(text, "g")); return; }
     var url = SV[k].url(buildQuery(text, k));
     var fill = $(SV[k].pane).querySelector(".fill");
     fill.innerHTML = "";
@@ -391,15 +442,15 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
   // ---- 트래픽 줄이기 ----
   // 1) 지금 화면에 보이는 쪽만 검색 (구글 전용이면 네이버는 안 부르고, 나중에 그 화면으로 바꿀 때 한 번만 불러옴)
-  // 2) 서비스별 최소 간격: 간격 안에 또 검색하면 마지막 검색어만 간격이 지난 뒤 실행 (구글 7초 / 네이버 1.5초)
-  var GAP = {g: 7000, n: 1500}, lastRun = {g: 0, n: 0}, timers = {g: null, n: null}, pending = {g: null, n: null};
+  // 2) 칸별 최소 간격: 간격 안에 또 검색하면 마지막 검색어만 간격이 지난 뒤 실행 (구글 7초 / API 0.6초)
+  var GAP = {g: 7000, a: 600}, lastRun = {g: 0, a: 0}, timers = {g: null, a: null}, pending = {g: null, a: null};
   function visibleKey(k){
     var b = document.body.classList;
     if(b.contains("layout-google")) return k === "g";
-    if(b.contains("layout-naver")) return k === "n";
+    if(b.contains("layout-api")) return k === "a";
     return true;
   }
-  function busy(){ $("goBtn").textContent = (timers.g || timers.n) ? "대기…" : "검색"; }
+  function busy(){ $("goBtn").textContent = (timers.g || timers.a) ? "대기…" : "검색"; }
   function dispatch(k, text){
     if(timers[k]){ clearTimeout(timers[k]); timers[k] = null; }
     var wait = lastRun[k] + GAP[k] - Date.now();
@@ -514,6 +565,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       saveCfg(k);
       var f = $(sv.pane).querySelector(".frame"); if(f) applyCrop(f, sv.cfg);
     });
+    if(Array.isArray(d.apis) && d.apis.length) AiaiApi.setCfg(d.apis);   // 관리자가 고른 API 목록 (키는 포함되지 않음)
     setCropInputs(); resetEditor(); render();
   }
   async function fetchSettings(){
@@ -609,7 +661,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       li.appendChild(t); li.appendChild(acts); list.appendChild(li);
     });
   }
-  function render(){ renderCurrent(); renderList(); renderCrop(); reportLayout(); }
+  function render(){ renderCurrent(); renderList(); renderCrop(); renderApiSum(); syncApiTabs(); reportLayout(); }
 
   edSave.addEventListener("click", function(){
     var v = ed.value.trim().slice(0, MAX_PROMPT); if(!v) return;
@@ -624,8 +676,128 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     autosize(ed); edCount();
   });
 
-  /* ---------- 보기 방식: 구글 전용 / 네이버 전용 / 상하 분할 / 좌우 분할 ---------- */
-  var MODES = ["google", "naver", "split", "side"];
+  /* ---------- API 칸 ---------- */
+  var apiRes = {}, apiSel = null, apiCtrl = null, apiPaintQueued = false, apiAsked = false;
+  function apiOn(){ return AiaiApi.getCfg().filter(function(c){ return c.on; }); }
+  function apiFill(){ return $("paneA").querySelector(".fill"); }
+  function hostOf(u){ try{ return new URL(u).hostname.replace(/^www\./, ""); }catch(e){ return u; } }
+
+  function renderApiSum(){
+    var on = apiOn(), box = $("apiSum");
+    box.innerHTML = "";
+    if(!on.length){
+      box.appendChild(div("off", "선택된 API가 없어요. 관리자 페이지에서 골라 주세요."));
+      $("subApi").textContent = "없음";
+      return;
+    }
+    on.forEach(function(c){
+      var has = !!AiaiApi.getKey(c.id);
+      var row = div("", null);
+      row.textContent = (has ? "✓ " : "⚠ ") + AiaiApi.displayName(c) + " · " + c.model + (c.web ? " · 웹검색" : "") + (has ? "" : " · 키 없음");
+      if(!has) row.className = "off";
+      box.appendChild(row);
+    });
+    $("subApi").textContent = on.map(AiaiApi.displayName).join(" · ");
+  }
+
+  // 관리자에서 API 선택이 바뀌었을 때, 이미 떠 있는 결과의 탭 구성을 맞춰 줌
+  function syncApiTabs(){
+    if(!apiAsked) return;
+    var on = apiOn();
+    Object.keys(apiRes).forEach(function(id){ if(!on.some(function(c){ return c.id === id; }) && apiRes[id].status !== "run") delete apiRes[id]; });
+    if(!apiRes[apiSel]) apiSel = on.length ? on[0].id : null;
+    paintApi();
+  }
+
+  function schedulePaint(){
+    if(apiPaintQueued) return;
+    apiPaintQueued = true;
+    requestAnimationFrame(function(){ apiPaintQueued = false; paintApi(true); });
+  }
+
+  // soft=true: 스트리밍 중 갱신 → 스크롤 위치와 탭 버튼은 그대로 두고 본문만 바꿈
+  function paintApi(soft){
+    var fill = apiFill();
+    var ids = Object.keys(apiRes);
+    if(!apiAsked || !ids.length){
+      var on = apiOn();
+      fill.innerHTML = "";
+      fill.appendChild(div("ph", on.length ? "검색어를 입력하세요" : "관리자 페이지에서 사용할 API를 선택하세요"));
+      return;
+    }
+    var wrap = fill.querySelector(".apiwrap");
+    if(!wrap || !soft){
+      fill.innerHTML = "";
+      wrap = div("apiwrap", '<div class="apitabs"></div><div class="apibody"></div>');
+      fill.appendChild(wrap);
+    }
+    var tabs = wrap.querySelector(".apitabs"), body = wrap.querySelector(".apibody");
+    // 탭 (하나뿐이어도 어떤 API 인지 보이게 항상 표시)
+    tabs.innerHTML = "";
+    ids.forEach(function(id){
+      var r = apiRes[id], b = document.createElement("button");
+      b.type = "button"; b.className = id === apiSel ? "on" : "";
+      b.innerHTML = '<i class="dot ' + r.status + '"></i>';
+      b.appendChild(document.createTextNode(AiaiApi.displayName(r.cfg)));
+      b.onclick = function(){ apiSel = id; paintApi(); };
+      tabs.appendChild(b);
+    });
+    var r = apiRes[apiSel] || apiRes[ids[0]];
+    if(!r) return;
+    var keepTop = soft ? body.scrollTop : 0;
+    var stick = soft && (body.scrollHeight - body.scrollTop - body.clientHeight < 60);
+    var html = '<div class="apimeta"><span>' + esc(r.cfg.model) + (r.cfg.web ? " · 웹검색" : "") +
+      (r.status === "run" ? " · 답변 생성 중…" : r.ms ? " · " + (r.ms / 1000).toFixed(1) + "초" : "") + '</span><span class="sp"></span>' +
+      (r.text ? '<button type="button" id="apiCopy">복사</button>' : "") + "</div>";
+    if(r.err) html += '<div class="apierr">' + esc(r.err) + "</div>";
+    html += '<div class="md">' + AiaiApi.renderMd(r.text) + "</div>";
+    if(r.sources.length){
+      html += '<div class="srcs"><b>출처</b>' + r.sources.map(function(s){
+        return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' + esc(s.title || hostOf(s.url)) + "</a>";
+      }).join("") + "</div>";
+    }
+    body.innerHTML = html;
+    body.scrollTop = stick ? body.scrollHeight : keepTop;
+    var cp = body.querySelector("#apiCopy");
+    if(cp) cp.onclick = function(){
+      var done = function(){ cp.textContent = "복사됨"; setTimeout(function(){ cp.textContent = "복사"; }, 1200); };
+      try{ navigator.clipboard.writeText(r.text).then(done, function(){}); }catch(e){}
+    };
+  }
+  function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+  function runApi(text){
+    if(apiCtrl) apiCtrl.abort();
+    var ctrl = new AbortController(); apiCtrl = ctrl;
+    var provs = apiOn();
+    apiAsked = true; apiRes = {};
+    if(!provs.length){ paintApi(); return; }
+    if(!provs.some(function(c){ return c.id === apiSel; })) apiSel = provs[0].id;
+    provs.forEach(function(c){ apiRes[c.id] = {cfg: c, text: "", sources: [], seen: {}, status: "run", err: "", t0: Date.now(), ms: 0}; });
+    paintApi();
+    provs.forEach(function(c){
+      var r = apiRes[c.id];
+      AiaiApi.run(c, text, {
+        signal: ctrl.signal,
+        onText: function(d){ if(apiCtrl === ctrl){ r.text += d; schedulePaint(); } },
+        onSource: function(s){ if(apiCtrl === ctrl && s && s.url && !r.seen[s.url]){ r.seen[s.url] = 1; r.sources.push(s); schedulePaint(); } }
+      }).then(function(){
+        if(apiCtrl !== ctrl) return;
+        r.status = r.text ? "done" : "err";
+        if(!r.text) r.err = "빈 응답이 왔어요. 모델 이름과 사용 한도를 확인하세요.";
+      }, function(e){
+        if(apiCtrl !== ctrl || (e && e.name === "AbortError")) return;
+        r.status = "err"; r.err = (e && e.message) || "알 수 없는 오류";
+      }).then(function(){
+        if(apiCtrl !== ctrl) return;
+        r.ms = Date.now() - r.t0;
+        paintApi(true);
+      });
+    });
+  }
+
+  /* ---------- 보기 방식: 구글 전용 / API 전용 / 상하 분할 / 좌우 분할 ---------- */
+  var MODES = ["google", "api", "split", "side"];
   function setLayout(l){
     if(MODES.indexOf(l) < 0) l = "split";
     MODES.forEach(function(m){ document.body.classList.toggle("layout-" + m, m === l); });
@@ -638,6 +810,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   });
   var savedL = null; try{ savedL = localStorage.getItem(LKEY); }catch(e){}
   if(savedL === "tab") savedL = "google";          // 예전 저장값 호환
+  if(savedL === "naver") savedL = "api";
   setLayout(MODES.indexOf(savedL) >= 0 ? savedL : "split");
 
   /* ---------- 화면 꺼짐 방지 (Wake Lock) ---------- */
@@ -654,7 +827,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   document.addEventListener("visibilitychange", function(){
     if(document.visibilityState !== "visible") return;
     if(wantAwake) keepAwake();
-    // 구글/네이버 앱이나 관리자에서 바꾼 값이 있을 수 있으니 다시 읽어 옴 (편집 중이면 건드리지 않음)
+    // 구글 앱이나 관리자에서 바꾼 값(프롬프트·API 선택 등)이 있을 수 있으니 다시 읽어 옴 (편집 중이면 건드리지 않음)
     if(editingId === null && !ed.value){ loadAll(); setCropInputs(); render(); }
   });
 
@@ -664,7 +837,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     if(!NATIVE) return;
     var drawer = document.body.classList.contains("drawer-open");
     var out = {};
-    KEYS.forEach(function(k){
+    NKEYS.forEach(function(k){
       var fill = $(SV[k].pane).querySelector(".fill");
       var r = fill.getBoundingClientRect(), c = SV[k].cfg;
       var vis = !!loaded[k] && !drawer && r.width > 6 && r.height > 6;
@@ -679,7 +852,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   if(NATIVE){
     if(window.ResizeObserver){
       var ro = new ResizeObserver(function(){ reportLayout(); });
-      ro.observe($("panes")); ro.observe($("paneG")); ro.observe($("paneN"));
+      ro.observe($("panes")); ro.observe($("paneG")); ro.observe($("paneA"));
     }
     new MutationObserver(function(){ reportLayout(); }).observe(document.body, {attributes: true, attributeFilter: ["class"]});
     window.addEventListener("resize", reportLayout);
@@ -687,7 +860,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
 
   /* ---------- 시작 ---------- */
-  edCount(); applyAcc(); applySide(); setCropInputs(); render();
+  edCount(); applyAcc(); applySide(); setCropInputs(); render(); paintApi();
   // 처음 설치해서 저장된 프롬프트가 없으면 한 번만 자동으로 설정을 받아옴
   if(!SV.g.st.prompts.length) pullRemote();
 })();

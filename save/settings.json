@@ -12,5 +12,6 @@
   "cropBottom": 100,
   "cropLeft": 0,
   "cropRight": 0,
-  "shiftX": 0
+  "shiftX": 0,
+  "apis": []
 }
