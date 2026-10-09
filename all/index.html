@@ -98,9 +98,17 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .field small{display:block;color:var(--muted);font-size:12px;margin-top:5px;line-height:1.5}
 .crop{display:flex;gap:8px;flex-wrap:wrap}.crop>div{flex:1 1 calc(50% - 8px);min-width:110px}.crop small{margin:0 0 4px}
 .spacer{flex:1;min-height:8px}
-.np-btn{flex:none;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 12px;margin-bottom:8px;border-radius:14px;font-size:14px;font-weight:600;background:var(--accent);color:#fff;border:1px solid var(--accent)}
-.np-btn:hover{filter:brightness(1.08)}
-.np-btn small{font-size:12px;font-weight:400;opacity:.85}
+.np-btn{flex:none;width:100%;display:flex;align-items:center;gap:10px;padding:11px 12px;margin-bottom:8px;border-radius:14px;font-size:14px;font-weight:600}
+.np-btn{background:var(--card);color:var(--fg);border:1px solid var(--border)}
+.np-btn:hover{border-color:var(--accent)}
+.np-btn .sw{margin-left:auto;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--border);color:var(--muted)}
+.np-btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.np-btn.on .sw{background:var(--accent);color:#fff}
+.np-btn .tx{display:flex;flex-direction:column;align-items:flex-start;text-align:left}
+.np-btn small{font-size:12px;font-weight:400;color:var(--muted)}
+.np-pick{flex:none;margin-bottom:8px;padding:8px 10px;border:1px solid var(--accent);border-radius:14px;background:var(--accent-soft)}
+.np-pick[hidden]{display:none}
+.np-pick select{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:14px}
 .admin-link{display:flex;align-items:center;gap:10px;padding:11px 12px;text-decoration:none;color:inherit;margin-bottom:0}
 .admin-link .sub{font-size:12px;font-weight:400;color:var(--muted)}
 
@@ -211,7 +219,13 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   <!-- 왼쪽 메뉴 -->
   <aside id="side">
 
-    <button type="button" class="np-btn" id="noPromptBtn" title="프롬프트를 붙이지 않고 입력한 검색어만 검색해요">🔎 프롬프트 없이 검색 <small>(입력한 검색어만)</small></button>
+    <button type="button" class="np-btn" id="noPromptBtn" aria-pressed="false" title="켜면 프롬프트를 붙이지 않고 입력한 검색어만 검색해요. 끄면 프롬프트를 골라서 검색해요.">
+      <span class="ico">🚫</span><span class="tx">프롬프트 없이 검색<small id="npSub"></small></span><span class="sw" id="npSw">꺼짐</span>
+    </button>
+    <div class="np-pick" id="npPick" hidden>
+      <div class="label">검색에 쓸 프롬프트 선택</div>
+      <select id="npSel" aria-label="검색에 쓸 프롬프트 선택"></select>
+    </div>
 
     <div class="acc" data-key="cur">
       <button type="button" class="acc-head" aria-expanded="false">
@@ -455,8 +469,11 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   ["cropTop", "cropBottom", "cropLeft", "cropRight", "shiftX"].forEach(function(id){ $(id).addEventListener("input", liveCrop); });
 
   /* ---------- 검색 ---------- */
+  // "프롬프트 없이 검색" 모드: 켜면 모든 검색(엔터·검색 버튼 포함)에서 프롬프트를 붙이지 않음. 끄면 선택한 프롬프트 사용
+  var NPKEY = "uni_noprompt_v1", NOPROMPT = false;
+  try{ NOPROMPT = localStorage.getItem(NPKEY) === "1"; }catch(e){}
   function buildQuery(text, k, noPrompt){
-    var a = noPrompt ? null : active(k === "a" || k === "n" ? "g" : k);
+    var a = (noPrompt || NOPROMPT) ? null : active(k === "a" || k === "n" ? "g" : k);
     if(!a) return text;
     return text.replace(/\s+$/, "") + "\n\n\n" + a.text; // 검색어 → 빈 줄 2개 → 프롬프트
   }
@@ -522,7 +539,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   window.__aiaiWarn = function(key, msg){ showWarn(String(key), String(msg)); };
 
   function run(k, text, np){
-    if(k === "a"){ var ap = np ? null : active("g"); runApi(buildQuery(text, "g", np), text, ap ? ap.text : ""); return; }
+    if(k === "a"){ var ap = (np || NOPROMPT) ? null : active("g"); runApi(buildQuery(text, "g", np), text, ap ? ap.text : ""); return; }
     var url = SV[k].url(buildQuery(text, k, np));
     if(k === "g"){
       clearWarn("g:");
@@ -606,11 +623,34 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     keepAwake();
   }
   $("goBtn").addEventListener("click", function(){ var had = q.value.trim(); search(); if(had) hideKb(); });
-  // 메뉴 맨 위 "프롬프트 없이 검색": 설정된 프롬프트를 붙이지 않고 입력한 검색어만 검색
+  // 메뉴 맨 위 "프롬프트 없이 검색" 토글: 켜면 프롬프트 없이, 끄면 자동으로 프롬프트 선택 모드
+  function paintNp(){
+    var b = $("noPromptBtn"), sel = $("npSel"), st = SV.g.st;
+    b.classList.toggle("on", NOPROMPT);
+    b.setAttribute("aria-pressed", NOPROMPT ? "true" : "false");
+    $("npSw").textContent = NOPROMPT ? "켜짐" : "꺼짐";
+    $("npSub").textContent = NOPROMPT ? "프롬프트 없이 검색어만 보내요" : "아래에서 프롬프트를 골라 검색해요";
+    $("npPick").hidden = NOPROMPT;
+    sel.innerHTML = "";
+    if(!st.prompts.length){
+      var o0 = document.createElement("option"); o0.value = ""; o0.textContent = "저장된 프롬프트가 없어요"; sel.appendChild(o0); sel.disabled = true;
+    }else{
+      sel.disabled = false;
+      st.prompts.forEach(function(p){
+        var o = document.createElement("option"); o.value = p.id; o.textContent = short(p.text, 40);
+        if(p.id === st.activeId) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+  }
   $("noPromptBtn").addEventListener("click", function(){
-    var had = q.value.trim();
-    if(!had){ document.body.classList.remove("drawer-open"); q.focus(); return; }
-    search(true); hideKb();
+    NOPROMPT = !NOPROMPT;
+    try{ localStorage.setItem(NPKEY, NOPROMPT ? "1" : "0"); }catch(e){}
+    render();
+  });
+  $("npSel").addEventListener("change", function(){
+    var st = SV.g.st; if(!this.value) return;
+    st.activeId = this.value; persist(); render();
   });
   // 엔터(Shift+Enter 제외)로 검색했을 때만 모바일 키보드를 내림
   function hideKb(){
@@ -761,6 +801,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     edSave.textContent = "추가"; edCancel.hidden = true; autosize(ed);
   }
   function renderCurrent(){
+    if(NOPROMPT){
+      curBody.className = "cur-body none";
+      curBody.textContent = "지금은 '프롬프트 없이 검색'이 켜져 있어요. 끄면 선택한 프롬프트가 다시 붙어요.";
+      $("subCur").textContent = "사용 안 함 (프롬프트 없이 검색 중)";
+      return;
+    }
     var a = active(cur);
     curBody.className = "cur-body" + (a ? "" : " none");
     curBody.textContent = a ? a.text : "설정된 프롬프트가 없어요. 관리자 페이지에서 만들어 주세요.";
@@ -794,7 +840,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       li.appendChild(t); li.appendChild(acts); list.appendChild(li);
     });
   }
-  function render(){ renderCurrent(); renderList(); renderCrop(); renderApiSum(); syncApiTabs(); reportLayout(); }
+  function render(){ paintNp(); renderCurrent(); renderList(); renderCrop(); renderApiSum(); syncApiTabs(); reportLayout(); }
 
   edSave.addEventListener("click", function(){
     var v = ed.value.trim().slice(0, MAX_PROMPT); if(!v) return;
