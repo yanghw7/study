@@ -1,17 +1,92 @@
 {
   "v": 1,
-  "updated": 1791442473869,
+  "updated": 1791548290157,
   "prompts": [
     {
-      "id": "muydmi94pt4q8",
-      "text": "관련 이미지나 사진 보여주고\n\n1. 정의\n2. 증상\n3. 위험인자 (취약한 신체 부위, 취약한 사람, 호발부위)\n4. 진단 (검사방법)\n5. 치료\n6. 부작용\n\n주관식 서술형 시험 답안으로 하게 요약 해줘"
+      "id": "mv0x3khdmjqla",
+      "text": "."
+    },
+    {
+      "id": "mv0x39byjcnrk",
+      "text": "검색어에 따른 의학 이론 시험을 준비중이다. \n\n **핵심 암기 사항:** 반드시 기억할 내용을 항목별로 정리한다.\n우선적으로 검색어에서 가장 연상되는 키워드를 먼저 보여준다. \n키워드는 임의로 축약하지 않고 그대로 보여준다. \n또한 키워드를 나열하지말고 숫자를 붙인뒤 줄바꿈해서 굵은글씨로 전부 보여준다. \n예를들면 \n1. 키워드 1\n2. 키워드 2 \n3. 키워드 3\n\n예를들면 \n검색어로 제시된 단어가 지방색전증이라면 문제에서 제시될 수 있는 증상인 호흡곤란, 의식저하, 점상출혈과 호발 부위인 대퇴골, 골반골, 대형 장관골 골절 등을 강조해서 표현해준다. \n\n질문 유형별 원칙\n- **질환:** 정의, 원인·기전, 증상, 진단, 치료 중 핵심을 선별한다.\n- **해부학:** 정확한 구조물 명칭과 위치·기능·관계를 구분한다.\n- **검사법:** 검사 목적, 시행 방법, 양성 소견 및 의미를 설명한다.\n- **나열형:** 요구된 항목 수를 준수하고 각 항목을 명확히 구분한다.\n- **진단 기준·분류:** 정확한 수치, 단위, 단계 및 적용 조건을 제시한다.\n- **사례형:** 사례의 단서와 진단명, 손상 구조, 검사 및 관련 지식을 연결한다.\n- **비교형:** 두 개념의 핵심적인 차이를 중심으로 정리한다.\n\n**최종 원칙:** 무엇을 암기해야 하는지, 어떤 키워드를 떠올려야 하는지, 그것을 시험 답안에 어떻게 서술해야 하는지를 연결하여 가르친다. 지식의 양보다 정확한 회상과 답안 재현을 우선한다.\n\n시험에 관련한 핵심 키워드를 제시한 다음 일반적으로 \n1. 정의 \n2. 원인·기전 \n3. 위험 인자·취약인(원인 질환, 연령·성별) \n4. 호발 부위 \n5. 전형적 증상·징후 \n6. 진단(신체검사, 영상, 혈액검사, 진단 기준 수치) \n7. 분류·단계·병기 \n8. 치료(응급, 보존, 수술) \n9. 구별해야 하는 것들"
     }
   ],
-  "activeId": "muydmi94pt4q8",
+  "activeId": "mv0x39byjcnrk",
   "cropTop": 0,
   "cropBottom": 100,
   "cropLeft": 0,
   "cropRight": 0,
   "shiftX": 0,
-  "apis": []
+  "apis": [
+    {
+      "id": "groq",
+      "on": true,
+      "model": "openai/gpt-oss-120b",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "gemini",
+      "on": false,
+      "model": "gemini-3.8-flash",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "openrouter",
+      "on": false,
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "cloudflare",
+      "on": false,
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "custom1",
+      "on": false,
+      "model": "",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "custom2",
+      "on": false,
+      "model": "",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "custom3",
+      "on": false,
+      "model": "",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    }
+  ]
 }
