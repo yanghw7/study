@@ -9,7 +9,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.16.0";
+  var VERSION = "1.16.1";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -51,21 +51,55 @@
     {id: "mistral", label: "Mistral (OpenAI 호환)", name: "Mistral", format: "compat", baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/api-keys"}
   ];
 
-  function provider(id){
+  function copiedGroup(cfg){
+    if(cfg && (cfg.group === "free" || cfg.group === "paid")) return cfg.group;
+    // 이전 버전에서 만든 복사 카드에는 group 값이 없으므로 주소/모델로 무료 공급자를 추정해 자동 보정합니다.
+    var base = String(cfg && cfg.baseUrl || "").toLowerCase().replace(/\/+$/, "");
+    var model = String(cfg && cfg.model || "").toLowerCase();
+    var fmt = String(cfg && cfg.format || "").toLowerCase();
+    var vendor = String(cfg && cfg.vendor || "").toLowerCase();
+    if(base.indexOf("api.groq.com") >= 0 || /\bgroq\b/.test(vendor)) return "free";
+    if(base.indexOf("openrouter.ai") >= 0 && (/:free$/.test(model) || /\bopenrouter\b/.test(vendor))) return "free";
+    if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0 || /cloudflare workers ai/.test(vendor)) return "free";
+    if(fmt === "gemini" && (/^gemini[-.]/.test(model) || /^models\/gemini/.test(model) || /google ai studio/.test(vendor))) return "free";
+    return "paid";
+  }
+  function copiedVendor(cfg){
+    if(cfg && typeof cfg.vendor === "string" && cfg.vendor.trim()) return cfg.vendor.trim();
+    var base = String(cfg && cfg.baseUrl || "").toLowerCase();
+    var fmt = String(cfg && cfg.format || "").toLowerCase();
+    var model = String(cfg && cfg.model || "").toLowerCase();
+    if(base.indexOf("api.groq.com") >= 0) return "Groq";
+    if(base.indexOf("openrouter.ai") >= 0) return "OpenRouter";
+    if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0) return "Cloudflare Workers AI";
+    if(base.indexOf("api.x.ai") >= 0) return "xAI · Grok";
+    if(base.indexOf("api.deepseek.com") >= 0) return "DeepSeek";
+    if(base.indexOf("api.mistral.ai") >= 0) return "Mistral";
+    if(fmt === "gemini" && /^gemini[-.]/.test(model)) return "Google AI Studio";
+    return "복사한 카드";
+  }
+  function provider(id, cfg){
     for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].id === id) return PROVIDERS[i];
-    // 관리자에서 복사한 API 카드는 고유 ID를 가지며, 독립된 사용자 지정 API로 취급합니다.
+    // 복사한 카드는 원본의 분류(무료/유료)와 공급자명을 설정에 저장해 그대로 유지합니다.
     if(typeof id === "string" && /^copy_[a-z0-9]+$/i.test(id)){
-      return {id: id, group: "paid", custom: true, label: "복사한 API", vendor: "복사한 카드", model: "", keyHint: "", note: ""};
+      return {
+        id: id,
+        group: copiedGroup(cfg),
+        custom: true,
+        label: "복사한 API",
+        vendor: copiedVendor(cfg),
+        model: "", keyHint: "", note: ""
+      };
     }
     return null;
   }
   function formatOf(c){
-    var p = provider(c.id);
+    var p = provider(c.id, c);
     if(p && p.custom) return (["openai", "claude", "gemini"].indexOf(c.format) >= 0) ? c.format : "compat";
     return p ? p.format : "compat";
   }
   function baseOf(c){
-    var p = provider(c.id);
+    var p = provider(c.id, c);
     if(!p) return "";
     if(p.custom) return (c.baseUrl || "").replace(/\/+$/, "");
     if(p.account) return c.account ? "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(c.account) + "/ai/v1" : "";
@@ -79,12 +113,12 @@
     // 입력된 순서를 그대로 유지하고(= 사용자가 정한 표시 순서), 빠진 항목만 기본 순서대로 뒤에 붙임
     var by = {}, order = [];
     (Array.isArray(arr) ? arr : []).forEach(function(c){
-      if(c && typeof c.id === "string" && provider(c.id) && !by.hasOwnProperty(c.id)){ by[c.id] = c; order.push(c.id); }
+      if(c && typeof c.id === "string" && provider(c.id, c) && !by.hasOwnProperty(c.id)){ by[c.id] = c; order.push(c.id); }
     });
     PROVIDERS.forEach(function(p){ if(!by.hasOwnProperty(p.id)) order.push(p.id); });
     function str(v){ return typeof v === "string" ? v.trim() : ""; }
     return order.map(function(id){
-      var p = provider(id), c = by[id] || {};
+      var c = by[id] || {}, p = provider(id, c);
       return {
         id: p.id,
         on: c.on === true,
@@ -93,7 +127,10 @@
         baseUrl: str(c.baseUrl),
         name: str(c.name),
         format: (["openai", "claude", "gemini"].indexOf(c.format) >= 0) ? c.format : "compat",
-        account: str(c.account)
+        account: str(c.account),
+        // 복사 카드가 원본의 무료/유료 분류와 공급자명을 유지하도록 설정에 포함합니다.
+        group: /^copy_[a-z0-9]+$/i.test(id) ? copiedGroup(c) : p.group,
+        vendor: /^copy_[a-z0-9]+$/i.test(id) ? (str(c.vendor) || copiedVendor(c)) : str(p.vendor)
       };
     });
   }
@@ -151,7 +188,7 @@
     var prev = cur.map(function(c){ return c.id; }), t = orderTime();
     // 직접 추가 칸(Grok 등)은 GitHub 쪽이 비어 있고 이 기기엔 설정이 있으면 이 기기 값을 지킴 (빈 값으로 덮어써서 설정이 사라지는 것 방지)
     var keepArr = (Array.isArray(arr) ? arr : []).map(function(rc){
-      var p = rc && provider(rc.id);
+      var p = rc && provider(rc.id, rc);
       if(!p || !p.custom) return rc;
       var lc = cur.filter(function(x){ return x.id === rc.id; })[0];
       var remoteBlank = !(rc.name || rc.baseUrl || rc.model || rc.on);
@@ -207,7 +244,7 @@
     nativeSave(k);
   }
   function displayName(c){
-    var p = provider(c.id);
+    var p = provider(c.id, c);
     // 복사 작업에서 붙인 이름(Grok 1, Grok 2 등)은 인덱스의 결과 탭에도 그대로 사용합니다.
     if(c && typeof c.name === "string" && c.name.trim()) return c.name.trim();
     if(p && p.custom) return p.label;
@@ -215,7 +252,7 @@
   }
   // 이 설정으로 호출할 준비가 안 된 부분이 있으면 한국어 문장으로 알려줌 (없으면 "")
   function missing(c){
-    var p = provider(c.id);
+    var p = provider(c.id, c);
     if(!p) return "지원하지 않는 API";
     if(!c.model) return "모델 이름이 비어 있어요.";
     if(p.account && !c.account) return "Cloudflare 계정 ID를 입력하세요.";
@@ -449,7 +486,7 @@
   // h.idleMs: 이 시간 동안 아무 응답 조각도 안 오면 중단하고 안내 (기본 60초)
   async function run(c, text, h){
     var fmt = formatOf(c), caller = CALLERS[fmt];
-    if(!caller || !provider(c.id)) throw new Error("지원하지 않는 API: " + c.id);
+    if(!caller || !provider(c.id, c)) throw new Error("지원하지 않는 API: " + c.id);
     var key = getKey(c.id);
     if(!key) throw new Error("🔑 API 키가 없어요. 관리자 페이지에서 키를 입력하세요.");
     var miss = missing(c);
@@ -488,7 +525,7 @@
   async function listModels(c){
     var key = getKey(c.id);
     if(!key) throw new Error("🔑 API 키를 먼저 저장하세요.");
-    var fmt = formatOf(c), p = provider(c.id), resp, j, ids = [];
+    var fmt = formatOf(c), p = provider(c.id, c), resp, j, ids = [];
     if(p.account){ throw new Error("Cloudflare 는 목록 조회를 지원하지 않아요. 문서의 모델 이름(예: @cf/meta/llama-3.3-70b-instruct-fp8-fast)을 직접 입력하세요."); }
     try{
       if(fmt === "openai") resp = await fetch("https://api.openai.com/v1/models", {headers: {"Authorization": "Bearer " + key}});
