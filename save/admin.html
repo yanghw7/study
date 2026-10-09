@@ -552,10 +552,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
         if(typed){ AiaiApi.setKey(c.id, typed); inp.value = ''; keyInfo(); }
         mst.textContent = '불러오는 중…'; mst.style.color = '';
         try{
-          var ids = await AiaiApi.listModels(apiRead(el, c.id));
+          var cur = apiRead(el, c.id);
+          var ids = await AiaiApi.listModels(cur);
+          // OpenRouter 는 이름 끝이 ':free' 인 무료 모델만 보여줌
+          var isOR = /openrouter/i.test([c.id, cur.id, cur.baseUrl, cur.name, p.label, p.vendor, p.baseUrl].join(' '));
+          if(isOR) ids = ids.filter(function(id){ return /:free$/i.test(id); });
           var dl = q('datalist'); dl.innerHTML = '';
           ids.forEach(function(id){ var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
-          mst.textContent = ids.length ? ('✓ ' + ids.length + '개 — 아래 목록에서 눌러 선택하세요') : '사용 가능한 모델이 없어요.';
+          mst.textContent = ids.length ? ('✓ ' + (isOR ? '무료(:free) ' : '') + ids.length + '개 — 아래 목록에서 눌러 선택하세요') : '사용 가능한 모델이 없어요.';
           var ml = q('.modellist'); ml.innerHTML = '';
           ids.forEach(function(id){
             var b = document.createElement('button'); b.type = 'button'; b.className = 'mchip'; b.textContent = id;
