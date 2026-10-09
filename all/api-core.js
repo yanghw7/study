@@ -9,14 +9,15 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.15.1";
+  var VERSION = "1.16.0";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
   var FORMATS = [
     {id: "compat", label: "OpenAI 호환 (chat/completions)"},
     {id: "openai", label: "ChatGPT 공식 (OpenAI)"},
-    {id: "claude", label: "Claude 공식 (Anthropic)"}
+    {id: "claude", label: "Claude 공식 (Anthropic)"},
+    {id: "gemini", label: "Gemini 공식 (Google)"}
   ];
   var WEB_FORMATS = {gemini: "Google 검색 연동 사용", openai: "웹 검색 도구 사용", claude: "웹 검색 도구 사용"};
 
@@ -52,11 +53,15 @@
 
   function provider(id){
     for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].id === id) return PROVIDERS[i];
+    // 관리자에서 복사한 API 카드는 고유 ID를 가지며, 독립된 사용자 지정 API로 취급합니다.
+    if(typeof id === "string" && /^copy_[a-z0-9]+$/i.test(id)){
+      return {id: id, group: "paid", custom: true, label: "복사한 API", vendor: "복사한 카드", model: "", keyHint: "", note: ""};
+    }
     return null;
   }
   function formatOf(c){
     var p = provider(c.id);
-    if(p && p.custom) return (c.format === "openai" || c.format === "claude") ? c.format : "compat";
+    if(p && p.custom) return (["openai", "claude", "gemini"].indexOf(c.format) >= 0) ? c.format : "compat";
     return p ? p.format : "compat";
   }
   function baseOf(c){
@@ -87,7 +92,7 @@
         web: c.web === true,
         baseUrl: str(c.baseUrl),
         name: str(c.name),
-        format: (c.format === "openai" || c.format === "claude") ? c.format : "compat",
+        format: (["openai", "claude", "gemini"].indexOf(c.format) >= 0) ? c.format : "compat",
         account: str(c.account)
       };
     });
@@ -203,7 +208,9 @@
   }
   function displayName(c){
     var p = provider(c.id);
-    if(p && p.custom) return c.name || p.label;
+    // 복사 작업에서 붙인 이름(Grok 1, Grok 2 등)은 인덱스의 결과 탭에도 그대로 사용합니다.
+    if(c && typeof c.name === "string" && c.name.trim()) return c.name.trim();
+    if(p && p.custom) return p.label;
     return p ? p.label : c.id;
   }
   // 이 설정으로 호출할 준비가 안 된 부분이 있으면 한국어 문장으로 알려줌 (없으면 "")
