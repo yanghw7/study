@@ -2,40 +2,89 @@
  *
  *  - 어떤 API 를 쓸지(선택·모델·웹검색 여부)는 설정(settings.json)으로 공유되고,
  *    API 키는 "이 기기의 localStorage" 에만 저장됩니다. (GitHub 에는 절대 올라가지 않음)
- *  - 새 API 를 추가하려면 PROVIDERS 에 한 줄 추가하고 CALLERS 에 호출 함수를 하나 만들면 됩니다.
+ *  - 새 서비스 추가: PROVIDERS 에 한 줄 추가 (OpenAI 호환이면 format:"compat" + base 만 적으면 끝)
+ *  - 형식(format): compat = OpenAI 호환 chat/completions, openai = ChatGPT 공식(Responses),
+ *                  claude = Anthropic 공식, gemini = Google 공식
  */
 (function(root){
   "use strict";
 
-  var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name}]  (비밀 아님)
-  var KEY_KEY = "uni_api_keys_v1";  // {openai:"…", gemini:"…", …}        (비밀 · 이 기기에만)
+  var VERSION = "1.14.5";
+  var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
+  var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
+
+  var FORMATS = [
+    {id: "compat", label: "OpenAI 호환 (chat/completions)"},
+    {id: "openai", label: "ChatGPT 공식 (OpenAI)"},
+    {id: "claude", label: "Claude 공식 (Anthropic)"}
+  ];
+  var WEB_FORMATS = {gemini: "Google 검색 연동 사용", openai: "웹 검색 도구 사용", claude: "웹 검색 도구 사용"};
 
   var PROVIDERS = [
-    {id: "openai", label: "ChatGPT", vendor: "OpenAI",    model: "gpt-6.1-sol",       keyHint: "sk-…",     webLabel: "웹 검색 도구 사용"},
-    {id: "gemini", label: "Gemini",  vendor: "Google",    model: "gemini-3.8-flash",  keyHint: "AIza…",    webLabel: "Google 검색 연동 사용"},
-    {id: "claude", label: "Claude",  vendor: "Anthropic", model: "claude-sonnet-5-5", keyHint: "sk-ant-…", webLabel: "웹 검색 도구 사용"},
-    {id: "custom", label: "직접 추가", vendor: "OpenAI 호환 (Grok · DeepSeek · Perplexity 등)", model: "", keyHint: "", custom: true}
+    // ---- 무료 한도가 있는 서비스 ----
+    {id: "gemini", group: "free", label: "Gemini", vendor: "Google AI Studio", format: "gemini", model: "gemini-3.8-flash",
+     keyHint: "AIza…", keyUrl: "https://aistudio.google.com/apikey",
+     note: "무료 한도 안에서 사용 가능 (모델·계정별 제한). 공부용 질의응답·긴 글 요약에 좋아요."},
+    {id: "groq", group: "free", label: "Groq", vendor: "Groq", format: "compat", base: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile",
+     keyHint: "gsk_…", keyUrl: "https://console.groq.com/keys",
+     note: "응답이 매우 빨라요. 무료 요청 횟수·토큰 한도가 있어요."},
+    {id: "openrouter", group: "free", label: "OpenRouter", vendor: "OpenRouter", format: "compat", base: "https://openrouter.ai/api/v1", model: "meta-llama/llama-3.3-70b-instruct:free",
+     keyHint: "sk-or-…", keyUrl: "https://openrouter.ai/keys",
+     note: "키 하나로 여러 회사 모델을 골라 써요. 이름 끝이 :free 인 모델이 무료예요(요청 횟수 제한)."},
+    {id: "cloudflare", group: "free", label: "Cloudflare Workers AI", vendor: "Cloudflare", format: "compat", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", account: true,
+     keyHint: "API 토큰", keyUrl: "https://dash.cloudflare.com/profile/api-tokens",
+     note: "하루 무료 할당량이 있어요. 계정 ID와 Workers AI 권한이 있는 API 토큰이 필요하고, 브라우저 직접 호출이 막혀 있으면 연결 테스트에서 실패할 수 있어요."},
+    // ---- 유료·기타: 직접 추가 ----
+    {id: "custom1", group: "paid", custom: true, label: "직접 추가 1", vendor: "ChatGPT · Claude · DeepSeek · Grok 등", model: "", keyHint: "", note: ""},
+    {id: "custom2", group: "paid", custom: true, label: "직접 추가 2", vendor: "", model: "", keyHint: "", note: ""},
+    {id: "custom3", group: "paid", custom: true, label: "직접 추가 3", vendor: "", model: "", keyHint: "", note: ""}
+  ];
+
+  // 직접 추가 칸에서 고를 수 있는 프리셋
+  var PRESETS = [
+    {id: "", label: "직접 입력"},
+    {id: "chatgpt", label: "ChatGPT (OpenAI 공식 · 유료)", name: "ChatGPT", format: "openai", baseUrl: "", keyUrl: "https://platform.openai.com/api-keys"},
+    {id: "claude", label: "Claude (Anthropic 공식 · 유료)", name: "Claude", format: "claude", baseUrl: "", keyUrl: "https://console.anthropic.com/settings/keys"},
+    {id: "deepseek", label: "DeepSeek (OpenAI 호환 · 유료)", name: "DeepSeek", format: "compat", baseUrl: "https://api.deepseek.com", keyUrl: "https://platform.deepseek.com/api_keys"},
+    {id: "grok", label: "Grok (xAI · OpenAI 호환 · 유료)", name: "Grok", format: "compat", baseUrl: "https://api.x.ai/v1", keyUrl: "https://console.x.ai"},
+    {id: "mistral", label: "Mistral (OpenAI 호환)", name: "Mistral", format: "compat", baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/api-keys"}
   ];
 
   function provider(id){
     for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].id === id) return PROVIDERS[i];
     return null;
   }
+  function formatOf(c){
+    var p = provider(c.id);
+    if(p && p.custom) return (c.format === "openai" || c.format === "claude") ? c.format : "compat";
+    return p ? p.format : "compat";
+  }
+  function baseOf(c){
+    var p = provider(c.id);
+    if(!p) return "";
+    if(p.custom) return (c.baseUrl || "").replace(/\/+$/, "");
+    if(p.account) return c.account ? "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(c.account) + "/ai/v1" : "";
+    return p.base || "";
+  }
+  function webLabelOf(c){ return WEB_FORMATS[formatOf(c)] || ""; }
 
   /* ---------- 설정 / 키 저장 ---------- */
-  // 어떤 입력이 와도 항상 PROVIDERS 순서의 완전한 목록으로 정리
+  // 어떤 입력이 와도 항상 PROVIDERS 순서의 완전한 목록으로 정리 (예전 저장값의 모르는 id 는 버림)
   function normCfg(arr){
     var by = {};
     (Array.isArray(arr) ? arr : []).forEach(function(c){ if(c && typeof c.id === "string") by[c.id] = c; });
     return PROVIDERS.map(function(p){
       var c = by[p.id] || {};
+      function str(v){ return typeof v === "string" ? v.trim() : ""; }
       return {
         id: p.id,
         on: c.on === true,
-        model: (typeof c.model === "string" && c.model.trim()) ? c.model.trim() : p.model,
+        model: str(c.model) || p.model,
         web: c.web === true,
-        baseUrl: typeof c.baseUrl === "string" ? c.baseUrl.trim() : "",
-        name: typeof c.name === "string" ? c.name.trim() : ""
+        baseUrl: str(c.baseUrl),
+        name: str(c.name),
+        format: (c.format === "openai" || c.format === "claude") ? c.format : "compat",
+        account: str(c.account)
       };
     });
   }
@@ -62,8 +111,50 @@
   }
   function displayName(c){
     var p = provider(c.id);
-    if(p && p.custom) return c.name || "직접 추가";
+    if(p && p.custom) return c.name || p.label;
     return p ? p.label : c.id;
+  }
+  // 이 설정으로 호출할 준비가 안 된 부분이 있으면 한국어 문장으로 알려줌 (없으면 "")
+  function missing(c){
+    var p = provider(c.id);
+    if(!p) return "지원하지 않는 API";
+    if(!c.model) return "모델 이름이 비어 있어요.";
+    if(p.account && !c.account) return "Cloudflare 계정 ID를 입력하세요.";
+    if(formatOf(c) === "compat" && !/^https:\/\//i.test(baseOf(c))) return "기본 주소(https://…)를 입력하세요.";
+    return "";
+  }
+
+  /* ---------- 오류를 한국어로 풀어서 설명 ---------- */
+  // raw: 서비스가 보낸 원문, status: HTTP 상태(없으면 0), fmt: 형식
+  function explain(raw, status, fmt){
+    var t = String(raw || "").toLowerCase();
+    var billing = /insufficient_quota|credit_balance|no credits|credits remaining|credit balance is too low|insufficient credits|insufficient funds|payment required|add credits|purchase credits|out of credits|billing_not_active|billing hard limit|plans and billing|requires a paid|upgrade to a paid/.test(t) || status === 402;
+    var limit = /resource_exhausted|rate.?limit|too many requests|per.?minute|per.?day|requests per|tokens per|free.?tier|quota/.test(t) || status === 429;
+    // Gemini 는 무료 한도를 넘어도 "quota … billing" 문장을 보내므로 결제 부족이 아니라 한도 초과로 안내
+    if(fmt === "gemini" && (limit || billing) && status !== 402){
+      return "⏳ Gemini 무료 사용 한도를 넘었어요. 1분~하루 정도 기다렸다 다시 시도하거나, 다른 무료 API를 함께 선택해 보세요. 계속 많이 쓰려면 Google AI Studio 에서 결제를 설정하면 한도가 늘어나요.";
+    }
+    if(billing){
+      return "💳 유료 충전이 필요해요. 이 계정에 사용할 크레딧(잔액)이 없어요. 해당 서비스의 결제(Billing) 페이지에서 크레딧을 충전하거나 결제 수단을 등록하세요. 충전 뒤 반영까지 몇 분 걸릴 수 있어요. (ChatGPT·Claude 구독과 API 결제는 별개예요)";
+    }
+    if(limit){
+      return "⏳ 사용 한도(분당·일일)를 넘었어요. 잠시 뒤 다시 시도하거나, 다른 API를 함께 선택해 보세요. 무료 모델은 한도가 작아서 자주 걸려요.";
+    }
+    if(status === 401 || /invalid api key|incorrect api key|invalid x-api-key|api key not valid|unauthorized|authentication|missing bearer|invalid token/.test(t)){
+      return "🔑 API 키가 올바르지 않거나 비어 있어요. 키를 다시 복사해서 [키 저장]을 누르세요. 다른 서비스의 키를 붙이지 않았는지도 확인하세요.";
+    }
+    if(status === 404 || /model_not_found|does not exist|no such model|not found|unknown model|invalid model/.test(t)){
+      return "❓ 모델 이름이 맞지 않거나 이 키로는 쓸 수 없는 모델이에요. [사용 가능한 모델 불러오기]로 목록에서 고르세요.";
+    }
+    if(status === 403 || /permission|forbidden|not allowed|must be verified|organization/.test(t)){
+      return "🚫 이 키로는 이 모델·기능을 쓸 권한이 없어요. 계정 인증, 모델 접근 권한, 지역 제한을 확인하세요.";
+    }
+    if(status >= 500) return "🛠 서비스 쪽 일시적인 오류예요. 잠시 뒤 다시 시도하세요.";
+    return "";
+  }
+  // 한국어 설명 + 원문
+  function fullMsg(kor, orig){
+    return kor ? kor + "\n원문: " + orig : orig;
   }
 
   /* ---------- 스트리밍(SSE) 읽기 ---------- */
@@ -94,55 +185,97 @@
   }
   function parse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
 
-  // 스트림 중간에 온 오류 이벤트에서 사람이 읽을 수 있는 문장을 뽑음 (없으면 원문 일부를 그대로 보여줌)
-  function errText(j, fallback){
+  // 스트림 중간에 온 오류 이벤트 → 한국어 설명 + 원문
+  function errText(j, fallback, fmt){
     var e = j && (j.error || (j.response && (j.response.error || j.response.incomplete_details)) || j);
     var m = e && (e.message || e.reason || e.code || e.type);
     var raw = "";
     try{ raw = JSON.stringify(j).slice(0, 300); }catch(x){}
-    return (fallback || "오류") + (m ? ": " + m : "") + (raw ? "  [" + raw + "]" : "");
+    var status = (e && (+e.code || +e.status)) || 0;
+    var orig = (fallback || "오류") + (m ? ": " + m : "") + (raw ? "  [" + raw + "]" : "");
+    return fullMsg(explain(raw + " " + (m || ""), status, fmt), orig);
   }
 
-  async function failFrom(resp){
+  async function failFrom(resp, fmt){
     var txt = "";
     try{ txt = await resp.text(); }catch(e){}
     var j = parse(txt), msg = "";
     if(j){
       if(typeof j.error === "string") msg = j.error;
       else if(j.error && j.error.message) msg = j.error.message;
+      else if(Array.isArray(j) && j[0] && j[0].error && j[0].error.message) msg = j[0].error.message;
       else if(j.message) msg = j.message;
+      else if(Array.isArray(j.errors) && j.errors[0] && j.errors[0].message) msg = j.errors[0].message;   // Cloudflare
     }
-    if(!msg) msg = txt.slice(0, 200);
-    var hint = "";
-    if(resp.status === 401 || resp.status === 403) hint = " → API 키가 올바른지, 사용 권한이 있는지 확인하세요.";
-    else if(resp.status === 404) hint = " → 모델 이름이 맞는지 확인하세요.";
-    else if(resp.status === 429) hint = " → 요청 한도 또는 결제 한도를 확인하세요.";
-    throw new Error("오류 " + resp.status + (msg ? ": " + msg : "") + hint);
+    if(!msg) msg = txt.slice(0, 300);
+    var where = "";
+    try{ where = " (" + new URL(resp.url).pathname + ")"; }catch(e){}
+    var orig = "오류 " + resp.status + where + (msg ? ": " + msg : "");
+    var err = new Error(fullMsg(explain(txt + " " + msg, resp.status, fmt), orig));
+    err.httpStatus = resp.status;
+    throw err;
   }
 
-  /* ---------- 서비스별 호출 ---------- */
+  /* ---------- 형식별 호출 ---------- */
   // 공통 규약: h.onText(조각) / h.onSource({url,title}) / h.signal
+
+  // ChatGPT 공식: Responses API
+  async function openaiResponses(c, key, text, h){
+    var body = {model: c.model, input: text, stream: true};
+    if(c.web) body.tools = [{type: "web_search"}];
+    var resp = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST", signal: h.signal,
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + key},
+      body: JSON.stringify(body)
+    });
+    if(!resp.ok) await failFrom(resp, "openai");
+    await readSSE(resp, function(ev, data){
+      var j = parse(data); if(!j) return;
+      if(j.type === "response.output_text.delta" && j.delta) h.onText(j.delta);
+      else if(j.type === "response.output_text.annotation.added" && j.annotation && j.annotation.url) h.onSource({url: j.annotation.url, title: j.annotation.title});
+      else if(j.type === "response.failed" || j.type === "response.incomplete") throw new Error(errText(j, "응답 실패", "openai"));
+      else if(j.type === "error") throw new Error(errText(j, "오류 이벤트", "openai"));
+    });
+  }
+
+  // OpenAI 호환 chat/completions (Groq · OpenRouter · Cloudflare · DeepSeek · Grok 등, 그리고 ChatGPT 대체 경로)
+  async function compatChat(c, key, text, h, base, fmt){
+    var resp = await fetch(base + "/chat/completions", {
+      method: "POST", signal: h.signal,
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + key},
+      body: JSON.stringify({model: c.model, stream: true, messages: [{role: "user", content: text}]})
+    });
+    if(!resp.ok) await failFrom(resp, fmt || "compat");
+    await readSSE(resp, function(ev, data){
+      if(data.trim() === "[DONE]") return;
+      var j = parse(data); if(!j) return;
+      if(j.error) throw new Error(errText(j, "오류", fmt || "compat"));
+      var d = j.choices && j.choices[0] && j.choices[0].delta;
+      if(d && typeof d.content === "string" && d.content) h.onText(d.content);
+      if(Array.isArray(j.citations)) j.citations.forEach(function(u){ if(typeof u === "string") h.onSource({url: u}); });
+    });
+  }
+
   var CALLERS = {
-    // ChatGPT: Responses API
+    // ChatGPT 공식: Responses 먼저, HTTP 오류로 실패하면(결제·한도 제외) Chat Completions 로 한 번 더
     openai: async function(c, key, text, h){
-      var body = {model: c.model, input: text, stream: true};
-      if(c.web) body.tools = [{type: "web_search"}];
-      var resp = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST", signal: h.signal,
-        headers: {"Content-Type": "application/json", "Authorization": "Bearer " + key},
-        body: JSON.stringify(body)
-      });
-      if(!resp.ok) await failFrom(resp);
-      await readSSE(resp, function(ev, data){
-        var j = parse(data); if(!j) return;
-        if(j.type === "response.output_text.delta" && j.delta) h.onText(j.delta);
-        else if(j.type === "response.output_text.annotation.added" && j.annotation && j.annotation.url) h.onSource({url: j.annotation.url, title: j.annotation.title});
-        else if(j.type === "response.failed" || j.type === "response.incomplete") throw new Error(errText(j, "응답 실패"));
-        else if(j.type === "error") throw new Error(errText(j, "오류 이벤트"));
-      });
+      var got = false;
+      var h1 = {signal: h.signal, onSource: h.onSource, onText: function(d){ got = true; h.onText(d); }};
+      try{
+        await openaiResponses(c, key, text, h1);
+      }catch(e){
+        var st = e && e.httpStatus;
+        if(!st || st === 429 || st === 402 || st === 401 || got || (h.signal && h.signal.aborted)) throw e;
+        try{
+          await compatChat(c, key, text, h, "https://api.openai.com/v1", "openai");
+        }catch(e2){
+          if(e2 && e2.name === "AbortError") throw e2;
+          throw new Error(e.message + "\n↳ 대체 경로도 실패: " + (e2 && e2.message));
+        }
+      }
     },
 
-    // Gemini: generateContent (스트리밍)
+    // Gemini 공식 (스트리밍)
     gemini: async function(c, key, text, h){
       var body = {contents: [{role: "user", parts: [{text: text}]}]};
       if(c.web) body.tools = [{google_search: {}}];
@@ -152,11 +285,11 @@
         headers: {"Content-Type": "application/json", "x-goog-api-key": key},
         body: JSON.stringify(body)
       });
-      if(!resp.ok) await failFrom(resp);
+      if(!resp.ok) await failFrom(resp, "gemini");
       await readSSE(resp, function(ev, data){
         var j = parse(data); if(!j) return;
-        if(j.error) throw new Error(errText(j, "오류"));
-        if(j.promptFeedback && j.promptFeedback.blockReason) throw new Error("요청이 차단됐어요 (" + j.promptFeedback.blockReason + ")");
+        if(j.error) throw new Error(errText(j, "오류", "gemini"));
+        if(j.promptFeedback && j.promptFeedback.blockReason) throw new Error("🚫 요청이 안전 필터에 막혔어요 (" + j.promptFeedback.blockReason + "). 질문 표현을 바꿔 보세요.");
         var cand = j.candidates && j.candidates[0]; if(!cand) return;
         if(cand.content && cand.content.parts) cand.content.parts.forEach(function(p){ if(p.text && !p.thought) h.onText(p.text); });
         var gm = cand.groundingMetadata;
@@ -164,7 +297,7 @@
       });
     },
 
-    // Claude: Messages API (브라우저 직접 호출 허용 헤더 필요)
+    // Claude 공식 (브라우저 직접 호출 허용 헤더 필요)
     claude: async function(c, key, text, h){
       var body = {model: c.model, max_tokens: 8192, stream: true, messages: [{role: "user", content: text}]};
       if(c.web) body.tools = [{type: "web_search_20250305", name: "web_search", max_uses: 5}];
@@ -176,7 +309,7 @@
         },
         body: JSON.stringify(body)
       });
-      if(!resp.ok) await failFrom(resp);
+      if(!resp.ok) await failFrom(resp, "claude");
       await readSSE(resp, function(ev, data){
         var j = parse(data); if(!j) return;
         if(j.type === "content_block_delta" && j.delta){
@@ -185,40 +318,26 @@
         } else if(j.type === "content_block_start" && j.content_block && j.content_block.type === "web_search_tool_result" && Array.isArray(j.content_block.content)){
           j.content_block.content.forEach(function(r){ if(r && r.url) h.onSource({url: r.url, title: r.title}); });
         } else if(j.type === "error"){
-          throw new Error(errText(j, "오류"));
+          throw new Error(errText(j, "오류", "claude"));
         }
       });
     },
 
-    // 직접 추가: OpenAI 호환 Chat Completions
-    custom: async function(c, key, text, h){
-      var base = (c.baseUrl || "").replace(/\/+$/, "");
-      if(!/^https:\/\//i.test(base)) throw new Error("관리자 페이지에서 https:// 로 시작하는 기본 주소를 입력하세요.");
-      var resp = await fetch(base + "/chat/completions", {
-        method: "POST", signal: h.signal,
-        headers: {"Content-Type": "application/json", "Authorization": "Bearer " + key},
-        body: JSON.stringify({model: c.model, stream: true, messages: [{role: "user", content: text}]})
-      });
-      if(!resp.ok) await failFrom(resp);
-      await readSSE(resp, function(ev, data){
-        if(data.trim() === "[DONE]") return;
-        var j = parse(data); if(!j) return;
-        if(j.error) throw new Error(errText(j, "오류"));
-        var d = j.choices && j.choices[0] && j.choices[0].delta;
-        if(d && typeof d.content === "string" && d.content) h.onText(d.content);
-        if(Array.isArray(j.citations)) j.citations.forEach(function(u){ if(typeof u === "string") h.onSource({url: u}); });
-      });
+    // OpenAI 호환
+    compat: async function(c, key, text, h){
+      await compatChat(c, key, text, h, baseOf(c), "compat");
     }
   };
 
   // 한 API 에 질문을 보냄. 끝나면 resolve, 실패하면 Error 로 reject
   // h.idleMs: 이 시간 동안 아무 응답 조각도 안 오면 중단하고 안내 (기본 60초)
   async function run(c, text, h){
-    var caller = CALLERS[c.id];
-    if(!caller) throw new Error("지원하지 않는 API: " + c.id);
+    var fmt = formatOf(c), caller = CALLERS[fmt];
+    if(!caller || !provider(c.id)) throw new Error("지원하지 않는 API: " + c.id);
     var key = getKey(c.id);
-    if(!key) throw new Error("API 키가 없어요. 관리자 페이지에서 키를 입력하세요.");
-    if(!c.model) throw new Error("모델 이름이 비어 있어요. 관리자 페이지에서 입력하세요.");
+    if(!key) throw new Error("🔑 API 키가 없어요. 관리자 페이지에서 키를 입력하세요.");
+    var miss = missing(c);
+    if(miss) throw new Error("⚙ " + miss + " 관리자 페이지에서 입력하세요.");
     var idle = h.idleMs || 60000, ctrl = new AbortController(), timer = null, timedOut = false, t0 = Date.now();
     function arm(){
       clearTimeout(timer);
@@ -238,9 +357,9 @@
       await caller(c, key, text, h2);
     }catch(e){
       var sec = Math.round((Date.now() - t0) / 1000);
-      if(timedOut) throw new Error("서버에서 " + Math.round(idle / 1000) + "초 동안 응답이 없어서 중단했어요. 모델이 너무 느리거나(큰 모델), 이 기기에서 해당 서비스 접속이 막혀 있을 수 있어요. [사용 가능한 모델 불러오기]로 더 작은 모델을 골라 다시 해보세요.");
+      if(timedOut) throw new Error("⏳ 서버에서 " + Math.round(idle / 1000) + "초 동안 응답이 없어서 중단했어요. 모델이 너무 느리거나(큰 모델), 이 기기에서 해당 서비스 접속이 막혀 있을 수 있어요. 더 작은 모델로 바꿔 다시 해보세요.");
       if(e && e.name === "AbortError") throw e;
-      if(e instanceof TypeError) throw new Error("서버와 통신하지 못했어요 (" + (e.message || "연결 끊김") + " · " + sec + "초 뒤). 인터넷/와이파이·VPN·광고차단 설정을 확인하거나, 이 서비스가 브라우저(앱 화면)에서 직접 호출되는 것을 막은 경우일 수 있어요.");
+      if(e instanceof TypeError) throw new Error("📡 서버와 통신하지 못했어요 (" + (e.message || "연결 끊김") + " · " + sec + "초 뒤). 인터넷·VPN·광고차단 설정을 확인하세요. 이 서비스가 앱/브라우저 화면에서의 직접 호출(CORS)을 허용하지 않는 경우에도 나타나요.");
       if(e && e.message) throw e;
       throw new Error("알 수 없는 오류 (" + (e && e.name ? e.name : String(e)) + ")");
     }finally{
@@ -251,35 +370,37 @@
   /* ---------- 사용 가능한 모델 목록 (키로 직접 조회) ---------- */
   async function listModels(c){
     var key = getKey(c.id);
-    if(!key) throw new Error("API 키가 없어요.");
-    var resp, j, ids = [];
+    if(!key) throw new Error("🔑 API 키를 먼저 저장하세요.");
+    var fmt = formatOf(c), p = provider(c.id), resp, j, ids = [];
+    if(p.account){ throw new Error("Cloudflare 는 목록 조회를 지원하지 않아요. 문서의 모델 이름(예: @cf/meta/llama-3.3-70b-instruct-fp8-fast)을 직접 입력하세요."); }
     try{
-      if(c.id === "openai"){
-        resp = await fetch("https://api.openai.com/v1/models", {headers: {"Authorization": "Bearer " + key}});
-      } else if(c.id === "gemini"){
-        resp = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {headers: {"x-goog-api-key": key}});
-      } else if(c.id === "claude"){
-        resp = await fetch("https://api.anthropic.com/v1/models?limit=100", {headers: {"x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true"}});
-      } else {
-        var base = (c.baseUrl || "").replace(/\/+$/, "");
+      if(fmt === "openai") resp = await fetch("https://api.openai.com/v1/models", {headers: {"Authorization": "Bearer " + key}});
+      else if(fmt === "gemini") resp = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {headers: {"x-goog-api-key": key}});
+      else if(fmt === "claude") resp = await fetch("https://api.anthropic.com/v1/models?limit=100", {headers: {"x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true"}});
+      else {
+        var base = baseOf(c);
         if(!/^https:\/\//i.test(base)) throw new Error("기본 주소(https://…)를 먼저 입력하세요.");
         resp = await fetch(base + "/models", {headers: {"Authorization": "Bearer " + key}});
       }
     }catch(e){
-      if(e instanceof TypeError) throw new Error("네트워크 오류예요. 인터넷 연결을 확인하세요.");
+      if(e instanceof TypeError) throw new Error("📡 네트워크 오류예요. 인터넷 연결을 확인하세요.");
       throw e;
     }
-    if(!resp.ok) await failFrom(resp);
+    if(!resp.ok) await failFrom(resp, fmt);
     j = await resp.json();
-    if(c.id === "gemini"){
+    if(fmt === "gemini"){
       (j.models || []).forEach(function(m){
         if(m.name && (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0) ids.push(m.name.replace(/^models\//, ""));
       });
     } else {
       var arr = (j.data || []).slice();
-      if(c.id === "openai"){
+      if(fmt === "openai"){
         arr = arr.filter(function(m){ return /^(gpt|o\d|chatgpt)/i.test(m.id) && !/(embed|tts|whisper|dall|image|moderation|audio|realtime|transcribe|search-preview|instruct|davinci|babbage)/i.test(m.id); });
         arr.sort(function(a, b){ return (b.created || 0) - (a.created || 0); });
+      } else if(c.id === "openrouter"){
+        // 무료 모델(:free 이거나 가격 0)을 앞에 둠
+        var free = function(m){ return /:free$/.test(m.id) || (m.pricing && +m.pricing.prompt === 0 && +m.pricing.completion === 0); };
+        arr = arr.filter(free).concat(arr.filter(function(m){ return !free(m); }));
       }
       ids = arr.map(function(m){ return m.id; });
     }
@@ -351,9 +472,10 @@
   }
 
   root.AiaiApi = {
-    PROVIDERS: PROVIDERS, provider: provider, displayName: displayName,
+    VERSION: VERSION, PROVIDERS: PROVIDERS, PRESETS: PRESETS, FORMATS: FORMATS,
+    provider: provider, displayName: displayName, formatOf: formatOf, baseOf: baseOf, webLabelOf: webLabelOf, missing: missing,
     normCfg: normCfg, getCfg: getCfg, setCfg: setCfg,
     getKey: getKey, setKey: setKey,
-    run: run, listModels: listModels, renderMd: renderMd
+    run: run, listModels: listModels, renderMd: renderMd, explain: explain
   };
 })(window);

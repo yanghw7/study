@@ -50,7 +50,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 .apibox .hd .vend{font-size:14px;color:var(--muted);font-weight:400}
 .apibox .sub{display:none}
 .apibox.on .sub{display:block}
-.keyst{font-size:15px;color:var(--muted);margin:6px 0 0}
+.keyst{font-size:15px;color:var(--muted);margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
+.grp{font-size:18px;font-weight:700;margin:18px 0 10px}
+.grp small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:2px}
+.modelst{white-space:pre-wrap;word-break:break-word}
+#apiStatus{white-space:pre-wrap;word-break:break-word}
 .keyst.ok{color:var(--ok)}
 .keyst.bad{color:var(--danger)}
 </style>
@@ -104,10 +108,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 </div>
 <ul class="plist" id="list"></ul>
 
-<h2>🔌 API 선택</h2>
+<h2>🔌 API 선택 <span id="apiVer" style="font-weight:400;font-size:14px"></span></h2>
 <div class="card" id="apiCard">
   <div class="note" style="margin:0 0 12px">
-    통합 검색의 <b>API 칸</b>에서 쓸 AI를 고르세요. 여러 개를 고르면 검색할 때 모두에게 동시에 물어보고 탭으로 나눠 보여줘요.<br>
+    통합 검색의 <b>API 칸</b>에서 쓸 AI를 고르세요. 무료 서비스 위주로 준비했고, ChatGPT·Claude 같은 유료 API는 아래 <b>직접 추가</b> 칸에서 설정해요. 여러 개를 고르면 검색할 때 모두에게 동시에 물어보고 탭으로 나눠 보여줘요.<br>
     <b>사용 여부·모델 이름</b>은 [저장]을 누르면 GitHub 설정에 올라가 모든 기기에 반영되지만(각 페이지에서 [갱신]),
     <b>API 키는 이 기기의 브라우저/앱에만 저장</b>되고 GitHub에는 절대 올라가지 않아요. 키는 쓰는 기기마다 한 번씩 입력해야 해요.
   </div>
@@ -431,73 +435,115 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   function maskKey(k){ return k ? '저장됨 (' + (k.length > 8 ? '…' + k.slice(-4) : '●●●●') + ')' : '키 없음'; }
   function apiBuild(){
     var box = $('apiList'); box.innerHTML = '';
+    var lastGroup = '';
     AiaiApi.getCfg().forEach(function(c){
       var p = AiaiApi.provider(c.id);
+      if(p.group !== lastGroup){
+        lastGroup = p.group;
+        var gh = document.createElement('div');
+        gh.className = 'grp';
+        gh.innerHTML = p.group === 'free'
+          ? '🆓 무료로 시작하기 <small>무료 한도가 있는 서비스예요</small>'
+          : '💳 유료 · 기타 (직접 추가) <small>ChatGPT · Claude 등 유료 API나 그 밖의 서비스는 여기서 설정해요</small>';
+        box.appendChild(gh);
+      }
       var el = document.createElement('div');
       el.className = 'apibox' + (c.on ? ' on' : '');
       el.dataset.id = c.id;
+      var title = p.custom ? p.label : p.label;
       var h = '<div class="hd"><label class="chk"><input type="checkbox" class="f-on"' + (c.on ? ' checked' : '') + '> ' +
-        escHtml(p.label) + '</label><span class="vend">' + escHtml(p.vendor) + '</span></div><div class="sub">';
+        escHtml(title) + '</label><span class="vend">' + escHtml(p.vendor || '') + '</span></div><div class="sub">';
+      if(p.note) h += '<div class="note" style="margin:0 0 10px">' + escHtml(p.note) + '</div>';
       if(p.custom){
-        h += '<div class="field"><label>표시 이름</label><input type="text" class="f-name" placeholder="예: Grok" autocomplete="off"></div>' +
-             '<div class="field"><label>기본 주소 (Base URL)</label><input type="text" class="f-base" placeholder="https://api.x.ai/v1" autocomplete="off" inputmode="url">' +
+        h += '<div class="field"><label>프리셋 (고르면 아래 칸이 채워져요)</label><select class="f-preset"></select></div>' +
+             '<div class="field"><label>표시 이름</label><input type="text" class="f-name" placeholder="예: ChatGPT" autocomplete="off"></div>' +
+             '<div class="field"><label>연결 방식</label><select class="f-format"></select></div>' +
+             '<div class="field f-basebox"><label>기본 주소 (Base URL)</label><input type="text" class="f-base" placeholder="https://api.example.com/v1" autocomplete="off" inputmode="url">' +
              '<div class="note">주소 뒤에 /chat/completions 가 붙어서 호출돼요.</div></div>';
+      }
+      if(p.account){
+        h += '<div class="field"><label>Cloudflare 계정 ID</label><input type="text" class="f-account" placeholder="32자리 계정 ID" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+             '<div class="note">Cloudflare 대시보드 주소나 Workers AI 화면에서 확인할 수 있어요. (비밀 정보는 아니에요)</div></div>';
       }
       h += '<div class="field"><label>모델 이름</label><input type="text" class="f-model" list="dl-' + c.id + '" autocomplete="off" autocapitalize="off" spellcheck="false">' +
            '<datalist id="dl-' + c.id + '"></datalist>' +
            '<div class="row" style="margin-top:8px"><button type="button" class="mini ghost b-models">사용 가능한 모델 불러오기</button></div>' +
            '<div class="modelst note"></div>' +
-           '<div class="note">기본 모델 이름이 맞지 않을 수 있어요. 키를 저장한 뒤 [사용 가능한 모델 불러오기]를 누르면 이 키로 쓸 수 있는 모델이 목록에 나와요. 입력칸을 눌러 고르세요.</div></div>';
-      if(!p.custom){
-        h += '<div class="field"><label class="chk"><input type="checkbox" class="f-web"> ' + escHtml(p.webLabel) + '</label>' +
-             '<div class="note">켜면 최신 정보를 웹에서 찾아 답하고 출처를 보여줘요. (서비스·모델에 따라 추가 요금이 있거나 지원되지 않을 수 있어요)</div></div>';
-      }
+           '<div class="note">모델 이름은 자주 바뀌어요. 키를 저장한 뒤 [사용 가능한 모델 불러오기]를 누르면 이 키로 쓸 수 있는 모델이 나와요. 입력칸을 눌러 고르세요.</div></div>';
+      h += '<div class="field f-webbox"><label class="chk"><input type="checkbox" class="f-web"> <span class="f-weblabel"></span></label>' +
+           '<div class="note">켜면 최신 정보를 웹에서 찾아 답하고 출처를 보여줘요. (서비스·모델에 따라 추가 요금이 있거나 지원되지 않을 수 있어요)</div></div>';
       h += '<div class="field"><label>API 키 (이 기기에만 저장)</label><form onsubmit="return false" autocomplete="off">' +
            '<input type="password" class="f-key" placeholder="' + escHtml(p.keyHint || '키를 붙여넣으세요') + '" autocomplete="off"></form>' +
-           '<div class="keyst"></div></div>' +
+           '<div class="keyst"></div>' +
+           (p.keyUrl ? '<div class="note keylink"><a href="' + escHtml(p.keyUrl) + '" target="_blank" rel="noopener noreferrer">키 발급받기 ↗</a></div>' : '<div class="note keylink"></div>') +
+           '</div>' +
            '<div class="row"><button type="button" class="mini ghost b-key">키 저장</button>' +
            '<button type="button" class="mini ghost b-del">키 삭제</button>' +
            '<button type="button" class="mini ghost b-test">연결 테스트</button></div></div>';
       el.innerHTML = h;
       // 값은 DOM 으로 넣어서 따옴표 등이 들어 있어도 안전하게
-      el.querySelector('.f-model').value = c.model;
-      var fn = el.querySelector('.f-name'); if(fn) fn.value = c.name;
-      var fb = el.querySelector('.f-base'); if(fb) fb.value = c.baseUrl;
-      var fw = el.querySelector('.f-web'); if(fw) fw.checked = c.web;
-      var st = el.querySelector('.keyst');
+      var q = function(sel){ return el.querySelector(sel); };
+      q('.f-model').value = c.model;
+      q('.f-web').checked = c.web;
+      if(p.account) q('.f-account').value = c.account;
+      var fmtSel = q('.f-format'), presetSel = q('.f-preset');
+      function refreshFormat(){
+        var f = p.custom ? fmtSel.value : p.format;
+        q('.f-webbox').style.display = (f === 'gemini' || f === 'openai' || f === 'claude') ? '' : 'none';
+        q('.f-weblabel').textContent = ({gemini: 'Google 검색 연동 사용', openai: '웹 검색 도구 사용', claude: '웹 검색 도구 사용'})[f] || '';
+        var bb = q('.f-basebox'); if(bb) bb.style.display = (f === 'compat') ? '' : 'none';
+      }
+      if(p.custom){
+        q('.f-name').value = c.name;
+        q('.f-base').value = c.baseUrl;
+        AiaiApi.FORMATS.forEach(function(f){ var o = document.createElement('option'); o.value = f.id; o.textContent = f.label; fmtSel.appendChild(o); });
+        fmtSel.value = c.format;
+        AiaiApi.PRESETS.forEach(function(pr){ var o = document.createElement('option'); o.value = pr.id; o.textContent = pr.label; presetSel.appendChild(o); });
+        presetSel.onchange = function(){
+          var pr = null; AiaiApi.PRESETS.forEach(function(x){ if(x.id === presetSel.value) pr = x; });
+          if(!pr || !pr.id) return;
+          q('.f-name').value = pr.name; fmtSel.value = pr.format; q('.f-base').value = pr.baseUrl;
+          q('.f-model').value = '';                       // 모델은 키를 저장한 뒤 목록에서 고르게 비워 둠
+          var kl = q('.keylink'); kl.innerHTML = pr.keyUrl ? '<a href="' + escHtml(pr.keyUrl) + '" target="_blank" rel="noopener noreferrer">키 발급받기 ↗</a>' : '';
+          refreshFormat();
+        };
+        fmtSel.onchange = refreshFormat;
+      }
+      refreshFormat();
+      var st = q('.keyst');
       function keyInfo(msg, kind){
         var k = AiaiApi.getKey(c.id);
         st.textContent = msg || maskKey(k);
         st.className = 'keyst' + (kind ? ' ' + kind : (k ? ' ok' : ''));
       }
       keyInfo();
-      var mst = el.querySelector('.modelst');
+      var mst = q('.modelst');
       async function loadModels(){
-        var inp = el.querySelector('.f-key'), typed = inp.value.trim();
+        var inp = q('.f-key'), typed = inp.value.trim();
         if(typed){ AiaiApi.setKey(c.id, typed); inp.value = ''; keyInfo(); }
         mst.textContent = '불러오는 중…'; mst.style.color = '';
         try{
           var ids = await AiaiApi.listModels(apiRead(el, c.id));
-          var dl = el.querySelector('datalist'); dl.innerHTML = '';
+          var dl = q('datalist'); dl.innerHTML = '';
           ids.forEach(function(id){ var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
           mst.textContent = ids.length ? ('✓ ' + ids.length + '개 · 앞쪽: ' + ids.slice(0, 8).join(', ') + ' — 위 입력칸을 눌러 선택하세요') : '사용 가능한 모델이 없어요.';
           return ids;
         }catch(e){ mst.textContent = '✗ ' + e.message; mst.style.color = 'var(--danger)'; return null; }
       }
-      el.querySelector('.b-models').onclick = loadModels;
-      el.querySelector('.f-on').onchange = function(){ el.classList.toggle('on', this.checked); };
-      el.querySelector('.b-key').onclick = function(){
-        var inp = el.querySelector('.f-key'), v = inp.value.trim();
+      q('.b-models').onclick = loadModels;
+      q('.f-on').onchange = function(){ el.classList.toggle('on', this.checked); };
+      q('.b-key').onclick = function(){
+        var inp = q('.f-key'), v = inp.value.trim();
         if(!v){ keyInfo('키를 먼저 붙여넣으세요', 'bad'); return; }
         AiaiApi.setKey(c.id, v); inp.value = ''; keyInfo();
       };
-      el.querySelector('.b-del').onclick = function(){
+      q('.b-del').onclick = function(){
         if(!AiaiApi.getKey(c.id)){ keyInfo(); return; }
-        if(!confirm(p.label + ' 키를 이 기기에서 삭제할까요?')) return;
+        if(!confirm(AiaiApi.displayName(apiRead(el, c.id)) + ' 키를 이 기기에서 삭제할까요?')) return;
         AiaiApi.setKey(c.id, ''); keyInfo();
       };
-      el.querySelector('.b-test').onclick = async function(){
-        var btn = this, inp = el.querySelector('.f-key'), typed = inp.value.trim();
+      q('.b-test').onclick = async function(){
+        var btn = this, inp = q('.f-key'), typed = inp.value.trim();
         if(typed){ AiaiApi.setKey(c.id, typed); inp.value = ''; }   // 입력해 둔 키가 있으면 같이 저장
         var cur = apiRead(el, c.id), out = '';
         btn.disabled = true; keyInfo('테스트 중…');
@@ -506,7 +552,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
           keyInfo('✓ 연결 성공 · 응답: ' + (out.trim().slice(0, 40) || '(빈 응답)'), 'ok');
         }catch(e){
           keyInfo('✗ ' + e.message, 'bad');
-          if(/404|모델|응답이 없/.test(e.message) && AiaiApi.getKey(c.id)) loadModels();   // 모델 문제로 보이면 사용 가능한 모델을 바로 보여줌
+          if(/❓|모델 이름|응답이 없/.test(e.message) && AiaiApi.getKey(c.id) && !p.account) loadModels();   // 모델 문제로 보이면 사용 가능한 모델을 바로 보여줌
         }
         btn.disabled = false;
       };
@@ -515,12 +561,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   }
   function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function apiRead(el, id){
-    var q = function(c){ var x = el.querySelector(c); return x; };
+    var q = function(c){ return el.querySelector(c); };
     return {
       id: id, on: q('.f-on').checked, model: q('.f-model').value.trim(),
       web: q('.f-web') ? q('.f-web').checked : false,
       baseUrl: q('.f-base') ? q('.f-base').value.trim() : '',
-      name: q('.f-name') ? q('.f-name').value.trim() : ''
+      name: q('.f-name') ? q('.f-name').value.trim() : '',
+      format: q('.f-format') ? q('.f-format').value : 'compat',
+      account: q('.f-account') ? q('.f-account').value.trim() : ''
     };
   }
   $('apiSave').onclick = function(){
@@ -532,10 +580,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       var inp = el.querySelector('.f-key'), v = inp.value.trim();
       if(v){ AiaiApi.setKey(el.dataset.id, v); inp.value = ''; }
     });
-    var need = list.filter(function(c){ return c.on && !AiaiApi.getKey(c.id); }).map(function(c){ return AiaiApi.displayName(c); });
-    var warn = need.length ? ' · ⚠ 키가 없는 API: ' + need.join(', ') : '';
-    var custom = list.filter(function(c){ return c.on && c.id === 'custom' && !/^https:\/\//i.test(c.baseUrl); });
-    if(custom.length) warn += ' · ⚠ 직접 추가: https:// 로 시작하는 기본 주소가 필요해요';
+    var warn = '';
+    list.filter(function(c){ return c.on; }).forEach(function(c){
+      var n = AiaiApi.displayName(c), probs = [];
+      if(!AiaiApi.getKey(c.id)) probs.push('키 없음');
+      var m = AiaiApi.missing(c); if(m) probs.push(m);
+      if(probs.length) warn += ' · ⚠ ' + n + ': ' + probs.join(' / ');
+    });
+    var need = warn ? [1] : [];
     apiBuild();
     if(!state.data){ apiStatus('이 기기에는 저장됨 · GitHub 설정을 아직 못 불러와서 다른 기기에는 반영되지 않았어요' + warn, 'bad'); return; }
     state.data.apis = list;
@@ -548,6 +600,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     });
   };
   apiBuild();
+  $('apiVer').textContent = '(api-core v' + (AiaiApi.VERSION || '?') + ')';
 
   function cropSnap(d){ return {top:d.cropTop, bottom:d.cropBottom, left:d.cropLeft, right:d.cropRight, sx:d.shiftX}; }
   function cropVal(id){

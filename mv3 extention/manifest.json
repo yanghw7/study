@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI 모드 프레임 허용 (개인용)",
-  "version": "1.5",
-  "description": "AI 모드 프레임 허용(Google·네이버) 및 Google AI Mode의 특정 버튼 숨김",
+  "version": "1.7",
+  "description": "AI 모드 프레임 허용(Google·네이버·Duck.ai), Google AI Mode 버튼 숨김, Duck.ai 검색어 자동 입력",
   "permissions": [
     "declarativeNetRequest"
   ],
@@ -10,6 +10,10 @@
     "https://*.google.com/*",
     "https://*.google.co.kr/*",
     "https://*.naver.com/*",
+    "https://*.duckduckgo.com/*",
+    "https://duckduckgo.com/*",
+    "https://*.duck.ai/*",
+    "https://duck.ai/*",
     "https://yanghw7.github.io/*",
     "file:///*"
   ],
@@ -32,6 +36,19 @@
         "hide_contents.js"
       ],
       "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://duck.ai/*",
+        "https://*.duck.ai/*",
+        "https://duckduckgo.com/*",
+        "https://*.duckduckgo.com/*"
+      ],
+      "js": [
+        "duck_fill.js"
+      ],
+      "run_at": "document_idle",
       "all_frames": true
     }
   ]

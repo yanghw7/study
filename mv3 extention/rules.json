@@ -23,7 +23,9 @@
       "requestDomains": [
         "google.com",
         "google.co.kr",
-        "naver.com"
+        "naver.com",
+        "duckduckgo.com",
+        "duck.ai"
       ],
       "resourceTypes": [
         "sub_frame"
