@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791564678875,
+  "updated": 1791551706978,
   "prompts": [
     {
       "id": "mv0x39byjcnrk",
@@ -17,17 +17,7 @@
     {
       "id": "groq",
       "on": true,
-      "model": "qwen/qwen3.8-27b",
-      "web": false,
-      "baseUrl": "",
-      "name": "",
-      "format": "compat",
-      "account": ""
-    },
-    {
-      "id": "openrouter",
-      "on": true,
-      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "model": "openai/gpt-oss-120b",
       "web": false,
       "baseUrl": "",
       "name": "",
@@ -36,8 +26,18 @@
     },
     {
       "id": "gemini",
-      "on": true,
-      "model": "gemini-3.5-flash-lite",
+      "on": false,
+      "model": "gemini-3.8-flash",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "openrouter",
+      "on": false,
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
       "web": false,
       "baseUrl": "",
       "name": "",

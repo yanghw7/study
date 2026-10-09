@@ -9,7 +9,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.15.0";
+  var VERSION = "1.15.1";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -144,7 +144,16 @@
     // 이 기기의 선택이 GitHub 값보다 최근이거나, (예전 저장값이라 시각이 없는데) 이 기기엔 선택이 있고 GitHub 엔 선택이 하나도 없으면 → 이 기기 선택을 지키지 않고 덮어쓰면 "사용 중 API 가 전부 사라지는" 문제가 생김
     if(localT > remoteT || (!localT && localOn && !remoteOn)) return cur;
     var prev = cur.map(function(c){ return c.id; }), t = orderTime();
-    var n = storeCfg(arr);
+    // 직접 추가 칸(Grok 등)은 GitHub 쪽이 비어 있고 이 기기엔 설정이 있으면 이 기기 값을 지킴 (빈 값으로 덮어써서 설정이 사라지는 것 방지)
+    var keepArr = (Array.isArray(arr) ? arr : []).map(function(rc){
+      var p = rc && provider(rc.id);
+      if(!p || !p.custom) return rc;
+      var lc = cur.filter(function(x){ return x.id === rc.id; })[0];
+      var remoteBlank = !(rc.name || rc.baseUrl || rc.model || rc.on);
+      var localHas = lc && (lc.name || lc.baseUrl || lc.model || lc.on);
+      return (remoteBlank && localHas) ? lc : rc;
+    });
+    var n = storeCfg(keepArr);
     stampCfg(remoteT || Date.now());
     if(t > remoteT){ n = storeCfg(setOrderList(prev)); }
     return n;
@@ -158,9 +167,31 @@
     return arr.map(function(x){ return x.c; });
   }
 
-  function readKeys(){
-    try{ var k = JSON.parse(localStorage.getItem(KEY_KEY)); if(k && typeof k === "object") return k; }catch(e){}
+  // 앱(APK) 안에서는 키를 웹뷰 저장소 말고 앱 자체 저장소(SharedPreferences)에도 함께 보관합니다.
+  // 웹뷰 저장소가 비워져도 여기서 자동 복구됩니다. (브라우저·PWA 에서는 이 부분이 아무 일도 안 함)
+  function nativeLoad(){
+    try{
+      if(root.AiaiNative && root.AiaiNative.loadKeys){
+        var o = JSON.parse(root.AiaiNative.loadKeys() || "{}");
+        if(o && typeof o === "object") return o;
+      }
+    }catch(e){}
     return {};
+  }
+  function nativeSave(k){
+    try{ if(root.AiaiNative && root.AiaiNative.saveKeys) root.AiaiNative.saveKeys(JSON.stringify(k)); }catch(e){}
+  }
+  // 브라우저가 저장소를 임의로 지우지 않도록 요청 (지원하는 브라우저만)
+  try{ if(root.navigator && root.navigator.storage && root.navigator.storage.persist) root.navigator.storage.persist(); }catch(e){}
+  function readKeys(){
+    var k = {};
+    try{ var l = JSON.parse(localStorage.getItem(KEY_KEY)); if(l && typeof l === "object") k = l; }catch(e){}
+    var n = nativeLoad(), restored = false;
+    Object.keys(n).forEach(function(id){
+      if(typeof n[id] === "string" && n[id] && !k[id]){ k[id] = n[id]; restored = true; }
+    });
+    if(restored){ try{ localStorage.setItem(KEY_KEY, JSON.stringify(k)); }catch(e){} }
+    return k;
   }
   function getKey(id){ var v = readKeys()[id]; return typeof v === "string" ? v : ""; }
   function setKey(id, v){
@@ -168,6 +199,7 @@
     v = (v || "").trim();
     if(v) k[id] = v; else delete k[id];
     try{ localStorage.setItem(KEY_KEY, JSON.stringify(k)); }catch(e){}
+    nativeSave(k);
   }
   function displayName(c){
     var p = provider(c.id);
@@ -476,14 +508,9 @@
         arr = arr.filter(function(m){ return /^(gpt|o\d|chatgpt)/i.test(m.id) && !/(embed|tts|whisper|dall|image|moderation|audio|realtime|transcribe|search-preview|instruct|davinci|babbage)/i.test(m.id); });
         arr.sort(function(a, b){ return (b.created || 0) - (a.created || 0); });
       } else if(c.id === "openrouter"){
-        // 이름 끝이 ':free' 인 모델과, 이름엔 없지만 가격이 0 인 모델을 따로 나눔
-        var isFree = function(m){ return /:free$/i.test(m.id); };
-        var isZero = function(m){ return !isFree(m) && m.pricing && +m.pricing.prompt === 0 && +m.pricing.completion === 0; };
-        var gFree = arr.filter(isFree).map(function(m){ return m.id; });
-        var gZero = arr.filter(isZero).map(function(m){ return m.id; });
-        ids = gFree.concat(gZero);
-        ids.groups = [{label: "🆓 :free 모델", ids: gFree}, {label: "가격 0 (이름에 :free 없음)", ids: gZero}];
-        return ids;
+        // 무료 모델(:free 이거나 가격 0)을 앞에 둠
+        var free = function(m){ return /:free$/.test(m.id) || (m.pricing && +m.pricing.prompt === 0 && +m.pricing.completion === 0); };
+        arr = arr.filter(free).concat(arr.filter(function(m){ return !free(m); }));
       }
       ids = arr.map(function(m){ return m.id; });
     }
