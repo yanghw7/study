@@ -502,11 +502,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
         var cur = apiRead(el, c.id), out = '';
         btn.disabled = true; keyInfo('테스트 중…');
         try{
-          await AiaiApi.run(cur, '다른 말 없이 "연결 성공" 이라고만 답해 주세요.', {onText: function(d){ out += d; }, onSource: function(){}});
+          await AiaiApi.run(cur, '다른 말 없이 "연결 성공" 이라고만 답해 주세요.', {idleMs: 40000, onText: function(d){ out += d; }, onSource: function(){}});
           keyInfo('✓ 연결 성공 · 응답: ' + (out.trim().slice(0, 40) || '(빈 응답)'), 'ok');
         }catch(e){
           keyInfo('✗ ' + e.message, 'bad');
-          if(/404|모델/.test(e.message) && AiaiApi.getKey(c.id)) loadModels();   // 모델 문제로 보이면 사용 가능한 모델을 바로 보여줌
+          if(/404|모델|응답이 없/.test(e.message) && AiaiApi.getKey(c.id)) loadModels();   // 모델 문제로 보이면 사용 가능한 모델을 바로 보여줌
         }
         btn.disabled = false;
       };

@@ -203,18 +203,39 @@
   };
 
   // 한 API 에 질문을 보냄. 끝나면 resolve, 실패하면 Error 로 reject
+  // h.idleMs: 이 시간 동안 아무 응답 조각도 안 오면 중단하고 안내 (기본 60초)
   async function run(c, text, h){
     var caller = CALLERS[c.id];
     if(!caller) throw new Error("지원하지 않는 API: " + c.id);
     var key = getKey(c.id);
     if(!key) throw new Error("API 키가 없어요. 관리자 페이지에서 키를 입력하세요.");
     if(!c.model) throw new Error("모델 이름이 비어 있어요. 관리자 페이지에서 입력하세요.");
+    var idle = h.idleMs || 60000, ctrl = new AbortController(), timer = null, timedOut = false, t0 = Date.now();
+    function arm(){
+      clearTimeout(timer);
+      timer = setTimeout(function(){ timedOut = true; ctrl.abort(); }, idle);
+    }
+    if(h.signal){
+      if(h.signal.aborted) ctrl.abort();
+      else h.signal.addEventListener("abort", function(){ ctrl.abort(); });
+    }
+    var h2 = {
+      signal: ctrl.signal,
+      onText: function(d){ arm(); h.onText(d); },
+      onSource: function(s){ arm(); h.onSource(s); }
+    };
+    arm();
     try{
-      await caller(c, key, text, h);
+      await caller(c, key, text, h2);
     }catch(e){
+      var sec = Math.round((Date.now() - t0) / 1000);
+      if(timedOut) throw new Error("서버에서 " + Math.round(idle / 1000) + "초 동안 응답이 없어서 중단했어요. 모델이 너무 느리거나(큰 모델), 이 기기에서 해당 서비스 접속이 막혀 있을 수 있어요. [사용 가능한 모델 불러오기]로 더 작은 모델을 골라 다시 해보세요.");
       if(e && e.name === "AbortError") throw e;
-      if(e instanceof TypeError) throw new Error("네트워크 오류예요. 인터넷 연결을 확인하세요. (이 서비스가 브라우저 직접 호출을 막은 경우에도 나타납니다)");
-      throw e;
+      if(e instanceof TypeError) throw new Error("서버와 통신하지 못했어요 (" + (e.message || "연결 끊김") + " · " + sec + "초 뒤). 인터넷/와이파이·VPN·광고차단 설정을 확인하거나, 이 서비스가 브라우저(앱 화면)에서 직접 호출되는 것을 막은 경우일 수 있어요.");
+      if(e && e.message) throw e;
+      throw new Error("알 수 없는 오류 (" + (e && e.name ? e.name : String(e)) + ")");
+    }finally{
+      clearTimeout(timer);
     }
   }
 
