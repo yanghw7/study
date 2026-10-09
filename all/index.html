@@ -126,7 +126,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   .brk{display:block;flex:0 0 100%;height:0;margin:-8px 0 0}
   .seg button,#swapBtn{padding:6px 10px}
   /* 보낸 내용 = 1줄 오른쪽 / 경고 = 2줄 오른쪽 (버튼들을 한 줄에 같이 놓고 order 로 자리 지정) */
-  .tright{display:contents}
+  .tools .tright{display:contents}   /* (아래쪽 .tright 규칙보다 우선하도록 .tools 를 붙임) */
   .seg button{order:1}
   #sentBtn{order:2}
   .brk{order:3}
