@@ -1623,6 +1623,8 @@ function timerPeriodForCurrentDay(){
   day.periods.forEach((p, idx)=>{
     const started = recordedStartMsFromFields(p);
     if(started <= 0) return;
+    if(isPastRecordDay() && !(recordedEndMsFromFields(p) >= started)) return;
+    if(recordedEndMsFromFields(p) > 0 && recordedEndMsFromFields(p) < started) return;
     if(!latest || started > latest.started || (started === latest.started && idx > latest.idx)){
       latest = {p, idx, started};
     }
@@ -1631,7 +1633,7 @@ function timerPeriodForCurrentDay(){
   if(!latest) return null;
 
   const ended = recordedEndMsFromFields(latest.p);
-  latest.running = !(ended > 0 && ended >= latest.started);
+  latest.running = periodIsRunning(latest.p);
   return latest;
 }
 
@@ -2368,6 +2370,22 @@ function wasteInvalid(periods, idx){
 function isPastRecordDay(){
   try{ return ymd(cur) !== ymd(logicalToday()); }catch(_){ return false; }
 }
+function periodIsRunning(p){
+  // 과거일자에는 '진행 중' 상태가 없다: 시작시간만 입력한 카드도 실시간 타이머/입력 잠금 대상이 아니다.
+  const s = recordedStartMsFromFields(p), e = recordedEndMsFromFields(p);
+  if(!(s > 0) || e > 0) return false;
+  if(isPastRecordDay()) return false;
+  return true;
+}
+function dropPastManualAnchors(p){
+  // 과거일자에서 직접 입력한 기록은 타이머 기준(timerStartedAt/EndedAt)을 남기지 않는다.
+  // (남기면 기준시점 자동 분할이나 진행 타이머가 이 카드를 실제 진행 중 교시로 오인한다)
+  if(!p || !isPastRecordDay() || p._autoSplit === 'start') return;
+  const s = recordedStartMsFromFields(p), e = recordedEndMsFromFields(p);
+  if(s > 0 && e > 0 && e >= s){ p.timerStartedAt = s; p.timerEndedAt = e; }
+  else { p.timerStartedAt = null; p.timerEndedAt = null; }
+}
+
 function lockPastDayActionButtons(){
   if(!isPastRecordDay()) return;
   document.querySelectorAll('#periodList button[data-lecture-action]').forEach(b => { if(!b.disabled) b.disabled = true; });
@@ -2403,7 +2421,7 @@ const sErr = studyInvalid(p) || day.periods.slice(0, idx).some(function(q){var q
     const hasEnd = !!(p.endDate && p.endTime);
     const fieldStartMs = recordedStartMsFromFields(p);
     const fieldEndMs = recordedEndMsFromFields(p);
-    const isRunning = fieldStartMs > 0 && !(fieldEndMs > 0 && fieldEndMs >= fieldStartMs);
+    const isRunning = periodIsRunning(p);
     const startTimeDisabled = isRunning ? true : (isCurrentLectureDay && !hasStart);
     const endTimeDisabled   = isRunning ? true : (isCurrentLectureDay && (!hasStart || !hasEnd));
 
@@ -2535,7 +2553,7 @@ function refreshLectureTimeFieldDisabled(idx){
   const isCurrentLectureDay = ymd(cur) === ymd(logicalToday());
   const fieldStartMs = recordedStartMsFromFields(p);
   const fieldEndMs = recordedEndMsFromFields(p);
-  const isRunning = fieldStartMs > 0 && !(fieldEndMs > 0 && fieldEndMs >= fieldStartMs);
+  const isRunning = periodIsRunning(p);
   const startDisabled = isRunning ? true : (isCurrentLectureDay && !hasStart);
   const endDisabled   = isRunning ? true : (isCurrentLectureDay && (!hasStart || !hasEnd));
 
@@ -2803,18 +2821,7 @@ $('#periodList').addEventListener('input', async (e) => {
       }
 
       if(k === 'end' && selected){
-        const myStart = combineDT(p.startDate, p.startTime);
-        if(myStart && selected.getTime() <= myStart.getTime()){
-          await askConfirm(
-            `⚠️ 강의 종료시간은 같은 강의의 시작시간보다 뒤여야 합니다.\n\n` +
-            `이 강의 시작: ${koDateTimeLabel(p.startDate, p.startTime)}\n` +
-            `입력한 시간:  ${koDateTimeLabel(d, tm)}\n\n` +
-            `입력한 시간은 이전 값으로 되돌립니다.`,
-            true
-          );
-          t.value = prevDTVal;
-          return;
-        }
+        // 종료시간이 시작시간보다 앞서도 경고 없이 그대로 입력받는다(편집 편의). 순서가 어긋난 값은 '오류!'로 표시된다.
       }
 
       const oldStartMs = recordedStartMsFromFields(p);
@@ -2862,6 +2869,7 @@ $('#periodList').addEventListener('input', async (e) => {
   } else {
     p[k] = t.value;
   }
+  if(k === 'start' || k === 'end') dropPastManualAnchors(p);
 
   if(k==='startPage' || k==='endPage'){
     const isBlankPage = v => (v==='' || v==null || Number(v)===0);
