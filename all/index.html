@@ -370,7 +370,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         url: function(t){ return "https://m.search.naver.com/search.naver?ssc=tab.m_ait.all&sm=mtb_jum&dtm_source=search&dtm_medium=tab&query=" + encodeURIComponent(t); }}
   };
   var KEYS = ["g", "a"];   // 프롬프트·설정을 저장하는 칸
-  var SKEYS = ["g", "a", "n"];   // 검색을 보내는 칸 (n = 네이버 전용, 화면에 보일 때만 검색)
+  var SKEYS = ["g", "a", "n"];   // 검색을 보내는 칸 (네이버도 구글·API와 함께 항상 검색 → 네이버 전용을 눌렀을 때 결과가 바로 보임)
   var FKEYS = ["g", "a", "n"];   // 화면 자르기를 적용할 칸
   var NKEYS = ["g", "n"];  // 앱의 웹뷰가 필요한 칸 (구글 · 네이버: 네이버는 iframe 으로 열면 "잘못된 접근"으로 막히므로 앱에서는 진짜 웹뷰 사용)
 
@@ -586,15 +586,17 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     return false;
   }
   // ---- 트래픽 줄이기 ----
-  // 1) 지금 화면에 보이는 쪽만 검색 (구글 전용이면 네이버는 안 부르고, 나중에 그 화면으로 바꿀 때 한 번만 불러옴)
+  // 1) 구글·API는 지금 화면에 보이는 쪽만 검색 (안 보이는 쪽은 나중에 그 화면으로 바꿀 때 한 번만 불러옴)
+  //    네이버는 어느 화면에서든 항상 같이 검색 (숨겨진 채로 미리 불러와 두었다가 네이버 전용을 누르면 바로 보여줌)
   // 2) 칸별 최소 간격: 간격 안에 또 검색하면 마지막 검색어만 간격이 지난 뒤 실행 (구글 7초 / API 0.6초)
   var GAP = {g: 7000, a: 600, n: 1500}, lastRun = {g: 0, a: 0, n: 0}, timers = {g: null, a: null, n: null}, pending = {g: null, a: null, n: null};
   function visibleKey(k){
+    if(k === "n") return true;   // 네이버는 항상 같이 검색 (화면에 안 보여도 미리 불러와 둠)
     var b = document.body.classList;
     if(b.contains("layout-google")) return k === "g";
     if(b.contains("layout-api")) return k === "a";
-    if(b.contains("layout-naver")) return k === "n";
-    return k !== "n";   // 분할 화면은 구글 + API 만
+    if(b.contains("layout-naver")) return false;   // 네이버 전용 화면에선 구글·API 는 화면을 바꿀 때 이어서 검색
+    return true;   // 분할 화면은 구글 + API 둘 다
   }
   function busy(){ $("goBtn").textContent = (timers.g || timers.a || timers.n) ? "대기…" : "검색"; }
   // np = true 면 프롬프트 없이 검색어만 보냄
@@ -623,8 +625,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       if(visibleKey(k)){ pending[k] = null; dispatch(k, text, np); }
       else {
         if(timers[k]){ clearTimeout(timers[k]); timers[k] = null; }
-        // 네이버는 네이버 전용 화면에서만 검색하므로, 안 보이는 동안엔 대기시키지 않음 (구글·API만 화면 전환 시 이어서 검색)
-        pending[k] = k === "n" ? null : {text: text, np: !!np};
+        // 안 보이는 구글·API 칸은 화면을 바꿀 때 이어서 검색 (네이버는 항상 같이 검색하므로 여기 오지 않음)
+        pending[k] = {text: text, np: !!np};
       }
     });
     busy();
