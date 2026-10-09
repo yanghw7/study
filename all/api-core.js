@@ -9,14 +9,15 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.16.0";
+  var VERSION = "1.16.5";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
   var FORMATS = [
     {id: "compat", label: "OpenAI 호환 (chat/completions)"},
     {id: "openai", label: "ChatGPT 공식 (OpenAI)"},
-    {id: "claude", label: "Claude 공식 (Anthropic)"}
+    {id: "claude", label: "Claude 공식 (Anthropic)"},
+    {id: "gemini", label: "Gemini 공식 (Google)"}
   ];
   var WEB_FORMATS = {gemini: "Google 검색 연동 사용", openai: "웹 검색 도구 사용", claude: "웹 검색 도구 사용"};
 
@@ -43,51 +44,163 @@
   // 직접 추가 칸에서 고를 수 있는 프리셋
   var PRESETS = [
     {id: "", label: "직접 입력"},
-    {id: "chatgpt", label: "ChatGPT (OpenAI 공식 · 유료)", name: "ChatGPT", format: "openai", baseUrl: "", keyUrl: "https://platform.openai.com/api-keys"},
-    {id: "claude", label: "Claude (Anthropic 공식 · 유료)", name: "Claude", format: "claude", baseUrl: "", keyUrl: "https://console.anthropic.com/settings/keys"},
-    {id: "deepseek", label: "DeepSeek (OpenAI 호환 · 유료)", name: "DeepSeek", format: "compat", baseUrl: "https://api.deepseek.com", keyUrl: "https://platform.deepseek.com/api_keys"},
-    {id: "grok", label: "Grok (xAI · OpenAI 호환 · 유료)", name: "Grok", format: "compat", baseUrl: "https://api.x.ai/v1", keyUrl: "https://console.x.ai"},
-    {id: "mistral", label: "Mistral (OpenAI 호환)", name: "Mistral", format: "compat", baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/api-keys"}
+    {id: "chatgpt", label: "ChatGPT (OpenAI 공식 · 유료)", name: "ChatGPT", format: "openai", baseUrl: "", keyHint: "sk-…", keyUrl: "https://platform.openai.com/api-keys"},
+    {id: "claude", label: "Claude (Anthropic 공식 · 유료)", name: "Claude", format: "claude", baseUrl: "", keyHint: "sk-ant-…", keyUrl: "https://console.anthropic.com/settings/keys"},
+    {id: "deepseek", label: "DeepSeek (OpenAI 호환 · 유료)", name: "DeepSeek", format: "compat", baseUrl: "https://api.deepseek.com", keyHint: "API 키 붙여넣기", keyUrl: "https://platform.deepseek.com/api_keys"},
+    {id: "grok", label: "Grok (xAI · OpenAI 호환 · 유료)", name: "Grok", format: "compat", baseUrl: "https://api.x.ai/v1", keyHint: "xai-…", keyUrl: "https://console.x.ai"},
+    {id: "mistral", label: "Mistral (OpenAI 호환)", name: "Mistral", format: "compat", baseUrl: "https://api.mistral.ai/v1", keyHint: "API 키 붙여넣기", keyUrl: "https://console.mistral.ai/api-keys"}
   ];
 
-  /* ---------- 카드 복사본 ----------
-   *  기본 카드 id 뒤에 _c2, _c3 … 을 붙인 것이 복사본이에요. (예: custom1 → custom1_c2)
-   *  복사본은 원본과 같은 양식(provider)을 쓰고, 키도 원본 것을 함께 써요. (원하면 복사본 전용 키도 가능)
-   *  기본 카드(PROVIDERS)는 normCfg 가 항상 되살리므로 삭제할 수 없어요.
-   */
-  var MAX_CARDS = 9;            // 한 서비스(기본 카드 + 복사본)당 최대 카드 수
-  var cloneCache = {};
-  function baseProvider(id){
+  // 직접 추가 카드도 선택한 프리셋 정보를 보존합니다. 예전 저장값에는 presetId가 없을 수 있어
+  // Base URL/이름으로 보조 추정하되 Groq와 xAI Grok을 혼동하지 않습니다.
+  function presetOf(cfg){
+    if(!cfg || typeof cfg !== "object") return "";
+    var saved = String(cfg.presetId || "").trim();
+    if(saved && PRESETS.some(function(p){ return p.id === saved; })) return saved;
+    var base = String(cfg.baseUrl || "").toLowerCase().replace(/\/+$/, "");
+    var name = String(cfg.name || "").toLowerCase().trim();
+    var vendor = String(cfg.vendor || "").toLowerCase().trim();
+    if(base.indexOf("api.openai.com") >= 0 || base.indexOf("platform.openai.com") >= 0 || (!base && /^(chatgpt|openai)(?:\s+\d+)?$/.test(name))) return "chatgpt";
+    if(base.indexOf("api.anthropic.com") >= 0 || /anthropic/.test(base) || (!base && (/^(claude)(?:\s+\d+)?$/.test(name) || /anthropic/.test(vendor)))) return "claude";
+    if(base.indexOf("api.deepseek.com") >= 0 || (!base && /^(deepseek)(?:\s+\d+)?$/.test(name))) return "deepseek";
+    if(base.indexOf("api.x.ai") >= 0 || (!base && (/^(grok|xai[ -]?grok)(?:\s+\d+)?$/.test(name) || /xai.*grok/.test(vendor)))) return "grok";
+    if(base.indexOf("api.mistral.ai") >= 0 || (!base && /^(mistral)(?:\s+\d+)?$/.test(name))) return "mistral";
+    return "";
+  }
+  function presetDefinition(id){
+    for(var i = 0; i < PRESETS.length; i++) if(PRESETS[i].id === id) return PRESETS[i];
+    return null;
+  }
+  function presetMeta(cfg){
+    var id = presetOf(cfg), p = presetDefinition(id);
+    return {
+      presetId: id,
+      keyHint: String(cfg && cfg.keyHint || "") || (p && p.keyHint) || "",
+      keyUrl: String(cfg && cfg.keyUrl || "") || (p && p.keyUrl) || "",
+      note: String(cfg && cfg.note || "") || (p && p.note) || ""
+    };
+  }
+
+  function inferGroup(cfg, fallback){
+    var base = String(cfg && cfg.baseUrl || "").toLowerCase().replace(/\/+$/, "");
+    var model = String(cfg && cfg.model || "").toLowerCase();
+    var fmt = String(cfg && cfg.format || "").toLowerCase();
+    var vendor = String(cfg && cfg.vendor || "").toLowerCase();
+    var name = String(cfg && cfg.name || "").toLowerCase().trim();
+    // 예전 복사 카드도 API 주소뿐 아니라 카드명/공급자명으로 알려진 무료 공급자를 복구합니다.
+    if(base.indexOf("api.groq.com") >= 0 || (!base && (/^groq$/.test(vendor) || /^groq(?:\s+\d+)?$/.test(name)))) return "free";
+    if((base.indexOf("openrouter.ai") >= 0 || (!base && (/openrouter/.test(vendor) || /^openrouter(?:\s+\d+)?$/.test(name)))) && /:free$/.test(model)) return "free";
+    if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0 || (!base && (/cloudflare workers ai/.test(vendor) || /^cloudflare(?: workers ai)?(?:\s+\d+)?$/.test(name)))) return "free";
+    if((fmt === "gemini" || !base || base.indexOf("generativelanguage.googleapis.com") >= 0) && (/^gemini[-.]/.test(model) || /^models\/gemini/.test(model) || /google ai studio/.test(vendor) || /^gemini(?:\s+\d+)?$/.test(name))) return "free";
+    if(cfg && (cfg.group === "free" || cfg.group === "paid")) return cfg.group;
+    return fallback === "free" ? "free" : "paid";
+  }
+  function copiedGroup(cfg){ return inferGroup(cfg, "paid"); }
+  function copiedVendor(cfg){
+    var base = String(cfg && cfg.baseUrl || "").toLowerCase();
+    var fmt = String(cfg && cfg.format || "").toLowerCase();
+    var model = String(cfg && cfg.model || "").toLowerCase();
+    var name = String(cfg && cfg.name || "").toLowerCase();
+    var vendor = String(cfg && cfg.vendor || "").trim();
+    if(base.indexOf("api.groq.com") >= 0) return "Groq";
+    if(base.indexOf("openrouter.ai") >= 0) return "OpenRouter";
+    if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0) return "Cloudflare Workers AI";
+    if(base.indexOf("api.x.ai") >= 0) return "xAI · Grok";
+    if(base.indexOf("api.deepseek.com") >= 0) return "DeepSeek";
+    if(base.indexOf("api.mistral.ai") >= 0) return "Mistral";
+    if(fmt === "gemini" && /^gemini[-.]/.test(model)) return "Google AI Studio";
+    if(/^(chatgpt · claude · deepseek · grok 등|복사한 카드|직접 추가 api)$/i.test(vendor)) vendor = "";
+    if(vendor) return vendor;
+    if(/grok/.test(name) || /grok/.test(model)) return "Grok";
+    return "복사한 카드";
+  }
+  function knownProvider(id){
     for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].id === id) return PROVIDERS[i];
     return null;
   }
-  function splitId(id){
-    var m = /^(.+)_c(\d+)$/.exec(typeof id === "string" ? id : "");
-    if(m && +m[2] >= 2 && baseProvider(m[1])) return {base: m[1], n: +m[2]};
+  // 복사 카드는 표시 이름만 새로 만들고 원본의 카드 유형(양식/요청 방식)은 templateId로 유지합니다.
+  // 이전 버전의 복사 카드에는 templateId가 없으므로 주소/모델로 가능한 경우 원본 유형을 추정합니다.
+  function templateOf(cfg){
+    if(!cfg || typeof cfg !== "object") return "custom1";
+    var id = String(cfg.id || "");
+    if(!/^copy_[a-z0-9]+$/i.test(id)) return knownProvider(id) ? id : "custom1";
+
+    var saved = String(cfg.templateId || cfg.sourceProviderId || "");
+    var base = String(cfg.baseUrl || "").toLowerCase().replace(/\/+$/, "");
+    var vendor = String(cfg.vendor || "").toLowerCase().trim();
+    var name = String(cfg.name || "").toLowerCase().trim();
+    var model = String(cfg.model || "").toLowerCase();
+    var fmt = String(cfg.format || "").toLowerCase();
+
+    // 중요: 구버전 복사 카드에는 templateId="custom1"이 잘못 저장되었을 수 있습니다.
+    // 이 값이 알려진 공급자 단서보다 우선하면 복사본이 일반 카드로 바뀌고 Base URL이 사라집니다.
+    // 명확한 endpoint/vendor/name 단서를 먼저 검사해 기존 카드도 자동 복구합니다.
+    if(base.indexOf("api.groq.com/openai/v1") >= 0 || (!base && (vendor === "groq" || /^groq(?:\s+\d+)?$/.test(name)))) return "groq";
+    if(base.indexOf("openrouter.ai/api/v1") >= 0 || (!base && (vendor === "openrouter" || /^openrouter(?:\s+\d+)?$/.test(name)))) return "openrouter";
+    if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0 || (!base && (/cloudflare workers ai|^cloudflare$/.test(vendor) || /^cloudflare(?: workers ai)?(?:\s+\d+)?$/.test(name)))) return "cloudflare";
+    // 예전 Gemini 복사본은 format이 compat로 저장된 경우가 있어 이름/모델/기본 URL도 확인합니다.
+    if((fmt === "gemini" || !base || base.indexOf("generativelanguage.googleapis.com") >= 0) &&
+       (/^gemini[-.]/.test(model) || /^models\/gemini/.test(model) || /^gemini(?:\s+\d+)?$/.test(name) || /google ai studio/.test(vendor)) &&
+       (/google ai studio/.test(vendor) || /^gemini(?:\s+\d+)?$/.test(name))) return "gemini";
+
+    // 위에서 알려진 공급자 단서를 복구한 뒤에만 저장된 템플릿을 신뢰합니다.
+    if(knownProvider(saved)) return saved;
+    // xAI Grok 등 직접 입력한 API는 직접 추가 양식으로 유지합니다.
+    return "custom1";
+  }
+  function provider(id, cfg){
+    for(var i = 0; i < PROVIDERS.length; i++){
+      if(PROVIDERS[i].id === id){
+        var baseProvider = PROVIDERS[i];
+        if(baseProvider.custom && cfg){
+          return Object.assign({}, baseProvider, presetMeta(cfg), {
+            group: inferGroup(cfg, baseProvider.group),
+            vendor: copiedVendor(cfg) !== "복사한 카드" ? copiedVendor(cfg) : baseProvider.vendor
+          });
+        }
+        return baseProvider;
+      }
+    }
+    // 복사 카드도 원본과 같은 provider 정의를 사용합니다.
+    // 이 때문에 Groq 복사본은 Groq 전용 양식(키 힌트, 키 링크, 설명, 호출 방식 등)으로 렌더링됩니다.
+    if(typeof id === "string" && /^copy_[a-z0-9]+$/i.test(id)){
+      var template = knownProvider(templateOf(cfg));
+      if(template){
+        if(template.custom){
+          return Object.assign({}, template, presetMeta(cfg), {
+            id: id,
+            group: inferGroup(cfg, template.group),
+            vendor: copiedVendor(cfg) !== "복사한 카드" ? copiedVendor(cfg) : template.vendor
+          });
+        }
+        return Object.assign({}, template, {id: id});
+      }
+      return {
+        id: id,
+        group: copiedGroup(cfg),
+        custom: true,
+        label: "복사한 API",
+        vendor: copiedVendor(cfg),
+        model: "", keyHint: "", note: ""
+      };
+    }
     return null;
   }
-  function isClone(id){ return !!splitId(id); }
-  function baseIdOf(id){ var s = splitId(id); return s ? s.base : id; }
-  function provider(id){
-    var b = baseProvider(id);
-    if(b) return b;
-    var sp = splitId(id);
-    if(!sp) return null;
-    if(!cloneCache[id]){
-      var bp = baseProvider(sp.base), o = {};
-      Object.keys(bp).forEach(function(k){ o[k] = bp[k]; });
-      o.id = id; o.cloneOf = sp.base; o.cloneNo = sp.n;
-      cloneCache[id] = o;
-    }
-    return cloneCache[id];
+  function groupOf(cfg){
+    var p = cfg ? provider(cfg.id, cfg) : null;
+    return p && (p.group === "free" || p.group === "paid") ? p.group : "paid";
+  }
+  function vendorOf(cfg){
+    var p = cfg ? provider(cfg.id, cfg) : null;
+    return p && p.vendor ? p.vendor : copiedVendor(cfg);
   }
   function formatOf(c){
-    var p = provider(c.id);
-    if(p && p.custom) return (c.format === "openai" || c.format === "claude") ? c.format : "compat";
+    var p = provider(c.id, c);
+    if(p && p.custom) return (["openai", "claude", "gemini"].indexOf(c.format) >= 0) ? c.format : "compat";
     return p ? p.format : "compat";
   }
   function baseOf(c){
-    var p = provider(c.id);
+    var p = provider(c.id, c);
     if(!p) return "";
     if(p.custom) return (c.baseUrl || "").replace(/\/+$/, "");
     if(p.account) return c.account ? "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(c.account) + "/ai/v1" : "";
@@ -101,21 +214,40 @@
     // 입력된 순서를 그대로 유지하고(= 사용자가 정한 표시 순서), 빠진 항목만 기본 순서대로 뒤에 붙임
     var by = {}, order = [];
     (Array.isArray(arr) ? arr : []).forEach(function(c){
-      if(c && typeof c.id === "string" && provider(c.id) && !by.hasOwnProperty(c.id)){ by[c.id] = c; order.push(c.id); }
+      if(c && typeof c.id === "string" && provider(c.id, c) && !by.hasOwnProperty(c.id)){ by[c.id] = c; order.push(c.id); }
     });
     PROVIDERS.forEach(function(p){ if(!by.hasOwnProperty(p.id)) order.push(p.id); });
     function str(v){ return typeof v === "string" ? v.trim() : ""; }
     return order.map(function(id){
-      var p = provider(id), c = by[id] || {};
+      var c = by[id] || {}, p = provider(id, c);
+      var rawBase = str(c.baseUrl), rawFormat = str(c.format), savedPreset = str(c.presetId);
+      var pid = p.custom ? presetOf(c) : "", preset = pid ? presetDefinition(pid) : null;
+      var resolvedBase = rawBase, resolvedFormat = rawFormat, resolvedName = str(c.name);
+      // 이전 복사 카드에는 presetId가 없고 기본 주소/형식이 소실된 경우가 있어,
+      // 카드명/공급자에서 확인되는 프리셋의 기본값으로 빈 설정만 복구합니다.
+      if(p.custom && preset && !savedPreset){
+        if(!resolvedBase && preset.baseUrl) resolvedBase = preset.baseUrl;
+        if((!resolvedFormat || resolvedFormat === "compat") && !rawBase && (preset.format === "openai" || preset.format === "claude")) resolvedFormat = preset.format;
+        if(!resolvedName && preset.name) resolvedName = preset.name;
+      }
       return {
         id: p.id,
         on: c.on === true,
         model: str(c.model) || p.model,
         web: c.web === true,
-        baseUrl: str(c.baseUrl),
-        name: str(c.name),
-        format: (c.format === "openai" || c.format === "claude") ? c.format : "compat",
-        account: str(c.account)
+        baseUrl: resolvedBase,
+        name: resolvedName,
+        format: (["openai", "claude", "gemini"].indexOf(resolvedFormat) >= 0) ? resolvedFormat : "compat",
+        account: str(c.account),
+        // 복사본의 UI 양식까지 원본과 같도록 provider template ID를 저장합니다.
+        templateId: /^copy_[a-z0-9]+$/i.test(id) ? templateOf(c) : undefined,
+        // 직접 추가/복사 카드 모두 프리셋·키 발급 정보·분류·공급자 설정을 보존합니다.
+        presetId: p.custom ? presetOf(c) : "",
+        keyUrl: p.custom ? (str(c.keyUrl) || presetMeta(c).keyUrl) : "",
+        keyHint: p.custom ? (str(c.keyHint) || presetMeta(c).keyHint) : "",
+        note: p.custom ? (str(c.note) || presetMeta(c).note) : "",
+        group: p.custom ? inferGroup(c, p.group) : p.group,
+        vendor: p.custom ? vendorOf({id:id, templateId:templateOf(c), name:str(c.name), model:str(c.model), baseUrl:str(c.baseUrl), format:(c.format || "compat"), group:c.group, vendor:str(c.vendor), presetId:presetOf(c), keyUrl:str(c.keyUrl), keyHint:str(c.keyHint)}) : str(p.vendor)
       };
     });
   }
@@ -173,7 +305,7 @@
     var prev = cur.map(function(c){ return c.id; }), t = orderTime();
     // 직접 추가 칸(Grok 등)은 GitHub 쪽이 비어 있고 이 기기엔 설정이 있으면 이 기기 값을 지킴 (빈 값으로 덮어써서 설정이 사라지는 것 방지)
     var keepArr = (Array.isArray(arr) ? arr : []).map(function(rc){
-      var p = rc && provider(rc.id);
+      var p = rc && provider(rc.id, rc);
       if(!p || !p.custom) return rc;
       var lc = cur.filter(function(x){ return x.id === rc.id; })[0];
       var remoteBlank = !(rc.name || rc.baseUrl || rc.model || rc.on);
@@ -220,120 +352,24 @@
     if(restored){ try{ localStorage.setItem(KEY_KEY, JSON.stringify(k)); }catch(e){} }
     return k;
   }
-  // 복사본은 자기 전용 키가 없으면 원본 카드의 키를 그대로 씀 → 키는 한 번만 저장하면 됨
-  function ownKey(id){ var v = readKeys()[id]; return typeof v === "string" ? v : ""; }
-  function getKey(id){
-    var k = readKeys(), v = k[id];
-    if(typeof v === "string" && v) return v;
-    var sp = splitId(id);
-    if(sp){ v = k[sp.base]; if(typeof v === "string" && v) return v; }
-    return "";
-  }
+  function getKey(id){ var v = readKeys()[id]; return typeof v === "string" ? v : ""; }
   function setKey(id, v){
     var k = readKeys();
     v = (v || "").trim();
     if(v) k[id] = v; else delete k[id];
     try{ localStorage.setItem(KEY_KEY, JSON.stringify(k)); }catch(e){}
     nativeSave(k);
-    idbSave(k);
   }
-
-  // 브라우저·PWA 용 두 번째 백업(IndexedDB). localStorage 만 지워져도 여기서 자동 복구돼요.
-  // 복구되면 화면이 알 수 있게 "aiai-keys-restored" 이벤트를 보냄. (사용자가 직접 지운 키는 되살리지 않음)
-  var IDB_NAME = "aiai_keys_db", IDB_STORE = "kv";
-  function idbOpen(cb){
-    try{
-      if(!root.indexedDB){ cb(null); return; }
-      var rq = root.indexedDB.open(IDB_NAME, 1);
-      rq.onupgradeneeded = function(){ try{ rq.result.createObjectStore(IDB_STORE); }catch(e){} };
-      rq.onsuccess = function(){ cb(rq.result); };
-      rq.onerror = function(){ cb(null); };
-      rq.onblocked = function(){ cb(null); };
-    }catch(e){ cb(null); }
-  }
-  function idbSave(k){
-    idbOpen(function(db){
-      if(!db) return;
-      try{
-        var tx = db.transaction(IDB_STORE, "readwrite");
-        tx.objectStore(IDB_STORE).put(JSON.stringify(k), "keys");
-        tx.oncomplete = tx.onerror = tx.onabort = function(){ try{ db.close(); }catch(e){} };
-      }catch(e){ try{ db.close(); }catch(x){} }
-    });
-  }
-  function idbRestore(){
-    idbOpen(function(db){
-      if(!db) return;
-      try{
-        var rq = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE).get("keys");
-        rq.onsuccess = function(){
-          try{ db.close(); }catch(e){}
-          var saved = null;
-          try{ saved = JSON.parse(rq.result || "null"); }catch(e){}
-          if(!saved || typeof saved !== "object") return;
-          var k = readKeys(), n = 0;
-          Object.keys(saved).forEach(function(id){
-            if(typeof saved[id] === "string" && saved[id] && !k[id]){ k[id] = saved[id]; n++; }
-          });
-          if(!n) return;
-          try{ localStorage.setItem(KEY_KEY, JSON.stringify(k)); }catch(e){}
-          nativeSave(k);
-          try{ root.dispatchEvent(new Event("aiai-keys-restored")); }catch(e){}
-        };
-        rq.onerror = function(){ try{ db.close(); }catch(e){} };
-      }catch(e){ try{ db.close(); }catch(x){} }
-    });
-  }
-  // 페이지를 열 때마다 한 번: localStorage 에 있는 키는 백업에도 채워 두고, 없는 키는 백업에서 복구
-  (function(){
-    try{ var cur = readKeys(); if(Object.keys(cur).length) idbSave(cur); }catch(e){}
-    idbRestore();
-  })();
-  function baseName(c){
-    var p = provider(c.id);
-    if(!p) return c.id;
-    return p.custom ? (c.name || p.label) : p.label;
-  }
-  function numOf(id){ var sp = splitId(id); return sp ? sp.n : 1; }
-  // 같은 이름의 카드가 2개 이상이면 "Grok 1", "Grok 2" 처럼 번호를 붙여요. (번호는 카드 고유 번호라 순서를 바꿔도 안 바뀜)
-  // list 를 안 주면 이 기기에 저장된 목록을 기준으로 해요.
-  function displayName(c, list){
-    var name = baseName(c), arr = Array.isArray(list) ? list : getCfg(), low = name.toLowerCase();
-    var grp = arr.filter(function(x){ return x && provider(x.id) && baseName(x).toLowerCase() === low; });
-    if(grp.length < 2) return name;
-    var me = -1, nums = {}, dup = false;
-    grp.forEach(function(x, i){
-      if(x.id === c.id) me = i;
-      var n = numOf(x.id); if(nums[n]) dup = true; nums[n] = 1;
-    });
-    if(me < 0) return name + " " + numOf(c.id);
-    return name + " " + (dup ? me + 1 : numOf(c.id));
-  }
-
-  // 카드 복사: list 에서 srcId 카드를 같은 양식으로 복사해 그 그룹 맨 뒤에 넣어요. 새 목록과 새 id 를 돌려줌 (더 못 만들면 null)
-  function cloneCard(list, srcId){
-    var arr = normCfg(list), baseId = baseIdOf(srcId), src = null, used = {}, count = 0, last = -1;
-    arr.forEach(function(c, i){
-      if(c.id === srcId) src = c;
-      if(baseIdOf(c.id) === baseId){ count++; used[numOf(c.id)] = 1; last = i; }
-    });
-    if(!src || count >= MAX_CARDS) return null;
-    var n = 2; while(used[n]) n++;
-    var copy = {};
-    Object.keys(src).forEach(function(k){ copy[k] = src[k]; });
-    copy.id = baseId + "_c" + n;
-    copy.on = true;                     // 복사하면 바로 검색에 쓰이도록 켜 둠
-    arr.splice(last + 1, 0, copy);
-    return {list: arr, id: copy.id};
-  }
-  // 카드 삭제: 복사본만 지울 수 있어요. 기본 카드는 그대로 돌려줌
-  function removeCard(list, id){
-    if(!isClone(id)) return normCfg(list);
-    return normCfg((Array.isArray(list) ? list : []).filter(function(c){ return c && c.id !== id; }));
+  function displayName(c){
+    var p = provider(c.id, c);
+    // 복사 작업에서 붙인 이름(Grok 1, Grok 2 등)은 인덱스의 결과 탭에도 그대로 사용합니다.
+    if(c && typeof c.name === "string" && c.name.trim()) return c.name.trim();
+    if(p && p.custom) return p.label;
+    return p ? p.label : c.id;
   }
   // 이 설정으로 호출할 준비가 안 된 부분이 있으면 한국어 문장으로 알려줌 (없으면 "")
   function missing(c){
-    var p = provider(c.id);
+    var p = provider(c.id, c);
     if(!p) return "지원하지 않는 API";
     if(!c.model) return "모델 이름이 비어 있어요.";
     if(p.account && !c.account) return "Cloudflare 계정 ID를 입력하세요.";
@@ -567,7 +603,7 @@
   // h.idleMs: 이 시간 동안 아무 응답 조각도 안 오면 중단하고 안내 (기본 60초)
   async function run(c, text, h){
     var fmt = formatOf(c), caller = CALLERS[fmt];
-    if(!caller || !provider(c.id)) throw new Error("지원하지 않는 API: " + c.id);
+    if(!caller || !provider(c.id, c)) throw new Error("지원하지 않는 API: " + c.id);
     var key = getKey(c.id);
     if(!key) throw new Error("🔑 API 키가 없어요. 관리자 페이지에서 키를 입력하세요.");
     var miss = missing(c);
@@ -606,7 +642,7 @@
   async function listModels(c){
     var key = getKey(c.id);
     if(!key) throw new Error("🔑 API 키를 먼저 저장하세요.");
-    var fmt = formatOf(c), p = provider(c.id), resp, j, ids = [];
+    var fmt = formatOf(c), p = provider(c.id, c), resp, j, ids = [];
     if(p.account){ throw new Error("Cloudflare 는 목록 조회를 지원하지 않아요. 문서의 모델 이름(예: @cf/meta/llama-3.3-70b-instruct-fp8-fast)을 직접 입력하세요."); }
     try{
       if(fmt === "openai") resp = await fetch("https://api.openai.com/v1/models", {headers: {"Authorization": "Bearer " + key}});
@@ -708,11 +744,10 @@
 
   root.AiaiApi = {
     VERSION: VERSION, PROVIDERS: PROVIDERS, PRESETS: PRESETS, FORMATS: FORMATS,
-    provider: provider, displayName: displayName, formatOf: formatOf, baseOf: baseOf, webLabelOf: webLabelOf, missing: missing,
+    provider: provider, templateOf: templateOf, presetOf: presetOf, displayName: displayName, formatOf: formatOf, baseOf: baseOf, groupOf: groupOf, vendorOf: vendorOf, webLabelOf: webLabelOf, missing: missing,
     normCfg: normCfg, getCfg: getCfg, setCfg: setCfg,
     move: move, setOrder: setOrder, stampOrder: stampOrder, orderTime: orderTime, applyRemoteCfg: applyRemoteCfg,
-    getKey: getKey, setKey: setKey, ownKey: ownKey,
-    cloneCard: cloneCard, removeCard: removeCard, isClone: isClone, baseIdOf: baseIdOf, MAX_CARDS: MAX_CARDS,
+    getKey: getKey, setKey: setKey,
     run: run, listModels: listModels, renderMd: renderMd, explain: explain
   };
 })(window);
