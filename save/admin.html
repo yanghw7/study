@@ -443,8 +443,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
              '<div class="field"><label>기본 주소 (Base URL)</label><input type="text" class="f-base" placeholder="https://api.x.ai/v1" autocomplete="off" inputmode="url">' +
              '<div class="note">주소 뒤에 /chat/completions 가 붙어서 호출돼요.</div></div>';
       }
-      h += '<div class="field"><label>모델 이름</label><input type="text" class="f-model" autocomplete="off" autocapitalize="off" spellcheck="false">' +
-           '<div class="note">모델은 자주 바뀌어요. 오류가 나면 각 서비스 문서의 최신 모델 이름으로 바꾸세요.</div></div>';
+      h += '<div class="field"><label>모델 이름</label><input type="text" class="f-model" list="dl-' + c.id + '" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+           '<datalist id="dl-' + c.id + '"></datalist>' +
+           '<div class="row" style="margin-top:8px"><button type="button" class="mini ghost b-models">사용 가능한 모델 불러오기</button></div>' +
+           '<div class="modelst note"></div>' +
+           '<div class="note">기본 모델 이름이 맞지 않을 수 있어요. 키를 저장한 뒤 [사용 가능한 모델 불러오기]를 누르면 이 키로 쓸 수 있는 모델이 목록에 나와요. 입력칸을 눌러 고르세요.</div></div>';
       if(!p.custom){
         h += '<div class="field"><label class="chk"><input type="checkbox" class="f-web"> ' + escHtml(p.webLabel) + '</label>' +
              '<div class="note">켜면 최신 정보를 웹에서 찾아 답하고 출처를 보여줘요. (서비스·모델에 따라 추가 요금이 있거나 지원되지 않을 수 있어요)</div></div>';
@@ -468,6 +471,20 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
         st.className = 'keyst' + (kind ? ' ' + kind : (k ? ' ok' : ''));
       }
       keyInfo();
+      var mst = el.querySelector('.modelst');
+      async function loadModels(){
+        var inp = el.querySelector('.f-key'), typed = inp.value.trim();
+        if(typed){ AiaiApi.setKey(c.id, typed); inp.value = ''; keyInfo(); }
+        mst.textContent = '불러오는 중…'; mst.style.color = '';
+        try{
+          var ids = await AiaiApi.listModels(apiRead(el, c.id));
+          var dl = el.querySelector('datalist'); dl.innerHTML = '';
+          ids.forEach(function(id){ var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
+          mst.textContent = ids.length ? ('✓ ' + ids.length + '개 · 앞쪽: ' + ids.slice(0, 8).join(', ') + ' — 위 입력칸을 눌러 선택하세요') : '사용 가능한 모델이 없어요.';
+          return ids;
+        }catch(e){ mst.textContent = '✗ ' + e.message; mst.style.color = 'var(--danger)'; return null; }
+      }
+      el.querySelector('.b-models').onclick = loadModels;
       el.querySelector('.f-on').onchange = function(){ el.classList.toggle('on', this.checked); };
       el.querySelector('.b-key').onclick = function(){
         var inp = el.querySelector('.f-key'), v = inp.value.trim();
@@ -487,7 +504,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
         try{
           await AiaiApi.run(cur, '다른 말 없이 "연결 성공" 이라고만 답해 주세요.', {onText: function(d){ out += d; }, onSource: function(){}});
           keyInfo('✓ 연결 성공 · 응답: ' + (out.trim().slice(0, 40) || '(빈 응답)'), 'ok');
-        }catch(e){ keyInfo('✗ ' + e.message, 'bad'); }
+        }catch(e){
+          keyInfo('✗ ' + e.message, 'bad');
+          if(/404|모델/.test(e.message) && AiaiApi.getKey(c.id)) loadModels();   // 모델 문제로 보이면 사용 가능한 모델을 바로 보여줌
+        }
         btn.disabled = false;
       };
       box.appendChild(el);

@@ -218,6 +218,44 @@
     }
   }
 
+  /* ---------- 사용 가능한 모델 목록 (키로 직접 조회) ---------- */
+  async function listModels(c){
+    var key = getKey(c.id);
+    if(!key) throw new Error("API 키가 없어요.");
+    var resp, j, ids = [];
+    try{
+      if(c.id === "openai"){
+        resp = await fetch("https://api.openai.com/v1/models", {headers: {"Authorization": "Bearer " + key}});
+      } else if(c.id === "gemini"){
+        resp = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {headers: {"x-goog-api-key": key}});
+      } else if(c.id === "claude"){
+        resp = await fetch("https://api.anthropic.com/v1/models?limit=100", {headers: {"x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true"}});
+      } else {
+        var base = (c.baseUrl || "").replace(/\/+$/, "");
+        if(!/^https:\/\//i.test(base)) throw new Error("기본 주소(https://…)를 먼저 입력하세요.");
+        resp = await fetch(base + "/models", {headers: {"Authorization": "Bearer " + key}});
+      }
+    }catch(e){
+      if(e instanceof TypeError) throw new Error("네트워크 오류예요. 인터넷 연결을 확인하세요.");
+      throw e;
+    }
+    if(!resp.ok) await failFrom(resp);
+    j = await resp.json();
+    if(c.id === "gemini"){
+      (j.models || []).forEach(function(m){
+        if(m.name && (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0) ids.push(m.name.replace(/^models\//, ""));
+      });
+    } else {
+      var arr = (j.data || []).slice();
+      if(c.id === "openai"){
+        arr = arr.filter(function(m){ return /^(gpt|o\d|chatgpt)/i.test(m.id) && !/(embed|tts|whisper|dall|image|moderation|audio|realtime|transcribe|search-preview|instruct|davinci|babbage)/i.test(m.id); });
+        arr.sort(function(a, b){ return (b.created || 0) - (a.created || 0); });
+      }
+      ids = arr.map(function(m){ return m.id; });
+    }
+    return ids;
+  }
+
   /* ---------- 답변 표시용 간단 마크다운 ---------- */
   function esc(s){
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -286,6 +324,6 @@
     PROVIDERS: PROVIDERS, provider: provider, displayName: displayName,
     normCfg: normCfg, getCfg: getCfg, setCfg: setCfg,
     getKey: getKey, setKey: setKey,
-    run: run, renderMd: renderMd
+    run: run, listModels: listModels, renderMd: renderMd
   };
 })(window);
