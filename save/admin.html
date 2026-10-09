@@ -163,7 +163,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
 </div>
 
 
-<script src="../all/api-core.js?v=1.16.1"></script>
+<script src="../all/api-core.js?v=1.16.2"></script>
 <script>
 (function(){
   var API = 'https://api.github.com/repos/yanghw7/study/contents/save/settings.json';
@@ -480,16 +480,17 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       el.className = 'apibox' + (c.on ? ' on' : '');
       el.dataset.id = c.id;
       el.dataset.savedName = c.name || '';
-      el.dataset.group = c.group || p.group || 'paid';
-      el.dataset.vendor = c.vendor || p.vendor || '';
-      var title = (p.group === 'free' ? '🆓 ' : '💳 ') + AiaiApi.displayName(c);
+      el.dataset.group = AiaiApi.groupOf(c);
+      el.dataset.vendor = AiaiApi.vendorOf(c);
+      var title = (el.dataset.group === 'free' ? '🆓 ' : '💳 ') + AiaiApi.displayName(c);
       var h = '<div class="hd"><label class="chk"><input type="checkbox" class="f-on"' + (c.on ? ' checked' : '') + '> ' +
-        escHtml(title) + '</label><span class="vend">' + escHtml(p.vendor || '') + '</span>' +
+        '<span class="api-card-title">' + escHtml(title) + '</span></label><span class="vend">' + escHtml(el.dataset.vendor || p.vendor || '') + '</span>' +
         '<span class="mvs"><button type="button" class="mini ghost b-copy">카드 복사</button><button type="button" class="mini ghost b-card-del"' + (/^copy_[a-z0-9]+$/i.test(c.id) ? '' : ' disabled title="복사한 카드만 삭제할 수 있어요"') + '>카드 삭제</button><button type="button" class="mini ghost b-up" aria-label="위로 이동">▲</button><button type="button" class="mini ghost b-dn" aria-label="아래로 이동">▼</button></span></div><div class="sub">';
       if(p.note) h += '<div class="note" style="margin:0 0 10px">' + escHtml(p.note) + '</div>';
       if(p.custom){
         h += '<div class="field"><label>프리셋 (고르면 아래 칸이 채워져요)</label><select class="f-preset"></select></div>' +
-             '<div class="field"><label>표시 이름</label><input type="text" class="f-name" placeholder="예: ChatGPT" autocomplete="off"></div>' +
+             '<div class="field"><label>표시 이름</label><input type="text" class="f-name" placeholder="예: Grok 1" autocomplete="off"></div>' +
+             '<div class="field"><label>카드 분류</label><select class="f-group"><option value="free">무료 모델/무료 한도</option><option value="paid">유료·기타</option></select><div class="note">분류 표시는 API 주소·모델을 바꾸지 않습니다. 실제 요금은 연결한 서비스와 모델 정책을 따릅니다.</div></div>' +
              '<div class="field"><label>연결 방식</label><select class="f-format"></select></div>' +
              '<div class="field f-basebox"><label>기본 주소 (Base URL)</label><input type="text" class="f-base" placeholder="https://api.example.com/v1" autocomplete="off" inputmode="url">' +
              '<div class="note">주소 뒤에 /chat/completions 가 붙어서 호출돼요.</div></div>';
@@ -529,6 +530,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       if(p.custom){
         q('.f-name').value = c.name;
         q('.f-base').value = c.baseUrl;
+        q('.f-group').value = AiaiApi.groupOf(c);
+        q('.f-group').onchange = function(){ el.dataset.group = this.value; var t = el.querySelector('.api-card-title'); if(t) t.textContent = (this.value === 'free' ? '🆓 ' : '💳 ') + AiaiApi.displayName(apiRead(el, c.id)); };
         AiaiApi.FORMATS.forEach(function(f){ var o = document.createElement('option'); o.value = f.id; o.textContent = f.label; fmtSel.appendChild(o); });
         fmtSel.value = c.format;
         AiaiApi.PRESETS.forEach(function(pr){ var o = document.createElement('option'); o.value = pr.id; o.textContent = pr.label; presetSel.appendChild(o); });
@@ -538,6 +541,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
           q('.f-name').value = pr.name; fmtSel.value = pr.format; q('.f-base').value = pr.baseUrl;
           // 프리셋은 직접 추가(유료·기타) 항목이므로 복사 카드의 분류도 함께 갱신합니다.
           el.dataset.group = 'paid'; el.dataset.vendor = pr.name || '직접 추가 API';
+          if(q('.f-group')) { q('.f-group').value = 'paid'; var t = el.querySelector('.api-card-title'); if(t) t.textContent = '💳 ' + (q('.f-name').value || AiaiApi.displayName(c)); }
           q('.f-model').value = '';                       // 모델은 키를 저장한 뒤 목록에서 고르게 비워 둠
           var kl = q('.keylink'); kl.innerHTML = pr.keyUrl ? '<a href="' + escHtml(pr.keyUrl) + '" target="_blank" rel="noopener noreferrer">키 발급받기 ↗</a>' : '';
           refreshFormat();
@@ -653,7 +657,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       name: q('.f-name') ? q('.f-name').value.trim() : (el.dataset.savedName || ''),
       format: q('.f-format') ? q('.f-format').value : 'compat',
       account: q('.f-account') ? q('.f-account').value.trim() : '',
-      group: el.dataset.group || 'paid',
+      group: q('.f-group') ? q('.f-group').value : (el.dataset.group || 'paid'),
       vendor: el.dataset.vendor || ''
     };
   }
@@ -681,41 +685,44 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     var idx = -1;
     for(var i = 0; i < list.length; i++) if(list[i].id === el.dataset.id){ idx = i; break; }
     if(idx < 0) return;
-    var src = list[idx], srcProvider = AiaiApi.provider(src.id, src);
-    // 현재 카드에 입력했지만 아직 [키 저장]을 누르지 않은 키도 복사에 포함합니다.
+
+    // 화면에 현재 보이는 값을 원본 설정으로 사용합니다(저장 전 수정 내용도 포함).
+    var src = list[idx];
+    var srcProvider = AiaiApi.provider(src.id, src);
     var keyInput = el.querySelector('.f-key'), keyValue = keyInput ? keyInput.value.trim() : '';
     if(keyValue){ AiaiApi.setKey(src.id, keyValue); keyInput.value = ''; }
     var existingKey = AiaiApi.getKey(src.id);
+
     var sourceName = src.name || AiaiApi.displayName(src);
     var baseName = apiFamilyName(sourceName) || '복사한 API';
     var names = list.map(function(x){ return x.name || AiaiApi.displayName(x); });
-    var hasNumbered = names.some(function(n){ return n !== baseName && apiFamilyName(n) === baseName && /\s\d+$/.test(n); });
     var firstNumber;
     if(!/\s\d+$/.test(sourceName)){
+      var hasNumbered = names.some(function(n){ return n !== baseName && apiFamilyName(n) === baseName && /\s\d+$/.test(n); });
       if(!hasNumbered){ src.name = baseName + ' 1'; firstNumber = 2; }
       else { firstNumber = nextApiFamilyNumber(baseName, names); src.name = baseName + ' ' + firstNumber; firstNumber += 1; }
     }else{
       firstNumber = nextApiFamilyNumber(baseName, names);
     }
     var newName = baseName + ' ' + firstNumber;
-    var cloned = {
+
+    // 설정을 통째로 복제합니다. endpoint/model/format/web/account/group/vendor는 바꾸지 않고,
+    // 기본 provider의 generic 'paid' 값도 끌어오지 않습니다. 새 ID와 이름만 다릅니다.
+    var cloned = Object.assign({}, src, {
       id: id,
-      on: src.on,
-      model: src.model,
-      web: src.web,
-      baseUrl: (srcProvider && srcProvider.custom) ? src.baseUrl : AiaiApi.baseOf(src),
       name: newName,
+      baseUrl: src.baseUrl || (!(srcProvider && srcProvider.custom) ? AiaiApi.baseOf(src) : ''),
       format: (srcProvider && srcProvider.custom) ? src.format : AiaiApi.formatOf(src),
-      account: '',
-      group: srcProvider ? srcProvider.group : (src.group || 'paid'),
-      vendor: srcProvider ? srcProvider.vendor : (src.vendor || '복사한 카드')
-    };
+      account: src.account || '',
+      group: AiaiApi.groupOf(src),
+      vendor: AiaiApi.vendorOf(src)
+    });
     list.splice(idx + 1, 0, cloned);
     AiaiApi.setCfg(list);
     AiaiApi.stampOrder();
     if(existingKey) AiaiApi.setKey(id, existingKey);
     apiBuild();
-    apiStatus(AiaiApi.displayName(src) + ' 카드를 복사했어요. [' + newName + ']도 사용하려면 설정을 저장하세요.', 'ok');
+    apiStatus('원본 설정을 그대로 복사했어요: 모델·주소·연결 방식·웹 검색·계정 ID·분류 [' + newName + ']. 다른 기기에도 반영하려면 설정을 저장하세요.', 'ok');
     var created = $('apiList').querySelector('[data-id="' + id + '"]');
     if(created) try{ created.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(e){}
   }

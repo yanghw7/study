@@ -9,7 +9,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.16.1";
+  var VERSION = "1.16.2";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -51,24 +51,26 @@
     {id: "mistral", label: "Mistral (OpenAI 호환)", name: "Mistral", format: "compat", baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/api-keys"}
   ];
 
-  function copiedGroup(cfg){
-    if(cfg && (cfg.group === "free" || cfg.group === "paid")) return cfg.group;
-    // 이전 버전에서 만든 복사 카드에는 group 값이 없으므로 주소/모델로 무료 공급자를 추정해 자동 보정합니다.
+  function inferGroup(cfg, fallback){
     var base = String(cfg && cfg.baseUrl || "").toLowerCase().replace(/\/+$/, "");
     var model = String(cfg && cfg.model || "").toLowerCase();
     var fmt = String(cfg && cfg.format || "").toLowerCase();
     var vendor = String(cfg && cfg.vendor || "").toLowerCase();
-    if(base.indexOf("api.groq.com") >= 0 || /\bgroq\b/.test(vendor)) return "free";
-    if(base.indexOf("openrouter.ai") >= 0 && (/:free$/.test(model) || /\bopenrouter\b/.test(vendor))) return "free";
+    // 요금 분류를 예전에 잘못 'paid'로 저장한 복사 카드도 알려진 무료 모델/엔드포인트면 바로잡습니다.
+    if(base.indexOf("api.groq.com") >= 0 || /^groq$/.test(vendor)) return "free";
+    if(base.indexOf("openrouter.ai") >= 0 && /:free$/.test(model)) return "free";
     if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0 || /cloudflare workers ai/.test(vendor)) return "free";
     if(fmt === "gemini" && (/^gemini[-.]/.test(model) || /^models\/gemini/.test(model) || /google ai studio/.test(vendor))) return "free";
-    return "paid";
+    if(cfg && (cfg.group === "free" || cfg.group === "paid")) return cfg.group;
+    return fallback === "free" ? "free" : "paid";
   }
+  function copiedGroup(cfg){ return inferGroup(cfg, "paid"); }
   function copiedVendor(cfg){
-    if(cfg && typeof cfg.vendor === "string" && cfg.vendor.trim()) return cfg.vendor.trim();
     var base = String(cfg && cfg.baseUrl || "").toLowerCase();
     var fmt = String(cfg && cfg.format || "").toLowerCase();
     var model = String(cfg && cfg.model || "").toLowerCase();
+    var name = String(cfg && cfg.name || "").toLowerCase();
+    var vendor = String(cfg && cfg.vendor || "").trim();
     if(base.indexOf("api.groq.com") >= 0) return "Groq";
     if(base.indexOf("openrouter.ai") >= 0) return "OpenRouter";
     if(base.indexOf("api.cloudflare.com/client/v4/accounts/") >= 0) return "Cloudflare Workers AI";
@@ -76,11 +78,25 @@
     if(base.indexOf("api.deepseek.com") >= 0) return "DeepSeek";
     if(base.indexOf("api.mistral.ai") >= 0) return "Mistral";
     if(fmt === "gemini" && /^gemini[-.]/.test(model)) return "Google AI Studio";
+    if(/^(chatgpt · claude · deepseek · grok 등|복사한 카드|직접 추가 api)$/i.test(vendor)) vendor = "";
+    if(vendor) return vendor;
+    if(/grok/.test(name) || /grok/.test(model)) return "Grok";
     return "복사한 카드";
   }
   function provider(id, cfg){
-    for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].id === id) return PROVIDERS[i];
-    // 복사한 카드는 원본의 분류(무료/유료)와 공급자명을 설정에 저장해 그대로 유지합니다.
+    for(var i = 0; i < PROVIDERS.length; i++){
+      if(PROVIDERS[i].id === id){
+        var baseProvider = PROVIDERS[i];
+        if(baseProvider.custom && cfg){
+          return Object.assign({}, baseProvider, {
+            group: inferGroup(cfg, baseProvider.group),
+            vendor: copiedVendor(cfg) !== "복사한 카드" ? copiedVendor(cfg) : baseProvider.vendor
+          });
+        }
+        return baseProvider;
+      }
+    }
+    // 복사한 카드는 원본 설정을 유지하는 별도 사용자 지정 API입니다.
     if(typeof id === "string" && /^copy_[a-z0-9]+$/i.test(id)){
       return {
         id: id,
@@ -92,6 +108,14 @@
       };
     }
     return null;
+  }
+  function groupOf(cfg){
+    var p = cfg ? provider(cfg.id, cfg) : null;
+    return p && (p.group === "free" || p.group === "paid") ? p.group : "paid";
+  }
+  function vendorOf(cfg){
+    var p = cfg ? provider(cfg.id, cfg) : null;
+    return p && p.vendor ? p.vendor : copiedVendor(cfg);
   }
   function formatOf(c){
     var p = provider(c.id, c);
@@ -128,9 +152,9 @@
         name: str(c.name),
         format: (["openai", "claude", "gemini"].indexOf(c.format) >= 0) ? c.format : "compat",
         account: str(c.account),
-        // 복사 카드가 원본의 무료/유료 분류와 공급자명을 유지하도록 설정에 포함합니다.
-        group: /^copy_[a-z0-9]+$/i.test(id) ? copiedGroup(c) : p.group,
-        vendor: /^copy_[a-z0-9]+$/i.test(id) ? (str(c.vendor) || copiedVendor(c)) : str(p.vendor)
+        // 직접 추가/복사 카드 모두 원래 분류·공급자 설정을 보존합니다.
+        group: p.custom ? inferGroup(c, p.group) : p.group,
+        vendor: p.custom ? vendorOf({id:id, name:str(c.name), model:str(c.model), baseUrl:str(c.baseUrl), format:(c.format || "compat"), group:c.group, vendor:str(c.vendor)}) : str(p.vendor)
       };
     });
   }
@@ -627,7 +651,7 @@
 
   root.AiaiApi = {
     VERSION: VERSION, PROVIDERS: PROVIDERS, PRESETS: PRESETS, FORMATS: FORMATS,
-    provider: provider, displayName: displayName, formatOf: formatOf, baseOf: baseOf, webLabelOf: webLabelOf, missing: missing,
+    provider: provider, displayName: displayName, formatOf: formatOf, baseOf: baseOf, groupOf: groupOf, vendorOf: vendorOf, webLabelOf: webLabelOf, missing: missing,
     normCfg: normCfg, getCfg: getCfg, setCfg: setCfg,
     move: move, setOrder: setOrder, stampOrder: stampOrder, orderTime: orderTime, applyRemoteCfg: applyRemoteCfg,
     getKey: getKey, setKey: setKey,
