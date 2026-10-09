@@ -71,8 +71,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   </div>
   <div class="back">
     <a href="https://yanghw7.github.io/study/all" class="back-btn">통합 AI검색 복귀</a>
-    <a href="https://yanghw7.github.io/study/ai" class="back-btn">구글 AI검색 복귀</a>
-    <a href="https://yanghw7.github.io/study/nai" class="back-btn">네이버 AI검색 복귀</a>
   </div>
 </div>
 
@@ -713,18 +711,20 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     }
     // 관리자 페이지는 최초 1회만 원격 설정을 읽습니다. 이후 다시 불러오기는 버튼으로만 수행합니다.
     pull();
-    window.addEventListener('beforeunload', function(e){
-      if(state.dirty || state.cropEdit){ e.preventDefault(); e.returnValue = ''; }
-    });
+    // APK 웹뷰에서는 이 확인창이 이동 자체를 막아서(복귀 버튼 먹통) 앱에서는 쓰지 않습니다.
+    if(location.hostname !== 'appassets.androidplatform.net'){
+      window.addEventListener('beforeunload', function(e){
+        if(state.dirty || state.cropEdit){ e.preventDefault(); e.returnValue = ''; }
+      });
+    }
   })();
 })();
 </script>
 <script>
 // APK 안에서는 복귀 버튼이 앱의 통합 화면으로 돌아가게 함
 if(location.hostname === "appassets.androidplatform.net"){
-  var bs = document.querySelectorAll(".back-btn");
-  if(bs[0]) bs[0].setAttribute("href", "../all/index.html");
-  for(var i = 1; i < bs.length; i++) bs[i].style.display = "none";
+  var bb = document.querySelector(".back-btn");
+  if(bb) bb.setAttribute("href", "../all/index.html");
 }
 </script>
 </body>
