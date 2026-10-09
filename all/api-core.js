@@ -9,7 +9,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.16.5";
+  var VERSION = "1.16.6";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
