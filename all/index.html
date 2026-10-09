@@ -98,6 +98,9 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .field small{display:block;color:var(--muted);font-size:12px;margin-top:5px;line-height:1.5}
 .crop{display:flex;gap:8px;flex-wrap:wrap}.crop>div{flex:1 1 calc(50% - 8px);min-width:110px}.crop small{margin:0 0 4px}
 .spacer{flex:1;min-height:8px}
+.np-btn{flex:none;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 12px;margin-bottom:8px;border-radius:14px;font-size:14px;font-weight:600;background:var(--accent);color:#fff;border:1px solid var(--accent)}
+.np-btn:hover{filter:brightness(1.08)}
+.np-btn small{font-size:12px;font-weight:400;opacity:.85}
 .admin-link{display:flex;align-items:center;gap:10px;padding:11px 12px;text-decoration:none;color:inherit;margin-bottom:0}
 .admin-link .sub{font-size:12px;font-weight:400;color:var(--muted)}
 
@@ -120,7 +123,12 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 /* 탭: 두 패널을 겹쳐 두고 하나만 보이게 (둘 다 계속 로딩됨) */
 /* 전용: 한쪽만 전체 화면 · 분할: 상하 / 좌우 */
 .layout-google #paneA,.layout-api #paneG{display:none}
-.layout-google .phead,.layout-api .phead{display:none}
+.layout-google .phead,.layout-api .phead,.layout-naver .phead{display:none}
+/* 네이버 전용: 네이버 칸만 전체 화면 (분할에는 나오지 않음) */
+#paneN{display:none}
+.layout-naver #paneN{display:flex}
+.layout-naver #paneG,.layout-naver #paneA{display:none}
+.newtab.alt{right:130px;background:var(--accent);border-color:var(--accent);color:#fff}
 .layout-split #panes{grid-template-rows:1fr 1fr}
 .layout-side #panes{grid-template-columns:1fr 1fr}
 /* 분할 순서 바꾸기: 구글 ↔ API 위치 교체 (상하: 위/아래, 좌우: 왼쪽/오른쪽) */
@@ -128,7 +136,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .swap #paneA{order:1}
 #swapBtn{padding:6px 14px;font-size:13px;color:var(--fg);background:var(--card);border:1px solid var(--border)}
 #swapBtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.layout-google #swapBtn,.layout-api #swapBtn{display:none}
+.layout-google #swapBtn,.layout-api #swapBtn,.layout-naver #swapBtn{display:none}
 
 /* ===== API 칸 ===== */
 .apiwrap{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
@@ -203,6 +211,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   <!-- 왼쪽 메뉴 -->
   <aside id="side">
 
+    <button type="button" class="np-btn" id="noPromptBtn" title="프롬프트를 붙이지 않고 입력한 검색어만 검색해요">🔎 프롬프트 없이 검색 <small>(입력한 검색어만)</small></button>
+
     <div class="acc" data-key="cur">
       <button type="button" class="acc-head" aria-expanded="false">
         <span class="ico">📌</span>
@@ -211,7 +221,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="cur-body" id="curBody"></div>
-        <div class="note">검색할 때 이 프롬프트가 입력 내용 뒤에 자동으로 붙어요. 구글·API에 똑같이 적용돼요.</div>
+        <div class="note">검색할 때 이 프롬프트가 입력 내용 뒤에 자동으로 붙어요. 구글·API·네이버에 똑같이 적용돼요.</div>
       </div></div></div>
     </div>
 
@@ -296,6 +306,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       <div class="seg" id="layoutSeg">
         <button type="button" data-l="google">구글 전용</button>
         <button type="button" data-l="api">API 전용</button>
+        <button type="button" data-l="naver">네이버 전용</button>
         <button type="button" data-l="side">좌우 분할</button>
         <button type="button" data-l="split">상하 분할</button>
       </div>
@@ -310,6 +321,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     <div id="panes">
       <div class="pane" id="paneG"><div class="phead">구글 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
       <div class="pane" id="paneA"><div class="phead">API</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
+      <div class="pane" id="paneN"><div class="phead">네이버 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
     </div>
   </main>
 </div>
@@ -330,9 +342,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   var SV = {
     g: {name: "구글 AI",  pk: "aimode_prompts_v2",  ck: "aimode_cfg_v1",  pane: "paneG", st: null, cfg: null,
         url: function(t){ return "https://www.google.com/search?udm=50&q=" + encodeURIComponent(t); }},
-    a: {name: "API", pk: "naimode_prompts_v2", ck: "naimode_cfg_v1", pane: "paneA", st: null, cfg: null}
+    a: {name: "API", pk: "naimode_prompts_v2", ck: "naimode_cfg_v1", pane: "paneA", st: null, cfg: null},
+    // 네이버 전용 칸: 프롬프트·자르기 설정은 구글과 같은 값을 씀 (저장 키 없음)
+    n: {name: "네이버 AI", pane: "paneN",
+        url: function(t){ return "https://m.search.naver.com/search.naver?ssc=tab.m_ait.all&sm=mtb_jum&dtm_source=search&dtm_medium=tab&query=" + encodeURIComponent(t); }}
   };
-  var KEYS = ["g", "a"];   // 검색을 보내는 칸
+  var KEYS = ["g", "a"];   // 프롬프트·설정을 저장하는 칸
+  var SKEYS = ["g", "a", "n"];   // 검색을 보내는 칸 (n = 네이버 전용, 화면에 보일 때만 검색)
+  var FKEYS = ["g", "a", "n"];   // 화면 자르기를 적용할 칸
   var NKEYS = ["g"];       // 앱의 웹뷰가 필요한 칸 (구글만)
 
   var $ = function(id){ return document.getElementById(id); };
@@ -367,7 +384,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   // 구글·API 구분 없이 하나의 값으로 통일: 구글 저장값을 기준으로 쓰고, 저장할 때 네이버 단독 앱 쪽에도 똑같이 기록
   function persist(){ KEYS.forEach(function(k){ try{ localStorage.setItem(SV[k].pk, JSON.stringify(SV.g.st)); }catch(e){} }); }
   function saveCfg(){ KEYS.forEach(function(k){ try{ localStorage.setItem(SV[k].ck, JSON.stringify(SV.g.cfg)); }catch(e){} }); }
-  function loadAll(){ SV.g.st = loadSt("g"); SV.g.cfg = loadCfg("g"); SV.a.st = SV.g.st; SV.a.cfg = SV.g.cfg; }
+  function loadAll(){ SV.g.st = loadSt("g"); SV.g.cfg = loadCfg("g"); SV.a.st = SV.g.st; SV.a.cfg = SV.g.cfg; SV.n.st = SV.g.st; SV.n.cfg = SV.g.cfg; }
   function loadUi(){
     try{ var u = JSON.parse(localStorage.getItem(UIKEY)); if(u && u.open) return u; }catch(e){}
     return {open: {}, side: true, svc: "g"};
@@ -432,14 +449,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     c.cropLeft = num($("cropLeft")); c.cropRight = num($("cropRight"));
     var sxv = parseInt($("shiftX").value, 10); c.shiftX = isNaN(sxv) ? 0 : Math.max(-500, Math.min(500, sxv));
     saveCfg(cur);
-    KEYS.forEach(function(k){ var f = $(SV[k].pane).querySelector(".frame"); if(f) applyCrop(f, c); });
+    FKEYS.forEach(function(k){ var f = $(SV[k].pane).querySelector(".frame"); if(f) applyCrop(f, c); });
     renderCrop(); reportLayout();
   }
   ["cropTop", "cropBottom", "cropLeft", "cropRight", "shiftX"].forEach(function(id){ $(id).addEventListener("input", liveCrop); });
 
   /* ---------- 검색 ---------- */
-  function buildQuery(text, k){
-    var a = active(k);
+  function buildQuery(text, k, noPrompt){
+    var a = noPrompt ? null : active(k === "a" || k === "n" ? "g" : k);
     if(!a) return text;
     return text.replace(/\s+$/, "") + "\n\n\n" + a.text; // 검색어 → 빈 줄 2개 → 프롬프트
   }
@@ -504,15 +521,15 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   // APK 앱이 구글 화면을 확인하고 문제를 알릴 때 부르는 함수
   window.__aiaiWarn = function(key, msg){ showWarn(String(key), String(msg)); };
 
-  function run(k, text){
-    if(k === "a"){ var ap = active("g"); runApi(buildQuery(text, "g"), text, ap ? ap.text : ""); return; }
-    var url = SV[k].url(buildQuery(text, k));
+  function run(k, text, np){
+    if(k === "a"){ var ap = np ? null : active("g"); runApi(buildQuery(text, "g", np), text, ap ? ap.text : ""); return; }
+    var url = SV[k].url(buildQuery(text, k, np));
     if(k === "g"){
       clearWarn("g:");
     }
     var fill = $(SV[k].pane).querySelector(".fill");
     fill.innerHTML = "";
-    if(NATIVE){
+    if(NATIVE && k === "g"){
       fill.appendChild(div("ph", "불러오는 중…"));
       loaded[k] = true;
       try{ window.AiaiNative.load(k, url); }catch(e){}
@@ -526,6 +543,13 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     var a = document.createElement("a");
     a.className = "newtab"; a.target = "_blank"; a.rel = "noopener noreferrer"; a.href = url; a.textContent = "새 탭에서 열기 ↗";
     fill.appendChild(a);
+    if(k === "n"){
+      // 네이버가 가끔 "잘못된 접근"을 내면 눌러서 다시 불러오기
+      var rt = document.createElement("a");
+      rt.className = "newtab alt"; rt.href = "#"; rt.textContent = "↻ 다시 불러오기";
+      rt.addEventListener("click", function(ev){ ev.preventDefault(); fr.src = "about:blank"; setTimeout(function(){ fr.src = url; }, 800); });
+      fill.appendChild(rt);
+    }
   }
   // 같은 검색이 순식간에 여러 번 나가면 구글이 "비정상 트래픽"으로 보고 캡차를 띄우므로, 연타·중복 검색은 걸러 줌
   var lastSearch = {t: 0, text: ""};
@@ -539,43 +563,55 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   // ---- 트래픽 줄이기 ----
   // 1) 지금 화면에 보이는 쪽만 검색 (구글 전용이면 네이버는 안 부르고, 나중에 그 화면으로 바꿀 때 한 번만 불러옴)
   // 2) 칸별 최소 간격: 간격 안에 또 검색하면 마지막 검색어만 간격이 지난 뒤 실행 (구글 7초 / API 0.6초)
-  var GAP = {g: 7000, a: 600}, lastRun = {g: 0, a: 0}, timers = {g: null, a: null}, pending = {g: null, a: null};
+  var GAP = {g: 7000, a: 600, n: 1500}, lastRun = {g: 0, a: 0, n: 0}, timers = {g: null, a: null, n: null}, pending = {g: null, a: null, n: null};
   function visibleKey(k){
     var b = document.body.classList;
     if(b.contains("layout-google")) return k === "g";
     if(b.contains("layout-api")) return k === "a";
-    return true;
+    if(b.contains("layout-naver")) return k === "n";
+    return k !== "n";   // 분할 화면은 구글 + API 만
   }
-  function busy(){ $("goBtn").textContent = (timers.g || timers.a) ? "대기…" : "검색"; }
-  function dispatch(k, text){
+  function busy(){ $("goBtn").textContent = (timers.g || timers.a || timers.n) ? "대기…" : "검색"; }
+  // np = true 면 프롬프트 없이 검색어만 보냄
+  function dispatch(k, text, np){
     if(timers[k]){ clearTimeout(timers[k]); timers[k] = null; }
     var wait = lastRun[k] + GAP[k] - Date.now();
     if(wait > 0){
-      timers[k] = setTimeout(function(){ timers[k] = null; busy(); lastRun[k] = Date.now(); run(k, text); }, wait);
+      timers[k] = setTimeout(function(){ timers[k] = null; busy(); lastRun[k] = Date.now(); run(k, text, np); }, wait);
       busy();
       return;
     }
-    lastRun[k] = Date.now(); run(k, text);
+    lastRun[k] = Date.now(); run(k, text, np);
   }
   function flushPending(){
-    KEYS.forEach(function(k){
-      if(pending[k] && visibleKey(k)){ var t = pending[k]; pending[k] = null; dispatch(k, t); }
+    SKEYS.forEach(function(k){
+      if(pending[k] && visibleKey(k)){ var t = pending[k]; pending[k] = null; dispatch(k, t.text, t.np); }
     });
   }
-  function search(){
+  function search(np){
     var text = q.value.trim();
     if(!text) return;
-    if(throttled(text)) return;
+    if(throttled(text + (np ? "\u0000np" : ""))) return;
     document.body.classList.remove("drawer-open");
     submitted = true;
-    KEYS.forEach(function(k){
-      if(visibleKey(k)){ pending[k] = null; dispatch(k, text); }
-      else { if(timers[k]){ clearTimeout(timers[k]); timers[k] = null; } pending[k] = text; }
+    SKEYS.forEach(function(k){
+      if(visibleKey(k)){ pending[k] = null; dispatch(k, text, np); }
+      else {
+        if(timers[k]){ clearTimeout(timers[k]); timers[k] = null; }
+        // 네이버는 네이버 전용 화면에서만 검색하므로, 안 보이는 동안엔 대기시키지 않음 (구글·API만 화면 전환 시 이어서 검색)
+        pending[k] = k === "n" ? null : {text: text, np: !!np};
+      }
     });
     busy();
     keepAwake();
   }
   $("goBtn").addEventListener("click", function(){ var had = q.value.trim(); search(); if(had) hideKb(); });
+  // 메뉴 맨 위 "프롬프트 없이 검색": 설정된 프롬프트를 붙이지 않고 입력한 검색어만 검색
+  $("noPromptBtn").addEventListener("click", function(){
+    var had = q.value.trim();
+    if(!had){ document.body.classList.remove("drawer-open"); q.focus(); return; }
+    search(true); hideKb();
+  });
   // 엔터(Shift+Enter 제외)로 검색했을 때만 모바일 키보드를 내림
   function hideKb(){
     try{ q.blur(); }catch(e){}
@@ -661,6 +697,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       saveCfg(k);
       var f = $(sv.pane).querySelector(".frame"); if(f) applyCrop(f, sv.cfg);
     });
+    var nf = $(SV.n.pane).querySelector(".frame"); if(nf) applyCrop(nf, SV.g.cfg);
     if(Array.isArray(d.apis) && d.apis.length) AiaiApi.applyRemoteCfg(d.apis, d.updated);   // 관리자가 고른 API 목록·순서 (키는 포함되지 않음)
     setCropInputs(); resetEditor(); render();
   }
@@ -918,7 +955,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
 
   /* ---------- 보기 방식: 구글 전용 / API 전용 / 상하 분할 / 좌우 분할 ---------- */
-  var MODES = ["google", "api", "split", "side"];
+  var MODES = ["google", "api", "naver", "split", "side"];
   function setLayout(l){
     if(MODES.indexOf(l) < 0) l = "split";
     MODES.forEach(function(m){ document.body.classList.toggle("layout-" + m, m === l); });
@@ -931,7 +968,6 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   });
   var savedL = null; try{ savedL = localStorage.getItem(LKEY); }catch(e){}
   if(savedL === "tab") savedL = "google";          // 예전 저장값 호환
-  if(savedL === "naver") savedL = "api";
   setLayout(MODES.indexOf(savedL) >= 0 ? savedL : "split");
 
   /* 분할 순서 바꾸기 (구글 ↔ API) */
