@@ -124,7 +124,17 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 @media (max-width:720px){
   .seg{display:contents}
   .brk{display:block;flex:0 0 100%;height:0;margin:-8px 0 0}
-  .seg button,#swapBtn{padding:6px 12px}
+  .seg button,#swapBtn{padding:6px 10px}
+  /* 보낸 내용 = 1줄 오른쪽 / 경고 = 2줄 오른쪽 (버튼들을 한 줄에 같이 놓고 order 로 자리 지정) */
+  .tright{display:contents}
+  .seg button{order:1}
+  #sentBtn{order:2}
+  .brk{order:3}
+  .seg button[data-l="side"],.seg button[data-l="split"]{order:4}
+  #swapBtn{order:5}
+  #warnBtn{order:6}
+  /* 남는 자리에서만 늘어나고(내용 크기까지), 자리가 모자라면 말줄임 → 줄이 넘어가지 않음 */
+  #sentBtn,#warnBtn{flex:1 1 0;min-width:0;max-width:max-content;margin-left:auto;padding:6px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
 #panes{flex:1;min-height:0;position:relative;display:grid;grid-template-rows:1fr;grid-template-columns:1fr;gap:8px}
 .pane{display:flex;flex-direction:column;min-height:0;min-width:0}
