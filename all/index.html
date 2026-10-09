@@ -969,7 +969,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       (r.status === "run" ? " · 답변 생성 중…" : r.ms ? " · " + (r.ms / 1000).toFixed(1) + "초" : "") + '</span><span class="sp"></span>' +
       (r.text ? '<button type="button" id="apiCopy">복사</button>' : "") + "</div>";
     if(r.err) html += '<div class="apierr">' + esc(r.err) + "</div>";
-    html += '<div class="md">' + AiaiApi.renderMd(r.text) + "</div>";
+    html += '<div class="md">' + formatResultHtml(AiaiApi.renderMd(r.text)) + "</div>";
     if(r.sources.length){
       html += '<div class="srcs"><b>출처</b>' + r.sources.map(function(s){
         return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' + esc(s.title || hostOf(s.url)) + "</a>";
@@ -984,6 +984,14 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     };
   }
   function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+  // 검색 답변에서 표 셀 등에 문자 그대로 출력된 &lt;br&gt;를 실제 줄바꿈으로 표시.
+  // 코드 블록/인라인 코드는 예시 문자열일 수 있으므로 변환하지 않음.
+  function formatResultHtml(html){
+    return String(html).replace(/(<pre\b[^>]*>[\s\S]*?<\/pre>|<code\b[^>]*>[\s\S]*?<\/code>)|&lt;br\s*\/?\s*&gt;/gi, function(match, codeBlock){
+      return codeBlock || "<br>";
+    });
+  }
 
   var apiSent = null;   // 마지막으로 API 에 실제로 보낸 내용 (검색어 + 프롬프트)
   function runApi(text, rawQ, promptText){
