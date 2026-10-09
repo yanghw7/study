@@ -476,9 +476,14 @@
         arr = arr.filter(function(m){ return /^(gpt|o\d|chatgpt)/i.test(m.id) && !/(embed|tts|whisper|dall|image|moderation|audio|realtime|transcribe|search-preview|instruct|davinci|babbage)/i.test(m.id); });
         arr.sort(function(a, b){ return (b.created || 0) - (a.created || 0); });
       } else if(c.id === "openrouter"){
-        // 무료 모델(:free 이거나 가격 0)을 앞에 둠
-        var free = function(m){ return /:free$/.test(m.id) || (m.pricing && +m.pricing.prompt === 0 && +m.pricing.completion === 0); };
-        arr = arr.filter(free).concat(arr.filter(function(m){ return !free(m); }));
+        // 이름 끝이 ':free' 인 모델과, 이름엔 없지만 가격이 0 인 모델을 따로 나눔
+        var isFree = function(m){ return /:free$/i.test(m.id); };
+        var isZero = function(m){ return !isFree(m) && m.pricing && +m.pricing.prompt === 0 && +m.pricing.completion === 0; };
+        var gFree = arr.filter(isFree).map(function(m){ return m.id; });
+        var gZero = arr.filter(isZero).map(function(m){ return m.id; });
+        ids = gFree.concat(gZero);
+        ids.groups = [{label: "🆓 :free 모델", ids: gFree}, {label: "가격 0 (이름에 :free 없음)", ids: gZero}];
+        return ids;
       }
       ids = arr.map(function(m){ return m.id; });
     }
