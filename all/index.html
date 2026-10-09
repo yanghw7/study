@@ -144,6 +144,20 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .apimeta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:8px}
 .apimeta .sp{flex:1}
 .apimeta button{font-size:12px;padding:3px 10px;border:1px solid var(--border);color:var(--muted)}
+.tright{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tright button{padding:6px 12px;font-size:13px;color:var(--fg);background:var(--card);border:1px solid var(--border)}
+.tright button[hidden]{display:none}
+.tright button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#warnBtn{border-color:#f59e0b}
+.toppanel{flex:none;margin:0 0 8px;border:1px solid var(--border);border-radius:10px;background:var(--card);padding:8px 12px;font-size:13px;line-height:1.5;max-height:38vh;overflow-y:auto}
+.toppanel[hidden]{display:none}
+#warnBar{border-color:#f59e0b}
+.toppanel .ph2{display:flex;align-items:center;gap:8px;color:var(--muted);font-weight:600;margin-bottom:4px}
+.toppanel .ph2 .sp{flex:1}
+.toppanel .ph2 button{font-size:12px;padding:2px 10px;border:1px solid var(--border);color:var(--muted);background:var(--bg)}
+.toppanel .wi{margin:4px 0;word-break:break-word}
+.toppanel b{display:block;color:var(--muted);font-size:12px;margin:8px 0 3px}
+.toppanel pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13px;line-height:1.5;max-height:180px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;-webkit-user-select:text;user-select:text}
 .apierr{white-space:pre-wrap;color:var(--danger);font-size:14px;line-height:1.5;background:transparent;border:1px solid var(--danger);border-radius:10px;padding:10px 12px;margin:8px 0}
 .srcs{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-size:13px}
 .srcs b{display:block;color:var(--muted);margin-bottom:4px}
@@ -209,8 +223,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="editor">
-          <textarea id="ed" rows="3" maxlength="3500" placeholder="자주 쓰는 프롬프트를 입력하세요"></textarea>
-          <div class="note" id="edCount" style="text-align:right;margin:2px 0 0">0 / 3500자 (공백 포함)</div>
+          <textarea id="ed" rows="3" maxlength="5000" placeholder="자주 쓰는 프롬프트를 입력하세요"></textarea>
+          <div class="note" id="edCount" style="text-align:right;margin:2px 0 0">0 / 5000자 (공백 포함)</div>
           <div class="row">
             <button type="button" class="btn ghost" id="edCancel" hidden>취소</button>
             <button type="button" class="btn primary" id="edSave">추가</button>
@@ -286,7 +300,13 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
         <button type="button" data-l="split">상하 분할</button>
       </div>
       <button type="button" id="swapBtn" title="구글 AI와 API의 위치를 서로 바꿔요">⇅ 순서 바꾸기</button>
+      <span class="tright">
+        <button type="button" id="sentBtn" hidden>📤 보낸 내용</button>
+        <button type="button" id="warnBtn" hidden>⚠ 경고</button>
+      </span>
     </div>
+    <div id="sentPanel" class="toppanel" hidden></div>
+    <div id="warnBar" class="toppanel" hidden></div>
     <div id="panes">
       <div class="pane" id="paneG"><div class="phead">구글 AI</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
       <div class="pane" id="paneA"><div class="phead">API</div><div class="fill"><div class="ph">검색어를 입력하세요</div></div></div>
@@ -302,7 +322,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   var NATIVE = !!window.AiaiNative;
   var loaded = {g: false};
   var SITE_SETTINGS = /\.github\.io$/i.test(location.hostname) ? new URL("/study/save/settings.json", location.origin).href : "https://yanghw7.github.io/study/save/settings.json";
-  var MAX_PROMPT = 3500;
+  var MAX_PROMPT = 5000;
   var UIKEY = "uni_ui_v1", LKEY = "uni_layout_v1", ETAG_KEY = "uni_etag_v1";
   var mq = window.matchMedia("(max-width:720px)");
   // 구글/네이버 단독 앱과 같은 저장 키를 써서, 여기서 바꾼 프롬프트·자르기 설정이 각 앱에도 그대로 보입니다.
@@ -423,9 +443,73 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
     if(!a) return text;
     return text.replace(/\s+$/, "") + "\n\n\n" + a.text; // 검색어 → 빈 줄 2개 → 프롬프트
   }
+  /* ---------- 경고 바 (구글 쪽: 주소가 너무 길거나 검색어가 잘림) ---------- */
+  var warns = {}, warnOpen = false, lastWarnCount = 0;
+  function collectWarns(){
+    var out = [];
+    Object.keys(warns).forEach(function(k){ out.push(warns[k]); });
+    Object.keys(apiRes).forEach(function(id){
+      var r = apiRes[id];
+      (r.warns || []).forEach(function(w){ out.push("[" + AiaiApi.displayName(r.cfg) + "] " + w); });
+    });
+    return out;
+  }
+  // 경고는 보기 방식 버튼 줄 오른쪽 "⚠ 경고 N" 버튼으로 표시. 새 경고가 생기면 자동으로 펼쳐짐
+  function paintWarn(){
+    var list = collectWarns(), bar = $("warnBar"), btn = $("warnBtn");
+    btn.hidden = !list.length;
+    btn.textContent = "⚠ 경고 " + list.length;
+    if(list.length > lastWarnCount) warnOpen = true;
+    if(!list.length) warnOpen = false;
+    lastWarnCount = list.length;
+    btn.classList.toggle("on", warnOpen);
+    bar.hidden = !warnOpen;
+    bar.innerHTML = "";
+    if(!warnOpen) return;
+    var hd = div("ph2", null), t = document.createElement("span"), sp = document.createElement("span"), x = document.createElement("button");
+    t.textContent = "⚠ 경고"; sp.className = "sp"; x.type = "button"; x.textContent = "닫기";
+    x.onclick = function(){ warnOpen = false; paintWarn(); };
+    hd.appendChild(t); hd.appendChild(sp); hd.appendChild(x); bar.appendChild(hd);
+    list.forEach(function(m){ var d = div("wi", null); d.textContent = m; bar.appendChild(d); });
+  }
+  $("warnBtn").addEventListener("click", function(){ warnOpen = !warnOpen; paintWarn(); });
+  function showWarn(k, msg){ warns[k] = msg; paintWarn(); }
+  function clearWarn(prefix){ Object.keys(warns).forEach(function(k){ if(k.indexOf(prefix) === 0) delete warns[k]; }); paintWarn(); }
+
+  // 보낸 내용 확인: "📤 보낸 내용" 버튼을 누르면 펼쳐짐
+  var sentOpen = false;
+  function paintSent(){
+    var btn = $("sentBtn"), pn = $("sentPanel");
+    if(!apiSent){ btn.hidden = true; pn.hidden = true; return; }
+    var sq = apiSent.q.replace(/\s+$/, ""), sp = apiSent.p;
+    btn.hidden = false;
+    btn.textContent = "📤 보낸 내용 · " + apiSent.full.length.toLocaleString() + "자";
+    btn.classList.toggle("on", sentOpen);
+    pn.hidden = !sentOpen;
+    pn.innerHTML = "";
+    if(!sentOpen) return;
+    var hd = div("ph2", null), t = document.createElement("span"), spc = document.createElement("span"), x = document.createElement("button");
+    t.textContent = "📤 API로 보낸 내용 · 검색어 " + sq.length.toLocaleString() + "자" + (sp ? " + 프롬프트 " + sp.length.toLocaleString() + "자" : " (프롬프트 없음)") + " = 총 " + apiSent.full.length.toLocaleString() + "자";
+    spc.className = "sp"; x.type = "button"; x.textContent = "닫기";
+    x.onclick = function(){ sentOpen = false; paintSent(); };
+    hd.appendChild(t); hd.appendChild(spc); hd.appendChild(x); pn.appendChild(hd);
+    var b1 = document.createElement("b"); b1.textContent = "검색어"; pn.appendChild(b1);
+    var p1 = document.createElement("pre"); p1.textContent = sq; pn.appendChild(p1);
+    if(sp){
+      var b2 = document.createElement("b"); b2.textContent = "프롬프트 (검색어 뒤에 붙어서 함께 전송)"; pn.appendChild(b2);
+      var p2 = document.createElement("pre"); p2.textContent = sp; pn.appendChild(p2);
+    }
+  }
+  $("sentBtn").addEventListener("click", function(){ sentOpen = !sentOpen; paintSent(); });
+  // APK 앱이 구글 화면을 확인하고 문제를 알릴 때 부르는 함수
+  window.__aiaiWarn = function(key, msg){ showWarn(String(key), String(msg)); };
+
   function run(k, text){
-    if(k === "a"){ runApi(buildQuery(text, "g")); return; }
+    if(k === "a"){ var ap = active("g"); runApi(buildQuery(text, "g"), text, ap ? ap.text : ""); return; }
     var url = SV[k].url(buildQuery(text, k));
+    if(k === "g"){
+      clearWarn("g:");
+    }
     var fill = $(SV[k].pane).querySelector(".fill");
     fill.innerHTML = "";
     if(NATIVE){
@@ -798,21 +882,26 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   }
   function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
-  function runApi(text){
+  var apiSent = null;   // 마지막으로 API 에 실제로 보낸 내용 (검색어 + 프롬프트)
+  function runApi(text, rawQ, promptText){
+    apiSent = {full: text, q: rawQ == null ? text : rawQ, p: promptText || ""};
+    paintSent();
     if(apiCtrl) apiCtrl.abort();
     var ctrl = new AbortController(); apiCtrl = ctrl;
     var provs = apiOn();
     apiAsked = true; apiRes = {};
+    paintWarn();
     if(!provs.length){ paintApi(); return; }
     if(!provs.some(function(c){ return c.id === apiSel; })) apiSel = provs[0].id;
-    provs.forEach(function(c){ apiRes[c.id] = {cfg: c, text: "", sources: [], seen: {}, status: "run", err: "", t0: Date.now(), ms: 0}; });
+    provs.forEach(function(c){ apiRes[c.id] = {cfg: c, text: "", sources: [], seen: {}, warns: [], status: "run", err: "", t0: Date.now(), ms: 0}; });
     paintApi();
     provs.forEach(function(c){
       var r = apiRes[c.id];
       AiaiApi.run(c, text, {
         signal: ctrl.signal,
         onText: function(d){ if(apiCtrl === ctrl){ r.text += d; schedulePaint(); } },
-        onSource: function(s){ if(apiCtrl === ctrl && s && s.url && !r.seen[s.url]){ r.seen[s.url] = 1; r.sources.push(s); schedulePaint(); } }
+        onSource: function(s){ if(apiCtrl === ctrl && s && s.url && !r.seen[s.url]){ r.seen[s.url] = 1; r.sources.push(s); schedulePaint(); } },
+        onWarn: function(m){ if(apiCtrl === ctrl && r.warns.indexOf(m) < 0){ r.warns.push(m); paintWarn(); schedulePaint(); } }
       }).then(function(){
         if(apiCtrl !== ctrl) return;
         r.status = r.text ? "done" : "err";

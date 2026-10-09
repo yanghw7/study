@@ -188,6 +188,10 @@
   // raw: 서비스가 보낸 원문, status: HTTP 상태(없으면 0), fmt: 형식
   function explain(raw, status, fmt){
     var t = String(raw || "").toLowerCase();
+    // 보낸 글(검색어+프롬프트)이 이 모델이 받을 수 있는 길이를 넘은 경우
+    if(status === 413 || /context_length_exceeded|maximum context length|context length|context window|prompt is too long|too many tokens|input is too long|input too long|request too large|payload too large|reduce the length|exceeds the maximum|token count.*exceeds|input token count/.test(t)){
+      return "✂ 보낸 글(검색어+프롬프트)이 너무 길어서 이 모델이 받지 못했어요. 검색어나 프롬프트를 줄이거나, 더 많은 글을 받을 수 있는 모델로 바꿔 보세요. (무료 모델은 분당 토큰 한도 때문에 짧은 글만 받는 경우도 있어요)";
+    }
     var billing = /insufficient_quota|credit_balance|no credits|credits remaining|credit balance is too low|insufficient credits|insufficient funds|payment required|add credits|purchase credits|out of credits|billing_not_active|billing hard limit|plans and billing|requires a paid|upgrade to a paid/.test(t) || status === 402;
     var limit = /resource_exhausted|rate.?limit|too many requests|per.?minute|per.?day|requests per|tokens per|free.?tier|quota/.test(t) || status === 429;
     // Gemini 는 무료 한도를 넘어도 "quota … billing" 문장을 보내므로 결제 부족이 아니라 한도 초과로 안내
@@ -277,7 +281,9 @@
   }
 
   /* ---------- 형식별 호출 ---------- */
-  // 공통 규약: h.onText(조각) / h.onSource({url,title}) / h.signal
+  // 공통 규약: h.onText(조각) / h.onSource({url,title}) / h.onWarn(문장, 선택) / h.signal
+  function warn(h, m){ try{ if(h && h.onWarn) h.onWarn(m); }catch(e){} }
+  var CUT_MSG = "✂ 답변이 길이 제한에 걸려 중간에서 끊겼어요. 질문(검색어·프롬프트)을 짧게 하거나 나눠서 물어보세요.";
 
   // ChatGPT 공식: Responses API
   async function openaiResponses(c, key, text, h){
@@ -293,7 +299,11 @@
       var j = parse(data); if(!j) return;
       if(j.type === "response.output_text.delta" && j.delta) h.onText(j.delta);
       else if(j.type === "response.output_text.annotation.added" && j.annotation && j.annotation.url) h.onSource({url: j.annotation.url, title: j.annotation.title});
-      else if(j.type === "response.failed" || j.type === "response.incomplete") throw new Error(errText(j, "응답 실패", "openai"));
+      else if(j.type === "response.incomplete"){
+        var why = j.response && j.response.incomplete_details && j.response.incomplete_details.reason;
+        warn(h, why === "content_filter" ? "🚫 안전 필터 때문에 답변이 중간에서 멈췄어요." : CUT_MSG);
+      }
+      else if(j.type === "response.failed") throw new Error(errText(j, "응답 실패", "openai"));
       else if(j.type === "error") throw new Error(errText(j, "오류 이벤트", "openai"));
     });
   }
@@ -312,6 +322,9 @@
       if(j.error) throw new Error(errText(j, "오류", fmt || "compat"));
       var d = j.choices && j.choices[0] && j.choices[0].delta;
       if(d && typeof d.content === "string" && d.content) h.onText(d.content);
+      var fr = j.choices && j.choices[0] && j.choices[0].finish_reason;
+      if(fr === "length") warn(h, CUT_MSG);
+      else if(fr === "content_filter") warn(h, "🚫 안전 필터 때문에 답변이 중간에서 멈췄어요.");
       if(Array.isArray(j.citations)) j.citations.forEach(function(u){ if(typeof u === "string") h.onSource({url: u}); });
     });
   }
@@ -320,7 +333,7 @@
     // ChatGPT 공식: Responses 먼저, HTTP 오류로 실패하면(결제·한도 제외) Chat Completions 로 한 번 더
     openai: async function(c, key, text, h){
       var got = false;
-      var h1 = {signal: h.signal, onSource: h.onSource, onText: function(d){ got = true; h.onText(d); }};
+      var h1 = {signal: h.signal, onSource: h.onSource, onWarn: h.onWarn, onText: function(d){ got = true; h.onText(d); }};
       try{
         await openaiResponses(c, key, text, h1);
       }catch(e){
@@ -352,6 +365,8 @@
         if(j.promptFeedback && j.promptFeedback.blockReason) throw new Error("🚫 요청이 안전 필터에 막혔어요 (" + j.promptFeedback.blockReason + "). 질문 표현을 바꿔 보세요.");
         var cand = j.candidates && j.candidates[0]; if(!cand) return;
         if(cand.content && cand.content.parts) cand.content.parts.forEach(function(p){ if(p.text && !p.thought) h.onText(p.text); });
+        if(cand.finishReason === "MAX_TOKENS") warn(h, CUT_MSG);
+        else if(/SAFETY|RECITATION|PROHIBITED|BLOCKLIST|SPII/.test(cand.finishReason || "")) warn(h, "🚫 안전 필터 때문에 답변이 중간에서 멈췄어요 (" + cand.finishReason + ").");
         var gm = cand.groundingMetadata;
         if(gm && gm.groundingChunks) gm.groundingChunks.forEach(function(g){ if(g.web && g.web.uri) h.onSource({url: g.web.uri, title: g.web.title}); });
       });
@@ -377,6 +392,8 @@
           else if(j.delta.type === "citations_delta" && j.delta.citation && j.delta.citation.url) h.onSource({url: j.delta.citation.url, title: j.delta.citation.title});
         } else if(j.type === "content_block_start" && j.content_block && j.content_block.type === "web_search_tool_result" && Array.isArray(j.content_block.content)){
           j.content_block.content.forEach(function(r){ if(r && r.url) h.onSource({url: r.url, title: r.title}); });
+        } else if(j.type === "message_delta" && j.delta && j.delta.stop_reason){
+          if(j.delta.stop_reason === "max_tokens" || j.delta.stop_reason === "model_context_window_exceeded") warn(h, CUT_MSG);
         } else if(j.type === "error"){
           throw new Error(errText(j, "오류", "claude"));
         }
@@ -410,7 +427,8 @@
     var h2 = {
       signal: ctrl.signal,
       onText: function(d){ arm(); h.onText(d); },
-      onSource: function(s){ arm(); h.onSource(s); }
+      onSource: function(s){ arm(); h.onSource(s); },
+      onWarn: function(m){ arm(); if(h.onWarn) h.onWarn(m); }
     };
     arm();
     try{
