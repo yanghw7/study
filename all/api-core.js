@@ -200,6 +200,11 @@
     // 직접 추가 칸(Grok 등)은 GitHub 쪽이 비어 있고 이 기기엔 설정이 있으면 이 기기 값을 지킴 (빈 값으로 덮어써서 설정이 사라지는 것 방지)
     var keepArr = (Array.isArray(arr) ? arr : []).map(function(rc){
       var p = rc && provider(rc.id);
+      // GitHub 쪽 카드에 번호(seq)가 없으면(예전 저장값) 이 기기에 있던 번호를 그대로 지킴 → 인덱스에서 순서를 바꿔도 이름 번호는 안 바뀜
+      if(rc && !(+rc.seq > 0)){
+        var ls = cur.filter(function(x){ return x.id === rc.id; })[0];
+        if(ls && ls.seq > 0){ rc = JSON.parse(JSON.stringify(rc)); rc.seq = ls.seq; }
+      }
       if(!p || !p.custom) return rc;
       var lc = cur.filter(function(x){ return x.id === rc.id; })[0];
       var remoteBlank = !(rc.name || rc.baseUrl || rc.model || rc.on);
