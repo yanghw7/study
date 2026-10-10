@@ -316,7 +316,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       </button>
       <div class="acc-body"><div class="acc-inner"><div class="acc-pad">
         <div class="apisum" id="apiSum"></div>
-        <div class="note">사용할 API와 키는 관리자 페이지에서 정해요. 키는 이 기기에만 저장되고 GitHub에는 올라가지 않아요.</div>
+        <div class="note">사용할 API와 키는 관리자 페이지에서 정해요. 키도 관리자에서 저장하면 GitHub 설정에 함께 올라가서, 다른 기기에서는 <b>갱신</b>을 누르면 받아와요.</div>
       </div></div></div>
     </div>
 
@@ -358,7 +358,7 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   </main>
 </div>
 
-<script src="api-core.js?v=1.16.6"></script>
+<script src="api-core.js"></script>
 <script>
 (function(){
   // APK(안드로이드 앱) 안에서는 구글 화면을 iframe 대신 앱의 진짜 웹뷰로 띄웁니다. (iframe 차단 오류 방지)
@@ -758,7 +758,8 @@ ul.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
       var f = $(sv.pane).querySelector(".frame"); if(f) applyCrop(f, sv.cfg);
     });
     var nf = $(SV.n.pane).querySelector(".frame"); if(nf) applyCrop(nf, SV.g.cfg);
-    if(Array.isArray(d.apis) && d.apis.length) AiaiApi.applyRemoteCfg(d.apis, d.updated);   // 관리자가 고른 API 목록·순서 (키는 포함되지 않음)
+    if(Array.isArray(d.apis) && d.apis.length) AiaiApi.applyRemoteCfg(d.apis, d.updated);   // 관리자가 고른 API 목록·순서
+    if(typeof d.kv === "string" && d.kv) AiaiApi.applyRemoteKeys(d.kv, d.updated);   // 관리자에서 저장한 API 키(변환 저장)
     setCropInputs(); resetEditor(); render();
   }
   async function fetchSettings(){
