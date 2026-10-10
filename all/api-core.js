@@ -12,7 +12,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.16.0";
+  var VERSION = "1.16.1";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -37,6 +37,10 @@
     {id: "cloudflare", group: "free", label: "Cloudflare Workers AI", vendor: "Cloudflare", format: "compat", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", account: true,
      keyHint: "API 토큰", keyUrl: "https://dash.cloudflare.com/profile/api-tokens",
      note: "하루 무료 할당량이 있어요. 계정 ID와 Workers AI 권한이 있는 API 토큰이 필요하고, 브라우저 직접 호출이 막혀 있으면 연결 테스트에서 실패할 수 있어요."},
+    // ---- 유료: 전용 카드 ----
+    {id: "grok", group: "paid", label: "Grok", vendor: "xAI", format: "compat", base: "https://api.x.ai/v1", model: "grok-4",
+     keyHint: "xai-…", keyUrl: "https://console.x.ai",
+     note: "xAI Grok 공식 API(OpenAI 호환)예요. 유료라 console.x.ai 에서 크레딧 충전이 필요해요. 모델 이름은 [사용 가능한 모델 불러오기]로 고르세요."},
     // ---- 유료·기타: 직접 추가 ----
     {id: "custom1", group: "paid", custom: true, label: "직접 추가 1", vendor: "ChatGPT · Claude · DeepSeek · Grok 등", model: "", keyHint: "", note: ""},
     {id: "custom2", group: "paid", custom: true, label: "직접 추가 2", vendor: "", model: "", keyHint: "", note: ""},
