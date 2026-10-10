@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791636162782,
+  "updated": 1791636285196,
   "prompts": [
     {
       "id": "mv0x39byjcnrk",
@@ -51,10 +51,10 @@
       "maxTok": 0
     },
     {
-      "id": "gemini",
-      "seq": 1,
-      "on": true,
-      "model": "gemini-3.8-flash",
+      "id": "gemini~sj6f6z2",
+      "seq": 2,
+      "on": false,
+      "model": "gemini-3.5-flash",
       "web": false,
       "baseUrl": "",
       "name": "",
@@ -63,10 +63,10 @@
       "maxTok": 0
     },
     {
-      "id": "gemini~sj6f6z2",
-      "seq": 2,
-      "on": true,
-      "model": "gemini-3.5-flash",
+      "id": "gemini",
+      "seq": 1,
+      "on": false,
+      "model": "gemini-3.8-flash",
       "web": false,
       "baseUrl": "",
       "name": "",
