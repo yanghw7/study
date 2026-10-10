@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": 1791551706978,
+  "updated": 1791615535748,
   "prompts": [
     {
       "id": "mv0x39byjcnrk",
@@ -17,7 +17,7 @@
     {
       "id": "groq",
       "on": true,
-      "model": "openai/gpt-oss-120b",
+      "model": "qwen/qwen3.8-27b",
       "web": false,
       "baseUrl": "",
       "name": "",
@@ -25,9 +25,9 @@
       "account": ""
     },
     {
-      "id": "gemini",
-      "on": false,
-      "model": "gemini-3.8-flash",
+      "id": "groq~ldw1nxl",
+      "on": true,
+      "model": "qwen/qwen3.8-27b",
       "web": false,
       "baseUrl": "",
       "name": "",
@@ -37,7 +37,17 @@
     {
       "id": "openrouter",
       "on": false,
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "model": "poolside/laguna-xs-2.1:free",
+      "web": false,
+      "baseUrl": "",
+      "name": "",
+      "format": "compat",
+      "account": ""
+    },
+    {
+      "id": "gemini",
+      "on": false,
+      "model": "gemini-3.5-flash",
       "web": false,
       "baseUrl": "",
       "name": "",
@@ -84,5 +94,6 @@
       "format": "compat",
       "account": ""
     }
-  ]
+  ],
+  "kv": "1.HW1Df8GgmrS+VDgGCd6+5pUsO15/kK6y+SIGQj6E363kAA8SYqvz7+ffVyN0e4rWxoFVNkh54ITy2CgZSS6+nMCnBHAdP9OfoIPwIz9BOsu41udXPw0q17PUjlQuA0fe98S+SGNdOtvQ8IjgHF1WKY2Z1qpBYhg2z6GZ80wvUT7i/5SseXRMZHfW95D2TCcdIoyxtK4TfiJt0+6J5B41S23Futf0FzF8Q0e05eDVRl5hfImfrKkNUiB6tM3eljEgUEnlkOu0VWglWBSGnvWtUElAWbybqbsfAFUn2LbFvTUlAXmprsryDBB3BnWL/PCPe0dXT9mMq+MxNhYNoIHx5W0FLh7zl9WwtBMFe0yKwd7FNTMuMpLwiPA3bFlIrIvAzGEYHyHD78Odp0UAB2rb0dHsHwINV7uO7oYQeAUrl6Cg2yM9UkSguZvg9wZ0Hw7syOD0cCRpU56IyvU1NGdG04a7nFgbax6R9vOW/gdkXm6U59q4AHgVSr3a9OE5FVBHm6fr81JDbwMEx6vkkzU1XWeV77/ZJQlKF43XrLkMc0tzoor58QZkdG15vNvj6RgtZW7UuPf+S3McYZmmztZiHzAY5I3o4Qs8JwVQrcT/7jEBIVTi+pzCTltvaLu7/vVuGVpc0L/Yv2N8HF0mpLrR0zwRWno="
 }
