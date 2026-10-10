@@ -5,6 +5,7 @@
  *    "변환(난독화)된 문자열"로 함께 올라가 모든 기기에서 [갱신]으로 받아 씁니다.
  *    (암호화가 아니라 GitHub 비밀 탐지를 피하기 위한 변환입니다. 저장소가 공개면 누구나 풀 수 있어요)
  *  - 카드 복사: id 가 "원본id~접미사" 인 복사본 카드. 같은 이름이 여럿이면 "Grok 1", "Grok 2" 처럼 번호가 붙음
+ *    번호(seq)는 카드마다 고정: 원본 = 1, 첫 복사본 = 2, 다음 복사본 = 3 … 순서를 바꿔도 번호는 그대로라 "Grok 2, Grok 1, Grok 3" 처럼 보임
  *  - 새 서비스 추가: PROVIDERS 에 한 줄 추가 (OpenAI 호환이면 format:"compat" + base 만 적으면 끝)
  *  - 형식(format): compat = OpenAI 호환 chat/completions, openai = ChatGPT 공식(Responses),
  *                  claude = Anthropic 공식, gemini = Google 공식
@@ -12,7 +13,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.17.0";
+  var VERSION = "1.18.0";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -103,10 +104,11 @@
     });
     PROVIDERS.forEach(function(p){ if(!by.hasOwnProperty(p.id)) order.push(p.id); });
     function str(v){ return typeof v === "string" ? v.trim() : ""; }
-    return order.map(function(id){
+    var out = order.map(function(id){
       var p = provider(id), c = by[id] || {};
       return {
         id: p.id,
+        seq: (+c.seq > 0) ? Math.floor(+c.seq) : 0,
         on: c.on === true,
         model: str(c.model) || p.model,
         web: c.web === true,
@@ -117,6 +119,31 @@
         maxTok: (+c.maxTok > 0) ? Math.min(Math.floor(+c.maxTok), 1000000) : 0
       };
     });
+    return fillSeq(out);
+  }
+  // 같은 이름 카드마다 고정 번호(seq)를 보장: 번호가 없거나 겹치면 원본 → 복사본(목록 순서) 차례로 빈 번호를 채움
+  function fillSeq(list){
+    var groups = {};
+    list.forEach(function(c){
+      var k = plainName(c).toLowerCase();
+      (groups[k] = groups[k] || []).push(c);
+    });
+    Object.keys(groups).forEach(function(k){
+      var g = groups[k], used = {}, todo = [];
+      g.forEach(function(c){
+        if(c.seq > 0 && !used[c.seq]) used[c.seq] = 1; else { c.seq = 0; todo.push(c); }
+      });
+      todo.sort(function(a, b){ return (a.id.indexOf("~") < 0 ? 0 : 1) - (b.id.indexOf("~") < 0 ? 0 : 1); });
+      var n = 1;
+      todo.forEach(function(c){ while(used[n]) n++; c.seq = n; used[n] = 1; });
+    });
+    return list;
+  }
+  // 같은 이름 카드 중 다음 번호
+  function nextSeq(c, list){
+    var low = plainName(c).toLowerCase(), mx = 0;
+    (list || []).forEach(function(x){ if(x && plainName(x).toLowerCase() === low && +x.seq > mx) mx = +x.seq; });
+    return mx + 1;
   }
   function getCfg(){
     var raw = null;
@@ -292,13 +319,16 @@
     if(p && p.custom) return c.name || p.label;
     return p ? p.label : c.id;
   }
-  // 같은 이름의 카드가 둘 이상이면 목록 순서대로 "이름 1", "이름 2" …
+  // 같은 이름의 카드가 둘 이상이면 카드에 고정된 번호로 "이름 1", "이름 2" … (목록 순서를 바꿔도 번호는 그대로)
   function nameIn(c, list){
     var base = plainName(c), low = base.toLowerCase(), same = [];
-    (list || []).forEach(function(x){ if(x && plainName(x).toLowerCase() === low) same.push(x.id); });
+    (list || []).forEach(function(x){ if(x && plainName(x).toLowerCase() === low) same.push(x); });
     if(same.length < 2) return base;
-    var ix = same.indexOf(c.id);
-    return ix < 0 ? base : base + " " + (ix + 1);
+    var ix = -1;
+    same.forEach(function(x, i){ if(x.id === c.id) ix = i; });
+    if(ix < 0) return base;
+    var seq = +same[ix].seq;
+    return base + " " + (seq > 0 ? seq : ix + 1);
   }
   function displayName(c){ return nameIn(c, getCfg()); }
   // 이 설정으로 호출할 준비가 안 된 부분이 있으면 한국어 문장으로 알려줌 (없으면 "")
@@ -681,7 +711,7 @@
 
   root.AiaiApi = {
     VERSION: VERSION, PROVIDERS: PROVIDERS, PRESETS: PRESETS, FORMATS: FORMATS,
-    provider: provider, displayName: displayName, plainName: plainName, nameIn: nameIn, baseIdOf: baseIdOf, newCloneId: newCloneId,
+    provider: provider, nextSeq: nextSeq, displayName: displayName, plainName: plainName, nameIn: nameIn, baseIdOf: baseIdOf, newCloneId: newCloneId,
     ownKey: ownKey, exportKeys: exportKeys, applyRemoteKeys: applyRemoteKeys, formatOf: formatOf, baseOf: baseOf, webLabelOf: webLabelOf, missing: missing,
     normCfg: normCfg, getCfg: getCfg, setCfg: setCfg,
     move: move, setOrder: setOrder, stampOrder: stampOrder, orderTime: orderTime, applyRemoteCfg: applyRemoteCfg,

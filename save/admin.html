@@ -121,7 +121,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     통합 검색의 <b>API 칸</b>에서 쓸 AI를 고르세요. 무료 서비스 위주로 준비했고, ChatGPT·Claude 같은 유료 API는 아래 <b>직접 추가</b> 칸에서 설정해요. 여러 개를 고르면 검색할 때 모두에게 동시에 물어보고 탭으로 나눠 보여줘요. 각 칸의 <b>▲▼</b>로 표시 순서를 바꾸고 [API 선택 저장]을 누르면 탭·목록 순서에 반영돼요.<br>
     <b>사용 여부·모델 이름</b>은 [저장]을 누르면 GitHub 설정에 올라가 모든 기기에 반영되지만(각 페이지에서 [갱신]),
     <b>API 키도 [키 저장]·[API 선택 저장]을 누르면 GitHub 설정에 함께 올라가요.</b> (비밀 탐지에 걸리지 않게 변환해서 저장해요. 암호화가 아니라서 저장소가 공개라면 누구나 풀 수 있어요.) 다른 기기에서는 [갱신]·[GitHub에서 다시 불러오기]를 누르면 키까지 받아와요.<br>
-    각 카드의 <b>복사</b>를 누르면 같은 양식의 카드가 하나 더 생겨요. 같은 이름의 카드는 통합 검색에서 <b>Grok 1</b>, <b>Grok 2</b>처럼 따로 검색돼요. 복사본은 <b>삭제</b>로 지울 수 있고, 기본(원본) 카드는 지울 수 없어요. 복사본은 키를 따로 넣지 않으면 원본 카드의 키를 같이 써요.
+    각 카드의 <b>복사</b>를 누르면 같은 양식의 카드가 하나 더 생겨요. 같은 이름의 카드는 통합 검색에서 <b>Grok 1</b>, <b>Grok 2</b>처럼 따로 검색돼요. 번호는 카드에 고정돼요(원본 1 · 첫 복사본 2 · 다음 3). 위/아래로 순서를 바꾸면 <b>Grok 2, Grok 1, Grok 3</b>처럼 번호는 그대로 두고 자리만 바뀌어 보여요. 복사본은 <b>삭제</b>로 지울 수 있고, 기본(원본) 카드는 지울 수 없어요. 복사본은 키를 따로 넣지 않으면 원본 카드의 키를 같이 써요.
   </div>
   <div id="apiList"></div>
   <div class="row"><button id="apiSave" type="button">API 선택 저장</button></div>
@@ -483,7 +483,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
       var p = AiaiApi.provider(c.id);
       var el = document.createElement('div');
       el.className = 'apibox' + (c.on ? ' on' : '');
-      el.dataset.id = c.id;
+      el.dataset.id = c.id; el.dataset.seq = c.seq || 0;
       var title = (p.group === 'free' ? '🆓 ' : '💳 ') + p.label + (p.clone ? ' · 복사본' : '');
       var h = '<div class="hd"><label class="chk"><input type="checkbox" class="f-on"' + (c.on ? ' checked' : '') + '> ' +
         escHtml(title) + '</label><span class="vend">' + escHtml(p.vendor || '') + '</span>' +
@@ -681,6 +681,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
     if(ix < 0) return;
     var cl = JSON.parse(JSON.stringify(list[ix]));
     cl.id = AiaiApi.newCloneId(list[ix].id);
+    cl.seq = AiaiApi.nextSeq(cl, list);   // 복사본 번호 = 같은 이름 중 가장 큰 번호 + 1 (원본 1, 복사 2, 3 …)
     list.splice(ix + 1, 0, cl);
     flushTypedKeys();
     AiaiApi.setCfg(list);                 // 이 기기에 먼저 반영 (다른 기기에는 [API 선택 저장]을 눌러야 반영)
@@ -715,7 +716,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.25)
   function apiRead(el, id){
     var q = function(c){ return el.querySelector(c); };
     return {
-      id: id, on: q('.f-on').checked, model: q('.f-model').value.trim(),
+      id: id, seq: +el.dataset.seq || 0, on: q('.f-on').checked, model: q('.f-model').value.trim(),
       web: q('.f-web') ? q('.f-web').checked : false,
       baseUrl: q('.f-base') ? q('.f-base').value.trim() : '',
       name: q('.f-name') ? q('.f-name').value.trim() : '',
