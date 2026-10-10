@@ -12,7 +12,7 @@
 (function(root){
   "use strict";
 
-  var VERSION = "1.16.0";
+  var VERSION = "1.17.0";
   var CFG_KEY = "uni_api_cfg_v1";   // [{id,on,model,web,baseUrl,name,format,account}]  (비밀 아님)
   var KEY_KEY = "uni_api_keys_v1";  // {gemini:"…", groq:"…", …}                        (비밀 · 이 기기에만)
 
@@ -28,7 +28,7 @@
     {id: "gemini", group: "free", label: "Gemini", vendor: "Google AI Studio", format: "gemini", model: "gemini-3.8-flash",
      keyHint: "AIza…", keyUrl: "https://aistudio.google.com/apikey",
      note: "무료 한도 안에서 사용 가능 (모델·계정별 제한). 공부용 질의응답·긴 글 요약에 좋아요."},
-    {id: "groq", group: "free", label: "Groq", vendor: "Groq", format: "compat", base: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile",
+    {id: "groq", group: "free", label: "Groq", vendor: "Groq", format: "compat", base: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", maxOut: 8192,
      keyHint: "gsk_…", keyUrl: "https://console.groq.com/keys",
      note: "응답이 매우 빨라요. 무료 요청 횟수·토큰 한도가 있어요."},
     {id: "openrouter", group: "free", label: "OpenRouter", vendor: "OpenRouter", format: "compat", base: "https://openrouter.ai/api/v1", model: "meta-llama/llama-3.3-70b-instruct:free",
@@ -85,6 +85,12 @@
     if(p.account) return c.account ? "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(c.account) + "/ai/v1" : "";
     return p.base || "";
   }
+  // 답변 최대 길이(토큰): 카드에 적은 값 > 서비스 기본(maxOut) > 0(= 서비스 기본값에 맡김)
+  function maxTokOf(c){
+    if(+c.maxTok > 0) return Math.floor(+c.maxTok);
+    var p = provider(c.id);
+    return (p && p.maxOut) || 0;
+  }
   function webLabelOf(c){ return WEB_FORMATS[formatOf(c)] || ""; }
 
   /* ---------- 설정 / 키 저장 ---------- */
@@ -107,7 +113,8 @@
         baseUrl: str(c.baseUrl),
         name: str(c.name),
         format: (c.format === "openai" || c.format === "claude") ? c.format : "compat",
-        account: str(c.account)
+        account: str(c.account),
+        maxTok: (+c.maxTok > 0) ? Math.min(Math.floor(+c.maxTok), 1000000) : 0
       };
     });
   }
@@ -408,6 +415,7 @@
   // ChatGPT 공식: Responses API
   async function openaiResponses(c, key, text, h){
     var body = {model: c.model, input: text, stream: true};
+    if(maxTokOf(c)) body.max_output_tokens = maxTokOf(c);
     if(c.web) body.tools = [{type: "web_search"}];
     var resp = await fetch("https://api.openai.com/v1/responses", {
       method: "POST", signal: h.signal,
@@ -428,12 +436,13 @@
     });
   }
 
+  function withMax(body, c){ var m = maxTokOf(c); if(m) body.max_tokens = m; return body; }
   // OpenAI 호환 chat/completions (Groq · OpenRouter · Cloudflare · DeepSeek · Grok 등, 그리고 ChatGPT 대체 경로)
   async function compatChat(c, key, text, h, base, fmt){
     var resp = await fetch(base + "/chat/completions", {
       method: "POST", signal: h.signal,
       headers: {"Content-Type": "application/json", "Authorization": "Bearer " + key},
-      body: JSON.stringify({model: c.model, stream: true, messages: [{role: "user", content: text}]})
+      body: JSON.stringify(withMax({model: c.model, stream: true, messages: [{role: "user", content: text}]}, c))
     });
     if(!resp.ok) await failFrom(resp, fmt || "compat");
     await readSSE(resp, function(ev, data){
@@ -471,6 +480,7 @@
     // Gemini 공식 (스트리밍)
     gemini: async function(c, key, text, h){
       var body = {contents: [{role: "user", parts: [{text: text}]}]};
+      if(maxTokOf(c)) body.generationConfig = {maxOutputTokens: maxTokOf(c)};
       if(c.web) body.tools = [{google_search: {}}];
       var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(c.model) + ":streamGenerateContent?alt=sse";
       var resp = await fetch(url, {
@@ -494,7 +504,7 @@
 
     // Claude 공식 (브라우저 직접 호출 허용 헤더 필요)
     claude: async function(c, key, text, h){
-      var body = {model: c.model, max_tokens: 8192, stream: true, messages: [{role: "user", content: text}]};
+      var body = {model: c.model, max_tokens: maxTokOf(c) || 8192, stream: true, messages: [{role: "user", content: text}]};
       if(c.web) body.tools = [{type: "web_search_20250305", name: "web_search", max_uses: 5}];
       var resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST", signal: h.signal,
